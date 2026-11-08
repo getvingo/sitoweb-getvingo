@@ -2098,3 +2098,89 @@ class TestAccessi(Base):
         self.assertIn("Email già registrata", r.get_data(as_text=True))
         with self.app.app_context():
             self.assertIsNone(Organizzazione.query.filter_by(nome="Doppia").first())
+
+
+class TestUtenzaMaster(Base):
+    """Il gestore entra in qualsiasi concessionaria come amministratore ("Supporto Getvingo"), vede e
+    modifica tutto, e torna al Pannello. Nessun altro può usare quell'accesso."""
+    def setUp(self):
+        super().setUp()
+        self.app.config.update(POSTA_ATTIVA=False, GESTORI="admin@t.it", BASE_URL="https://getvingo.com")
+        with self.app.app_context():
+            org2 = servizi.crea_organizzazione("Altra Auto S.r.l.", "admin@altra.it", "password2")
+            db.session.add_all([Sede(nome="Sede Altra", tipo="propria"), Tag(codice="ZZZZ9999")])
+            db.session.add(Veicolo(vin="ZFA31200000123456", marca="Fiat", modello="Panda", condizione="nuovo",
+                                   sede=Sede.query.filter_by(nome="Sede Altra").first(), stato="in_sede"))
+            db.session.commit()
+            self.org2 = org2.id
+            self.v2 = Veicolo.query.filter_by(vin="ZFA31200000123456").one().id
+
+    def test_entra_vede_modifica_e_torna(self):
+        self.abbina()
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 404)  # da gestore, nella sua: non la vede
+        r = self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.assertEqual(r.status_code, 302)
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Sei dentro <b>Altra Auto S.r.l.</b> come Supporto Getvingo", home)
+        stock = self.c.get("/stock").get_data(as_text=True)
+        self.assertIn("Panda", stock)
+        self.assertNotIn("Golf", stock)  # i dati della concessionaria del gestore restano fuori
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 200)
+        # modifica: aggiunge un utente al cliente (resta del cliente)
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo Altra",
+                                                          "email": "nuovo@altra.it", "ruolo": "ufficio"})
+        with self.app.app_context():
+            u = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(email="nuovo@altra.it").one()
+            self.assertEqual(u.org_id, self.org2)
+            sup = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(supporto=True).one()
+            self.assertEqual((sup.org_id, sup.ruolo, sup.nome), (self.org2, "admin", "Supporto Getvingo"))
+        # il cliente vede il supporto nel suo elenco, ma non può aprirlo
+        gruppo = self.c.get("/admin/aziende/concessionaria").get_data(as_text=True)
+        self.assertIn("Accesso del gestore della piattaforma", gruppo)
+        self.assertEqual(self.c.get(f"/admin/utenti/{sup.id}").status_code, 302)
+        # torna al Pannello con il proprio account
+        self.assertEqual(self.c.post("/piattaforma/torna").headers["Location"], "/piattaforma/")
+        self.assertIn("Golf", self.c.get("/stock").get_data(as_text=True))
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 404)
+
+    def test_solo_il_gestore_puo_entrare(self):
+        self.entra("ufficio")
+        self.assertEqual(self.c.post(f"/piattaforma/{self.org2}/entra").status_code, 404)
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 404)
+
+    def test_il_supporto_non_entra_con_password_ne_link(self):
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.c.post("/piattaforma/torna")
+        with self.app.app_context():
+            sup = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(supporto=True).one()
+            sup.imposta_password("conosciuta1")
+            db.session.commit()
+            email = sup.email
+        altro = self.app.test_client()
+        altro.post("/login", data={"email": email, "password": "conosciuta1"})
+        self.assertEqual(altro.get("/").status_code, 302)
+        self.app.config["POSTA_ATTIVA"] = True
+        self.app.extensions.setdefault("posta_inviata", []).clear()
+        altro.post("/password-dimenticata", data={"email": email})
+        self.assertEqual(self.app.extensions["posta_inviata"], [])
+
+    def test_se_non_e_piu_gestore_esce_subito(self):
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.app.config["GESTORI"] = ""
+        self.assertEqual(self.c.get("/").status_code, 302)
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 302)
+
+    def test_entra_anche_in_un_cliente_sospeso(self):
+        self.c.post(f"/piattaforma/{self.org2}/stato")  # sospesa
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        testo = self.c.get("/").get_data(as_text=True)
+        self.assertIn("accesso sospeso", testo)
+        cliente = self.app.test_client()
+        cliente.post("/login", data={"email": "admin@altra.it", "password": "password2"})
+        self.assertEqual(cliente.get("/").status_code, 302)  # il cliente resta fuori
+
+    def test_supporto_non_conta_tra_gli_utenti_del_cliente(self):
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.c.post("/piattaforma/torna")
+        pannello = self.c.get("/piattaforma/").get_data(as_text=True)
+        self.assertNotIn("supporto-", pannello)

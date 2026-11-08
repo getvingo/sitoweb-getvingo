@@ -78,6 +78,9 @@ class Utente(PerOrganizzazione, db.Model):
     # accessi: invito mandato ma password non ancora scelta; ultimo ingresso nel portale
     invito_in_attesa = db.Column(db.Boolean, default=False)
     ultimo_accesso_at = db.Column(db.DateTime)
+    # "Supporto Getvingo": utente con cui il gestore della piattaforma entra in questa concessionaria
+    # (dal Pannello Getvingo). Non entra mai con una password.
+    supporto = db.Column(db.Boolean, default=False)
 
     sede = db.relationship("Sede", backref="utenti")
     vettore = db.relationship("Vettore")

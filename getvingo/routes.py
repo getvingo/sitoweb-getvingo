@@ -97,7 +97,7 @@ def _contesto_modulo(escludi_sede_id=None):
     sedi = (Sede.query.filter(Sede.attiva.is_(True), Sede.id != (escludi_sede_id or 0))
             .order_by(Sede.tipo != "propria", Sede.tipo, Sede.nome).all())
     if g.utente.interno:
-        nomi = [u.nome for u in Utente.query.filter_by(attivo=True).order_by(Utente.nome) if u.interno]
+        nomi = [u.nome for u in Utente.query.filter_by(attivo=True, supporto=False).order_by(Utente.nome) if u.interno]
     else:
         nomi = [u.nome for u in Utente.query.filter_by(attivo=True, sede_id=g.utente.sede_id)]
     return {

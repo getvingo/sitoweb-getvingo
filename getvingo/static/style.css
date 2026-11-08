@@ -1684,7 +1684,7 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 /* Pannello Getvingo: una scheda per concessionaria cliente */
 .lista-clienti { display: grid; gap: 12px; }
 @media (min-width: 1024px) { .lista-clienti { grid-template-columns: 1fr 1fr; } }
-.cliente { margin: 0; }
+.lista-clienti > .scheda.cliente { margin: 0; }
 .cliente.sospeso { opacity: .75; border-style: dashed; }
 .cliente-testa { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .cliente-testa h3 { margin: 0 0 2px; }
@@ -1699,3 +1699,13 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 .cliente-numeri dd.piccolo { font-size: .9rem; }
 .cliente-admin-riga { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--bordo); }
 .cliente-stato { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bordo); text-align: right; }
+
+/* Utenza master: barra quando il gestore lavora dentro una concessionaria cliente */
+.barra-gestore { display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 12px; flex-wrap: wrap; padding: 8px 16px; background: var(--arancio); color: #1C1533; font-size: .9rem; }
+.barra-gestore span { display: block; line-height: 1.4; }
+.barra-gestore span .icona { vertical-align: -3px; margin-right: 4px; }
+.barra-gestore .btn { background: #fff; border-color: #fff; color: #1C1533; }
+.cliente-entra { margin: 12px 0 0; }
+.voce-supporto { border-style: dashed; }
+.voce-supporto .avatar { background: var(--arancio-tenue); color: var(--arancio-testo); }

@@ -50,7 +50,7 @@ def leggi_link(token):
     except SignatureExpired:
         return None, "Il link è scaduto." if scopo == "invito" else "Il link è scaduto: valeva un'ora."
     u = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(id=dati.get("u")).first()
-    if u is None or not u.attivo or not u.organizzazione.attiva:
+    if u is None or not u.attivo or u.supporto or not u.organizzazione.attiva:
         return None, "L'account non è attivo: contatta l'amministratore della tua azienda."
     if dati.get("h") != _impronta(u):
         return None, "Il link è già stato usato."

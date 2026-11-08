@@ -5,12 +5,12 @@ Chi è gestore: le email in GETVINGO_GESTORI (variabile su Render), che devono a
 """
 from functools import wraps
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from sqlalchemy import func
 
 from . import accessi, servizi
 from .auth import gestore, login_richiesto
-from .models import Azienda, Ddt, Organizzazione, Utente, Veicolo, db
+from .models import Azienda, Ddt, Organizzazione, Utente, Veicolo, adesso, db
 
 bp = Blueprint("piattaforma", __name__, url_prefix="/piattaforma")
 
@@ -35,13 +35,14 @@ def _conta(modello, *filtri):
 @solo_gestore
 def indice():
     org = Organizzazione.query.order_by(Organizzazione.nome).all()
-    utenti = _conta(Utente, Utente.attivo.is_(True))
+    utenti = _conta(Utente, Utente.attivo.is_(True), Utente.supporto.is_(False))
     auto = _conta(Veicolo, Veicolo.stato != "consegnato")
     ddt = _conta(Ddt)
-    ultimo = dict(db.session.query(Utente.org_id, func.max(Utente.ultimo_accesso_at)).group_by(Utente.org_id)
+    ultimo = dict(db.session.query(Utente.org_id, func.max(Utente.ultimo_accesso_at))
+                  .filter(Utente.supporto.is_(False)).group_by(Utente.org_id)
                   .execution_options(tutte_le_organizzazioni=True).all())
     admin = {}
-    for u in Utente.query.filter_by(ruolo="admin").order_by(Utente.id) \
+    for u in Utente.query.filter_by(ruolo="admin", supporto=False).order_by(Utente.id) \
             .execution_options(tutte_le_organizzazioni=True):
         admin.setdefault(u.org_id, []).append(u)
     return render_template("piattaforma/indice.html", organizzazioni=org, utenti=utenti, auto=auto, ddt=ddt,
@@ -104,7 +105,7 @@ def cambia_stato(org_id):
 def rimanda_invito(org_id, utente_id):
     """Rimanda il link all'amministratore di un cliente (invito se non è mai entrato, altrimenti nuova password)."""
     _organizzazione(org_id)
-    u = Utente.query.filter_by(id=utente_id, org_id=org_id, ruolo="admin") \
+    u = Utente.query.filter_by(id=utente_id, org_id=org_id, ruolo="admin", supporto=False) \
         .execution_options(tutte_le_organizzazioni=True).first_or_404()
     if u.invito_in_attesa:
         link, inviata, errore = accessi.invia_invito(u, invitato_da="Getvingo")
@@ -121,3 +122,52 @@ def rimanda_invito(org_id, utente_id):
                 errore = str(e)
     return render_template("admin/invito.html", u=u, scopo=scopo, link=link, inviata=inviata, errore=errore,
                            torna=url_for("piattaforma.indice"), durata_ore=accessi.DURATA[scopo] // 3600)
+
+
+# ---------------------------------------------------------------- utenza master: entrare in un cliente
+
+def _utente_supporto(org):
+    """L'utente "Supporto Getvingo" della concessionaria (amministratore), creato al primo ingresso.
+    Ha una password casuale che nessuno conosce: si usa solo entrando dal Pannello."""
+    u = Utente.query.filter_by(org_id=org.id, supporto=True) \
+        .execution_options(tutte_le_organizzazioni=True).first()
+    if u is None:
+        u = Utente(org_id=org.id, nome="Supporto Getvingo", email=f"supporto-{org.id}@getvingo.com",
+                   ruolo="admin", supporto=True)
+        u.imposta_password(accessi.password_provvisoria())
+        db.session.add(u)
+    u.attivo, u.ruolo, u.invito_in_attesa = True, "admin", False
+    return u
+
+
+@bp.route("/<int:org_id>/entra", methods=["POST"])
+@solo_gestore
+def entra(org_id):
+    """Il gestore entra nella concessionaria come suo amministratore ("Supporto Getvingo"):
+    vede e modifica tutto, e ogni azione resta firmata Supporto Getvingo."""
+    org = _organizzazione(org_id)
+    if org.id == g.utente.org_id:
+        return redirect(url_for("main.home"))
+    gestore_id, gestore_ph = g.utente.id, g.utente.password_hash[-16:]
+    supporto = _utente_supporto(org)
+    supporto.ultimo_accesso_at = adesso()
+    db.session.commit()
+    current_app.logger.warning("Gestore %s entra in %s (n. %s) come Supporto Getvingo",
+                               g.utente.email, org.nome, org.id)
+    session.clear()
+    session.permanent = True
+    session.update(uid=supporto.id, gestore_uid=gestore_id, gestore_ph=gestore_ph)
+    flash(f"Sei dentro {org.nome} come Supporto Getvingo: vedi e modifichi tutto.", "ok")
+    return redirect(url_for("main.home"))
+
+
+@bp.route("/torna", methods=["POST"])
+def torna():
+    """Dalla concessionaria cliente si torna al Pannello, con il proprio account di gestore."""
+    orig = g.get("gestore_originale")
+    if orig is None:
+        return redirect(url_for("main.home"))
+    session.clear()
+    session.permanent = True
+    session.update(uid=orig.id, ph=orig.password_hash[-16:])
+    return redirect(url_for("piattaforma.indice"))

@@ -87,6 +87,13 @@
 </header>
 {% endif %}
 
+{% if gestore_dentro() %}
+<form method="post" action="{{ url_for('piattaforma.torna') }}" class="barra-gestore">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <span>{{ i('chiave', 's') }} Sei dentro <b>{{ g.utente.organizzazione.nome }}</b> come Supporto Getvingo{% if not g.utente.organizzazione.attiva %} · <b>accesso sospeso</b>{% endif %}</span>
+  <button class="btn piccolo">{{ i('indietro', 's') }} Torna al Pannello Getvingo</button>
+</form>
+{% endif %}
 {% block corpo %}
 <main>
   <div class="{% block larghezza %}colonna{% endblock %}">

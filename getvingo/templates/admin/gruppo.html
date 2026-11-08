@@ -6,12 +6,20 @@
 <h2>{{ i('utente') }} Utenti del gruppo</h2>
 <div class="lista">
 {% for u in utenti %}
+  {% if u.supporto %}
+  <div class="voce voce-supporto">
+    <span class="avatar">{{ i('chiave', 's') }}</span>
+    <div class="corpo"><h3>Supporto Getvingo</h3><div class="tratta">Accesso del gestore della piattaforma per assistenza · Amministratore</div>
+      <div class="tenue piccolo">{% if u.ultimo_accesso_at %}Ultimo accesso {{ u.ultimo_accesso_at|da_quanto }}{% else %}Mai entrato{% endif %} · le sue modifiche sono firmate Supporto Getvingo</div></div>
+  </div>
+  {% else %}
   <a class="voce" href="{{ url_for('admin.utente', utente_id=u.id) }}" style="{{ 'opacity:.5' if not u.attivo }}">
     <span class="avatar">{{ u.nome|iniziali }}</span>
     <div class="corpo"><h3>{{ u.nome }}</h3><div class="tratta">{{ u.email }} · {{ u.RUOLI[u.ruolo] }}{{ ' · disattivato' if not u.attivo }}</div>
       <div class="tenue piccolo">{% if u.invito_in_attesa %}<span class="stato-accesso attesa">Invito in attesa</span>{% elif u.ultimo_accesso_at %}Ultimo accesso {{ u.ultimo_accesso_at|da_quanto }}{% else %}Mai entrato{% endif %}</div></div>
     <span class="tenue piccolo">{{ i('matita', 's') }} Modifica</span>
   </a>
+  {% endif %}
 {% else %}
   <div class="vuoto">Nessun utente in questo gruppo.</div>
 {% endfor %}

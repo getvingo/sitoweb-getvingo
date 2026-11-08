@@ -56,9 +56,22 @@ def init_app(app):
         uid = session.get("uid")
         g.org_id = None  # l'utente si cerca tra tutte le organizzazioni
         g.utente = Utente.query.filter_by(id=uid, attivo=True).first() if uid else None
-        if g.utente is not None and not g.utente.organizzazione.attiva:
+        g.gestore_originale = None
+        if session.get("gestore_uid"):
+            # il gestore è entrato in una concessionaria come "Supporto Getvingo": vale finché resta gestore
+            orig = Utente.query.filter_by(id=session["gestore_uid"], attivo=True).first()
+            if orig is None or not gestore(orig) or session.get("gestore_ph") != orig.password_hash[-16:] \
+                    or g.utente is None or not g.utente.supporto:
+                session.clear()
+                g.utente = None
+            else:
+                g.gestore_originale = orig
+        elif g.utente is not None and g.utente.supporto:  # il supporto si usa solo dal Pannello Getvingo
+            session.clear()
             g.utente = None
-        if g.utente is not None:
+        if g.utente is not None and not g.utente.organizzazione.attiva and g.gestore_originale is None:
+            g.utente = None
+        if g.utente is not None and g.gestore_originale is None:
             ph = session.get("ph")
             if ph is None:  # sessioni aperte prima di questa versione: si adottano senza scollegarle
                 session["ph"] = g.utente.password_hash[-16:]
@@ -87,6 +100,8 @@ def init_app(app):
     # funzione globale (non variabile di contesto): così è visibile anche dentro le macro importate
     app.jinja_env.globals["csrf_token"] = csrf_token
     app.jinja_env.globals["gestore"] = lambda: gestore(g.get("utente"))
+    # il gestore sta operando dentro una concessionaria (barra "Torna al Pannello Getvingo")
+    app.jinja_env.globals["gestore_dentro"] = lambda: g.get("gestore_originale")
 
     @app.after_request
     def intestazioni_sicurezza(risposta):
@@ -129,7 +144,7 @@ def login():
         if _bloccato(*chiavi):
             flash("Troppi tentativi sbagliati: riprova tra 15 minuti.", "errore")
             return render_template("login.html"), 429
-        u = Utente.query.filter_by(email=email, attivo=True).first()
+        u = Utente.query.filter_by(email=email, attivo=True, supporto=False).first()
         if u and u.verifica_password(request.form["password"]) and not u.organizzazione.attiva:
             flash("L'accesso della tua azienda a Getvingo è sospeso: contatta Getvingo.", "errore")
             return render_template("login.html")
@@ -148,6 +163,9 @@ def login():
 @bp.route("/password", methods=["GET", "POST"])
 @login_richiesto
 def cambia_password():
+    if g.utente.supporto:
+        flash("Stai operando come Supporto Getvingo: la tua password si cambia dopo essere tornato al Pannello.", "errore")
+        return redirect(url_for("main.home"))
     if request.method == "POST":
         nuova = request.form.get("nuova", "")
         if not g.utente.verifica_password(request.form.get("attuale", "")):
@@ -179,7 +197,7 @@ def password_dimenticata():
             flash("Troppe richieste: riprova tra 15 minuti.", "errore")
             return render_template("password_dimenticata.html", attiva=attiva), 429
         _fallito(*chiavi)  # ogni richiesta conta: massimo 8 email ogni 15 minuti
-        u = Utente.query.filter_by(email=email, attivo=True).first()
+        u = Utente.query.filter_by(email=email, attivo=True, supporto=False).first()
         if u and u.organizzazione.attiva:
             try:
                 accessi.invia_recupero(u)

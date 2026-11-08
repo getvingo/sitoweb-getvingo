@@ -228,7 +228,7 @@ def _esito_link(u, scopo):
 def aziende():
     fornitori = [s for s in Sede.query.order_by(Sede.nome) if s.esterna]
     return render_template("admin/aziende.html", azienda=Azienda.query.first(), fornitori=fornitori,
-                           interni=[u for u in Utente.query.all() if u.interno])
+                           interni=[u for u in Utente.query.all() if u.interno and not u.supporto])
 
 
 @bp.route("/aziende/concessionaria", methods=["GET", "POST"])
@@ -250,7 +250,7 @@ def gruppo_concessionaria():
             db.session.commit()
             flash("Dati e firma della concessionaria salvati: valgono per tutti i suoi utenti.", "ok")
         return redirect(url_for("admin.gruppo_concessionaria"))
-    utenti = sorted((u for u in Utente.query.all() if u.interno), key=lambda u: u.nome)
+    utenti = sorted((u for u in Utente.query.all() if u.interno), key=lambda u: (u.supporto, u.nome))
     return render_template("admin/gruppo.html", tipo="concessionaria", nome=a.ragione_sociale or "Concessionaria",
                            dati=a, utenti=utenti, ruoli=RUOLI_INTERNI)
 
@@ -283,6 +283,9 @@ def gruppo_fornitore(sede_id):
 @ruolo_richiesto("admin")
 def utente(utente_id):
     u = db.get_or_404(Utente, utente_id)
+    if u.supporto:  # l'accesso del gestore Getvingo non si modifica né si usa dalla concessionaria
+        flash("“Supporto Getvingo” è l'accesso del gestore della piattaforma: non si modifica da qui.", "errore")
+        return redirect(url_for("admin.gruppo_concessionaria"))
     torna = url_for("admin.gruppo_fornitore", sede_id=u.sede_id) if u.ruolo == "fornitore" and u.sede_id \
         else url_for("admin.gruppo_concessionaria")
     if request.method == "POST" and request.form.get("azione") == "link":

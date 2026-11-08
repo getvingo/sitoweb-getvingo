@@ -107,7 +107,8 @@ def aggiungi_colonne():
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
             aggiunte.append("utente." + nome)
-    for nome, tipo in (("invito_in_attesa", "BOOLEAN DEFAULT FALSE"), ("ultimo_accesso_at", "TIMESTAMP")):
+    for nome, tipo in (("invito_in_attesa", "BOOLEAN DEFAULT FALSE"), ("ultimo_accesso_at", "TIMESTAMP"),
+                       ("supporto", "BOOLEAN DEFAULT FALSE")):
         if nome not in colonne_utente:  # inviti e ultimo accesso
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
