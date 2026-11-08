@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 
 from flask import g, has_app_context
@@ -9,8 +10,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 db = SQLAlchemy()
 
 
+ROMA = ZoneInfo("Europe/Rome")
+
+
 def adesso():
-    return datetime.now().replace(microsecond=0)
+    """Ora italiana (fuso di Roma, con l'ora legale), qualunque sia il fuso del server: su Render è UTC."""
+    return datetime.now(ROMA).replace(microsecond=0, tzinfo=None)
 
 
 # ---------------------------------------------------------------- più clienti sullo stesso portale
@@ -121,6 +126,8 @@ class Utente(PerOrganizzazione, db.Model):
     # "Supporto Getvingo": utente con cui il gestore della piattaforma entra in questa concessionaria
     # (dal Pannello Getvingo). Non entra mai con una password.
     supporto = db.Column(db.Boolean, default=False)
+    # eliminato dall'admin ma presente nello storico (DDT, movimenti): non entra e non compare negli elenchi
+    eliminato = db.Column(db.Boolean, default=False)
 
     sede = db.relationship("Sede", backref="utenti")
     vettore = db.relationship("Vettore")
@@ -148,11 +155,13 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
         "propria": "Sede o piazzale della concessionaria",
         "carrozzeria": "Carrozzeria",
         "officina": "Officina",
+        "allestitore": "Allestitore (veicoli commerciali)",
         "esposizione": "Esposizione (fiera, showroom esterno)",
+        "rivenditore": "Concessionario / rivenditore",
         "cliente": "Cliente",
         "altro": "Altro fornitore",
     }
-    FORNITORI = ("carrozzeria", "officina", "altro")  # luoghi dove le auto vanno in lavorazione
+    FORNITORI = ("carrozzeria", "officina", "allestitore", "altro")  # luoghi dove le auto vanno in lavorazione
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
@@ -165,6 +174,8 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     codice_fiscale = db.Column(db.String(16), default="")
     # la sede legale della concessionaria, creata e aggiornata dai Dati aziendali
     sede_legale = db.Column(db.Boolean, default=False)
+    # fornitore eliminato dall'admin ma presente nello storico: nascosto da elenchi e scelte
+    eliminata = db.Column(db.Boolean, default=False)
     tipo = db.Column(db.String(20), nullable=False, default="propria")
     attiva = db.Column(db.Boolean, default=True)
     # Coordinate usate per aggiornare la posizione dell'auto all'arrivo
@@ -181,7 +192,7 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     @property
     def societa(self):
         """Luogo di un'altra azienda (fornitore, esposizione): servono P. IVA e codice fiscale."""
-        return self.tipo in self.FORNITORI + ("esposizione",)
+        return self.tipo in self.FORNITORI + ("esposizione", "rivenditore")
 
     @property
     def dove(self):
@@ -244,8 +255,13 @@ class Veicolo(PerOrganizzazione, db.Model):
     # auto pronta: dove e quando verrà consegnata al cliente (l'ultimo DDT la porta lì)
     consegna_sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     consegna_prevista_at = db.Column(db.DateTime)
+    # note interne della concessionaria: mai sul DDT né ai fornitori (es. cliente e venditore)
+    cliente_nome = db.Column(db.String(200), default="")
+    venditore_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
+    note_interne = db.Column(db.Text, default="")
 
     sede = db.relationship("Sede", foreign_keys="Veicolo.sede_id")
+    venditore = db.relationship("Utente", foreign_keys=[venditore_id])
     consegna_sede = db.relationship("Sede", foreign_keys=[consegna_sede_id])
 
     @property
@@ -358,9 +374,11 @@ class Movimento(PerOrganizzazione, db.Model):
         "Conto esposizione",     # verso una fiera o uno showroom esterno
         "Reso esposizione",      # dall'esposizione indietro alla concessionaria
         "Consegna a cliente",
-        "Conto visione",
-        "Reso",
+        "Conto visione",         # verso un altro concessionario/rivenditore, l'auto può tornare
+        "Reso",                  # dal concessionario/rivenditore indietro
+        "Vendita",               # ceduta a un concessionario/rivenditore: all'arrivo esce dallo stock
     ]
+    CAUSALI_RIVENDITORE = ("Conto visione", "Vendita")
     # causali dei DDT emessi prima dell'08/11/2026: restano valide sui documenti già fatti
     CAUSALI_STORICHE = ["Trasferimento tra sedi", "Conto lavorazione", "Conto riparazione", "Rientro da lavorazione"]
     LAVORAZIONI = [
@@ -372,13 +390,14 @@ class Movimento(PerOrganizzazione, db.Model):
         "Montaggio accessori",
         "Pellicole / oscuramento vetri",
         "Revisione",
+        "Allestimento (veicoli commerciali)",
         "Altro",
     ]
     NESSUNA = LAVORAZIONI[0]
     # giorni di lavorazione stimati per tipo (si possono cambiare auto per auto: lavorazione_stima_giorni)
     GIORNI_STIMATI = {"Carrozzeria": 5, "Meccanica / tagliando": 2, "Preparazione alla consegna": 2,
                       "Lavaggio / detailing": 1, "Montaggio accessori": 2, "Pellicole / oscuramento vetri": 2,
-                      "Revisione": 1, "Altro": 3}
+                      "Revisione": 1, "Allestimento (veicoli commerciali)": 10, "Altro": 3}
     # come viaggia l'auto (scritto nel DDT)
     MEZZI = ["Su strada (guidata)", "Bisarca", "Carro attrezzi", "Furgone / carrello", "Altro"]
     # predisposto: creato dall'ufficio, in attesa di presa in carico

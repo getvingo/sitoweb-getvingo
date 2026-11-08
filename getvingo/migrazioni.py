@@ -79,6 +79,12 @@ def aggiungi_colonne():
             conn.exec_driver_sql("ALTER TABLE danno_foto ADD COLUMN risoluzione BOOLEAN NOT NULL DEFAULT FALSE")
         aggiunte.append("danno_foto.risoluzione")
     colonne_veicolo = [c["name"] for c in ispettore.get_columns("veicolo")]
+    for nome, tipo in (("cliente_nome", "VARCHAR(200) DEFAULT ''"), ("venditore_id", "INTEGER REFERENCES utente(id)"),
+                       ("note_interne", "TEXT DEFAULT ''")):
+        if nome not in colonne_veicolo:  # note interne (cliente, venditore): mai sul DDT
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE veicolo ADD COLUMN {nome} {tipo}")
+            aggiunte.append("veicolo." + nome)
     for nome, tipo in (("consegna_sede_id", "INTEGER REFERENCES sede(id)"), ("consegna_prevista_at", "TIMESTAMP")):
         if nome not in colonne_veicolo:  # sede e orario di consegna dell'auto pronta
             with db.engine.begin() as conn:
@@ -115,7 +121,7 @@ def aggiungi_colonne():
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
             aggiunte.append("utente." + nome)
     for nome, tipo in (("invito_in_attesa", "BOOLEAN DEFAULT FALSE"), ("ultimo_accesso_at", "TIMESTAMP"),
-                       ("supporto", "BOOLEAN DEFAULT FALSE")):
+                       ("supporto", "BOOLEAN DEFAULT FALSE"), ("eliminato", "BOOLEAN DEFAULT FALSE")):
         if nome not in colonne_utente:  # inviti e ultimo accesso
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
@@ -128,7 +134,8 @@ def aggiungi_colonne():
     INDIRIZZO = [("codice_fiscale", "VARCHAR(16) DEFAULT ''"), ("cap", "VARCHAR(10) DEFAULT ''"),
                  ("comune", "VARCHAR(120) DEFAULT ''"), ("provincia", "VARCHAR(4) DEFAULT ''"),
                  ("stato", "VARCHAR(60) DEFAULT 'Italia'"), ("lat", "FLOAT"), ("lon", "FLOAT")]
-    for tabella, extra in (("azienda", []), ("vettore", []), ("sede", [("sede_legale", "BOOLEAN DEFAULT FALSE")])):
+    for tabella, extra in (("azienda", []), ("vettore", []),
+                           ("sede", [("sede_legale", "BOOLEAN DEFAULT FALSE"), ("eliminata", "BOOLEAN DEFAULT FALSE")])):
         presenti = [c["name"] for c in ispettore.get_columns(tabella)]
         for nome, tipo in INDIRIZZO + extra:
             if nome not in presenti:

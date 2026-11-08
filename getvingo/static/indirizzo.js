@@ -50,6 +50,16 @@
       if (chiave === ultima) return;
       ultima = chiave;
       stato('Cerco l’indirizzo…');
+      if (GetvingoMappa.google) {
+        return cercaGoogle(via + ', ' + comune + ', ' + (c('stato').value || 'Italia')).then(function (ris) {
+          var r = ris[0];
+          if (!r || !r.via) { verificato(null); return stato('Via non trovata a ' + comune + ': controlla come è scritta, oppure tocca il punto sulla mappa.', 'errore'); }
+          c('comune').value = r.comune || comune; c('cap').value = r.cap || c('cap').value;
+          c('provincia').value = r.provincia || c('provincia').value; c('stato').value = r.stato || c('stato').value;
+          verificato(r.lat, r.lon);
+          stato(/\d/.test(via) && !/\d/.test(r.via) ? 'Via trovata; il civico non è sulla mappa: controlla il punto.' : 'Indirizzo trovato ✓', 'ok');
+        }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
+      }
       var q = new URLSearchParams({ format: 'jsonv2', addressdetails: 1, limit: 1, 'accept-language': 'it',
                                     street: via, city: comune, country: c('stato').value || 'Italia' });
       fetch(NOMINATIM + 'search?' + q).then(function (r) { return r.json(); }).then(function (ris) {
@@ -66,6 +76,12 @@
       }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
     }
     function daPunto(la, lo) {
+      if (c('indirizzo').value.trim() && c('comune').value.trim()) {
+        // indirizzo già scritto: si corregge solo il punto sulla mappa, via e civico restano quelli
+        verificato(la, lo);
+        c('indirizzo').classList.remove('campo-errore');
+        return stato('Punto aggiornato ✓ · via e civico restano quelli scritti', 'ok');
+      }
       stato('Leggo l’indirizzo del punto…');
       fetch(NOMINATIM + 'reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=it&lat=' + la + '&lon=' + lo)
         .then(function (r) { return r.json(); }).then(function (d) {
@@ -79,11 +95,75 @@
         }).catch(function () { stato('Lettura non riuscita: riprova.', 'errore'); });
     }
 
+    // ---- "Cerca un luogo": nome di un'azienda o indirizzo; scelto un risultato si compila tutto
+    var cercaIn = box.querySelector('[data-cerca]'), lista = box.querySelector('[data-risultati]');
+    var campoNome = form && (form.querySelector('[name=nome]') || form.querySelector('[name=nuova_destinazione]') ||
+                             form.querySelector('[name=ragione_sociale]'));
+    function riempi(r) {
+      lista.hidden = true; lista.innerHTML = '';
+      c('indirizzo').value = r.via; c('comune').value = r.comune || c('comune').value;
+      c('cap').value = r.cap || ''; c('provincia').value = r.provincia || ''; c('stato').value = r.stato || 'Italia';
+      if (campoNome && !campoNome.value.trim() && r.nome) campoNome.value = r.nome;
+      ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
+      verificato(r.lat, r.lon);
+      stato(r.via ? 'Luogo trovato ✓ · controlla i dati' + (/\d/.test(r.via) ? '' : ' e aggiungi il civico') : 'Luogo trovato: scrivi via e civico', r.via ? 'ok' : 'errore');
+    }
+    function componenti(comp) {
+      var t = {}, breve = {};
+      (comp || []).forEach(function (x) { (x.types || []).forEach(function (ty) { t[ty] = x.longText; breve[ty] = x.shortText; }); });
+      return { via: [t.route, t.street_number].filter(Boolean).join(' '), cap: t.postal_code,
+               comune: t.administrative_area_level_3 || t.locality, provincia: breve.administrative_area_level_2, stato: t.country };
+    }
+    function cercaGoogle(q) {
+      return fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GetvingoMappa.chiave,
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.addressComponents,places.location' },
+        body: JSON.stringify({ textQuery: q, languageCode: 'it', regionCode: 'IT', maxResultCount: 6 })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        return (d.places || []).map(function (p) {
+          var a = componenti(p.addressComponents);
+          a.nome = p.displayName && p.displayName.text; a.testo = p.formattedAddress;
+          a.lat = p.location.latitude; a.lon = p.location.longitude; return a;
+        });
+      });
+    }
+    function cercaOsm(q) {
+      var u = NOMINATIM + 'search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: 1, limit: 6,
+                                                          'accept-language': 'it', q: q });
+      return fetch(u).then(function (r) { return r.json(); }).then(function (ris) {
+        return ris.map(function (r) {
+          var a = r.address || {};
+          return { nome: r.name, testo: r.display_name, via: [a.road, a.house_number].filter(Boolean).join(' '),
+                   cap: a.postcode, comune: comuneDi(a), provincia: provincia(a), stato: a.country, lat: r.lat, lon: r.lon };
+        });
+      });
+    }
+    function cercaLuogo() {
+      var q = cercaIn.value.trim();
+      if (q.length < 3) return;
+      lista.hidden = false; lista.innerHTML = '<li class="tenue">Cerco…</li>';
+      (GetvingoMappa.google ? cercaGoogle(q) : cercaOsm(q)).then(function (ris) {
+        lista.innerHTML = '';
+        if (!ris.length) { lista.innerHTML = '<li class="tenue">Nessun luogo trovato: prova con nome e comune.</li>'; return; }
+        ris.forEach(function (r) {
+          var li = document.createElement('li'), b = document.createElement('button');
+          b.type = 'button'; b.className = 'risultato-luogo';
+          var t = document.createElement('b'); t.textContent = r.nome || r.via; b.appendChild(t);
+          var s2 = document.createElement('span'); s2.textContent = r.testo; b.appendChild(s2);
+          b.addEventListener('click', function () { riempi(r); });
+          li.appendChild(b); lista.appendChild(li);
+        });
+      }).catch(function () { lista.innerHTML = '<li class="tenue">Ricerca non riuscita: riprova.</li>'; });
+    }
+    if (cercaIn) {
+      box.querySelector('[data-cerca-vai]').addEventListener('click', cercaLuogo);
+      cercaIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); cercaLuogo(); } });
+    }
+
     leaflet.then(function () {
       var div = box.querySelector('[data-mappa]');
       mappa = L.map(div, { zoomControl: true, scrollWheelZoom: false }).setView([45.67, 12.24], 9);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-                  { maxZoom: 19, attribution: 'Tiles © Esri' }).addTo(mappa);
+      GetvingoMappa.sfondo(mappa);
       mappa.on('click', function (e) { daPunto(e.latlng.lat, e.latlng.lng); });
       if (lat.value && lon.value) { verificato(lat.value, lon.value); stato('Indirizzo sulla mappa ✓', 'ok'); }
       else if (c('indirizzo').value && c('comune').value) cerca();

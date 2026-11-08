@@ -87,6 +87,7 @@
 {% block script %}
 {% if piazzali %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='mappe.js') }}"></script>
 <script>
   (function () {
     if (!document.getElementById('mappa-piazzale')) return;  // nessun piazzale con la posizione
@@ -94,13 +95,8 @@
     var ZOOM_AUTO = 16;  // da qui in su si vedono le singole auto
     var mappa = L.map('mappa-piazzale', { zoomControl: true });
     bloccaMappa(mappa);
-    // tessere Esri: i server OpenStreetMap bloccano le richieste del portale (errore 418)
-    var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
-    // detectRetina: sugli schermi ad alta risoluzione (telefoni, Mac) si caricano tessere più dettagliate
-    // con detectRetina Leaflet chiede un livello in più: oltre il 19 Esri non ha immagini ("Map data not yet available")
-    var nitida = { maxZoom: 20, maxNativeZoom: L.Browser.retina ? 18 : 19, detectRetina: true, attribution: 'Tiles © Esri' };
-    // solo satellite, a ogni distanza: niente mappa stradale né scelta dello sfondo
-    L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', nitida).addTo(mappa);
+    // sfondo realistico: satellite con strade e nomi (Google se c'è la chiave, altrimenti Esri)
+    GetvingoMappa.sfondo(mappa);
     function colore(fase) {
       var el = document.createElement('i'); el.className = fase; document.body.appendChild(el);
       var c = getComputedStyle(el).getPropertyValue('--fase').trim() || '#1F6FB2'; el.remove(); return c;

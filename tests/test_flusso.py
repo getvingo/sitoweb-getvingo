@@ -197,14 +197,26 @@ class TestPartenzaEArrivo(Base):
             self.assertEqual(m.firma_destinatario, FIRMA)
             self.assertFalse(m.arrivo_per_conto)
 
-    def test_admin_conferma_per_conto(self):
+    def test_arrivo_solo_nel_raggio_anche_per_admin(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         d = self.ddt()
-        self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.2", "lon": "12.2"})  # admin in ufficio, lontano
+        r = self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.2", "lon": "12.2"})  # admin in ufficio, lontano
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "aperto")
+        self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.1", "lon": "12.1"})  # sul posto
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "chiuso")
+
+    def test_il_fornitore_destinatario_conferma_da_ovunque(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        self.entra("carr")
+        self.c.post(f"/ddt/{d}/arrivo")  # senza posizione
         with self.app.app_context():
             m = self.mov(d)
-            self.assertTrue(m.arrivo_per_conto)
+            self.assertEqual(m.stato, "chiuso")
             self.assertEqual(m.veicolo.lat, 45.1)  # l'auto prende le coordinate della destinazione
 
     def test_arrivo_solo_nella_destinazione_del_ddt(self):
@@ -830,18 +842,15 @@ class TestRipristino(Base):
             self.assertEqual(self.mov(d).stato, "aperto")
         self.assertEqual(self.c.get("/registro").status_code, 404)  # niente pagina separata
 
-    def test_ripristino_cancellazione_ddt(self):
+    def test_ddt_eliminato_non_si_ripristina(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         d = self.ddt()
-        self.c.post(f"/ddt/{d}/annulla", data={"motivo": "sbaglio"})
+        self.c.post(f"/ddt/{d}/annulla")
         with self.app.app_context():
-            aid = Azione.query.filter_by(tipo="annullamento").one().id
-        self.c.post(f"/azione/{aid}/ripristina")
-        with self.app.app_context():
-            documento = db.session.get(Ddt, d)
-            self.assertIsNone(documento.annullato_at)
-            self.assertEqual(documento.movimento.veicolo.stato, "in_viaggio")
+            self.assertIsNone(db.session.get(Ddt, d))
+            self.assertEqual(Azione.query.filter_by(tipo="annullamento").count(), 0)
+
 
 
 class TestPiazzaleMappa(Base):
@@ -977,8 +986,9 @@ class TestDdtGestione(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         d = self.ddt()
+        self.entra("ufficio")
         self.c.post(f"/ddt/{d}/modifica", data={"conducente": ""})
-        dati = self.dati("Sede A", causale="Trasferimento tra sedi", lavorazione="Lavaggio / detailing",
+        dati = self.dati("Sede A", causale="Spostamento", lavorazione="Lavaggio / detailing",
                          conducente="Luca Bianchi")
         self.c.post(f"/ddt/{d}/modifica", data=dati)
         self.c.post(f"/ddt/{d}/modifica", data=dati)  # nessun cambiamento: nessuna revisione
@@ -987,35 +997,36 @@ class TestDdtGestione(Base):
             self.assertEqual(documento.revisione, 1)
             campi = {c["campo"]: (c["prima"], c["dopo"]) for c in documento.revisioni[0].modifiche}
             self.assertEqual(campi["Conducente"], ("Mario Rossi", "Luca Bianchi"))
+        # l'admin modifica senza lasciare revisioni
+        self.entra("admin")
+        self.c.post(f"/ddt/{d}/modifica", data=dict(dati, conducente="Anna Verdi"))
+        with self.app.app_context():
+            documento = db.session.get(Ddt, d)
+            self.assertEqual((documento.revisione, len(documento.revisioni)), (1, 1))
+            self.assertEqual(documento.movimento.conducente, "Anna Verdi")
         self.arrivo(d)
         self.entra("autista")
         self.assertEqual(self.c.post(f"/ddt/{d}/modifica", data=dati).status_code, 403)
         self.entra("ufficio")
         self.assertEqual(self.c.get(f"/ddt/{d}/modifica").status_code, 200)
 
-    def test_annullamento_solo_admin(self):
+    def test_eliminazione_solo_admin_senza_motivo_e_senza_traccia(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         d = self.ddt()
         self.entra("ufficio")
         self.c.post(f"/ddt/{d}/annulla", data={"motivo": "errore"})
         with self.app.app_context():
-            self.assertIsNone(db.session.get(Ddt, d).annullato_at)
+            self.assertIsNotNone(db.session.get(Ddt, d))
         self.entra("admin")
-        self.c.post(f"/ddt/{d}/annulla", data={"motivo": ""})
+        self.c.post(f"/ddt/{d}/annulla")  # motivo non richiesto
         with self.app.app_context():
-            self.assertIsNone(db.session.get(Ddt, d).annullato_at)
-        self.c.post(f"/ddt/{d}/annulla", data={"motivo": "auto sbagliata"})
-        with self.app.app_context():
-            documento = db.session.get(Ddt, d)
-            self.assertIsNotNone(documento.annullato_at)
-            self.assertEqual(documento.movimento.veicolo.stato, "in_sede")  # torna all'origine
-        self.assertEqual(self.c.get("/ddt").get_data(as_text=True).count('class="voce"'), 0)
-        self.assertIn("auto sbagliata", self.c.get("/ddt?stato=annullati").get_data(as_text=True))
-        # il numero non viene riutilizzato
-        self.parti(vid, "Carrozzeria B")
-        with self.app.app_context():
-            self.assertEqual(sorted(x.numero for x in Ddt.query.all()), [1, 2])
+            self.assertIsNone(db.session.get(Ddt, d))  # sparito del tutto
+            self.assertEqual(Movimento.query.count(), 0)
+            self.assertEqual(DdtArchivio.query.count(), 0)
+            self.assertEqual(db.session.get(Veicolo, vid).stato, "in_sede")  # torna all'origine
+        self.c.get("/")  # consuma i messaggi di conferma
+        self.assertNotIn(f'href="/ddt/{d}"', self.c.get("/ddt?stato=annullati").get_data(as_text=True))
 
     def test_filtri_archivio(self):
         vid = self.abbina()
@@ -1192,17 +1203,23 @@ class TestArchivioDdt(Base):
         self.assertEqual(len(self.versioni(d)), 1)  # emissione
         self.c.get(f"/ddt/{d}")  # consultare non crea copie
         self.assertEqual(len(self.versioni(d)), 1)
+        self.entra("ufficio")  # una modifica dell'ufficio è una revisione con la sua copia
         self.c.post(f"/ddt/{d}/modifica", data=self.dati("Carrozzeria B", conducente="Luca Bianchi"))
-        self.arrivo(d)
-        self.c.post(f"/ddt/{d}/annulla", data={"motivo": "prova"})
         chiavi = self.versioni(d)
-        self.assertEqual(len(chiavi), 4)
+        self.assertEqual(len(chiavi), 2)
         self.assertIn("-rev1", chiavi[1])
-        self.assertTrue(chiavi[-1].startswith("org-1/") and "-annullato" in chiavi[-1])
         cartella = self.app.config["ARCHIVIO_DIR"]
         for k in chiavi:
             with open(f"{cartella}/{k}", "rb") as f:
                 self.assertTrue(f.read().startswith(b"%PDF"))
+        # l'admin corregge senza traccia: in archivio resta solo la versione nuova, senza revisione
+        self.entra("admin")
+        self.c.post(f"/ddt/{d}/modifica", data=self.dati("Carrozzeria B", conducente="Anna Verdi"))
+        chiavi_dopo = self.versioni(d)
+        self.assertEqual(len(chiavi_dopo), 1)
+        self.assertIn("-rev1", chiavi_dopo[0])
+        import os
+        self.assertFalse(any(os.path.exists(f"{cartella}/{k}") for k in chiavi))
 
     def test_recupero_dopo_invio_fallito(self):
         class Guasto:
@@ -1316,17 +1333,13 @@ class TestDdtMultiplo(BaseMultiplo):
             self.assertEqual(fatte, [vid])  # solo l'auto scelta
             self.assertIsNotNone(db.session.get(Veicolo, vid).movimento_predisposto)  # rientro pronto
 
-    def test_annullamento_e_ripristino_per_tutte(self):
+    def test_eliminazione_per_tutte(self):
         self.emetti()
         d = self.ddt()
-        self.c.post(f"/ddt/{d}/annulla", data={"motivo": "bisarca sbagliata"})
+        self.c.post(f"/ddt/{d}/annulla")
         with self.app.app_context():
+            self.assertIsNone(db.session.get(Ddt, d))
             self.assertTrue(all(db.session.get(Veicolo, i).stato == "in_sede" for i in self.ids))
-            azione = Azione.query.filter_by(tipo="annullamento", veicolo_id=self.ids[0]).first()
-        self.c.post(f"/azione/{azione.id}/ripristina", data={"torna": f"/ddt/{d}"})
-        with self.app.app_context():
-            self.assertIsNone(db.session.get(Ddt, d).annullato_at)
-            self.assertTrue(all(db.session.get(Veicolo, i).stato == "in_viaggio" for i in self.ids))
 
     def test_annulla_arrivo_solo_se_ultimo_per_tutte(self):
         self.emetti()
@@ -2577,3 +2590,129 @@ class TestAnagraficaEDDT(Base):
             ddt = db.session.get(Ddt, d)
             self.assertEqual(ddt.dati_fissi, prima)
             self.assertEqual(ddt.dati_fissi["mittente"][0], "Test S.r.l.")
+
+
+class TestNovitaAdmin(Base):
+    """Rivenditori e allestitori, eliminazione di account e fornitori, note interne, password generata, ora di Roma."""
+    def _sede(self, nome, tipo):
+        with self.app.app_context():
+            s = Sede(nome=nome, tipo=tipo, lat=45.2, lon=12.2, comune="Treviso", provincia="TV")
+            db.session.add(s); db.session.commit()
+            return s.id
+
+    def test_rivenditore_conto_visione_o_vendita(self):
+        riv = self._sede("Auto Bianchi S.r.l.", "rivenditore")
+        vid = self.abbina()
+        self.entra("autista")
+        self.c.post("/profilo-guida", data={"vettore_id": self._id(Vettore, nome="Vettore X"), "mezzo": "Bisarca", "firma": FIRMA})
+        self.c.post("/t/ABCD2345", data=POS)
+        t = self.c.get(f"/veicolo/{vid}/sposta").get_data(as_text=True)
+        self.assertIn(f'value="{riv}|Conto visione"', t)
+        self.assertIn(f'value="{riv}|Vendita"', t)
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_causale": f"{riv}|Vendita"})
+        d = self.ddt()
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).causale, "Vendita")
+        self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.2", "lon": "12.2"})
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Veicolo, vid).stato, "consegnato")  # venduta: esce dallo stock
+            a, r = Sede.query.filter_by(nome="Sede A").one(), db.session.get(Sede, riv)
+            self.assertEqual(servizi.causale_per(a, r), "Conto visione")
+            self.assertEqual(servizi.causale_per(r, a), "Reso")
+
+    def test_allestitore_e_una_lavorazione(self):
+        allest = self._sede("Allestimenti Rossi", "allestitore")
+        with self.app.app_context():
+            s = db.session.get(Sede, allest)
+            self.assertTrue(s.esterna)
+            self.assertEqual(servizi.causale_per(Sede.query.filter_by(nome="Sede A").one(), s), "Invio lavorazione")
+            self.assertIn("Allestimento (veicoli commerciali)", Movimento.LAVORAZIONI)
+
+    def test_elimina_utente(self):
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Da Togliere",
+                                                          "email": "togli@t.it", "ruolo": "autista", "password": "password1"})
+        uid = self._id(Utente, email="togli@t.it")
+        self.c.post(f"/admin/utenti/{uid}", data={"azione": "elimina"})
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(Utente, uid))  # mai usato: cancellato del tutto
+        # un account con DDT nello storico: non entra più, sparisce dagli elenchi, l'email torna libera
+        self.entra("autista")
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.entra("admin")
+        aid = self._id(Utente, email="autista@t.it")
+        self.c.post(f"/admin/utenti/{aid}", data={"azione": "elimina"})
+        with self.app.app_context():
+            u = db.session.get(Utente, aid)
+            self.assertTrue(u.eliminato and not u.attivo)
+            self.assertNotEqual(u.email, "autista@t.it")
+        self.assertNotIn("autista@t.it", self.c.get("/admin/aziende/concessionaria").get_data(as_text=True))
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo", "email": "autista@t.it",
+                                                          "ruolo": "autista", "password": "password1"})
+        with self.app.app_context():
+            self.assertEqual(Utente.query.filter_by(email="autista@t.it").count(), 1)
+        # non si elimina sé stessi
+        self.c.post(f"/admin/utenti/{self._id(Utente, email='admin@t.it')}", data={"azione": "elimina"})
+        with self.app.app_context():
+            self.assertIsNotNone(Utente.query.filter_by(email="admin@t.it").first())
+
+    def test_elimina_fornitore(self):
+        nuovo = self._sede("Officina Vuota", "officina")
+        self.c.post(f"/admin/aziende/fornitore/{nuovo}", data={"azione": "utente", "nome": "Gino", "email": "gino@t.it",
+                                                              "password": "password1"})
+        self.c.post(f"/admin/aziende/fornitore/{nuovo}", data={"azione": "elimina_fornitore"})
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(Sede, nuovo))
+            self.assertIsNone(Utente.query.filter_by(email="gino@t.it").first())
+        # con auto ancora da lui non si elimina
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        carr = self._id(Sede, nome="Carrozzeria B")
+        self.c.post(f"/admin/aziende/fornitore/{carr}", data={"azione": "elimina_fornitore"})
+        with self.app.app_context():
+            self.assertFalse(db.session.get(Sede, carr).eliminata)
+
+    def test_note_interne(self):
+        vid = self.abbina()
+        aid = self._id(Utente, email="autista@t.it")
+        self.c.post(f"/veicolo/{vid}/note", data={"cliente_nome": "Mario Bianchi", "venditore_id": aid,
+                                                  "note_interne": "richiama martedì"})
+        with self.app.app_context():
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.cliente_nome, v.venditore_id, v.note_interne), ("Mario Bianchi", aid, "richiama martedì"))
+        self.assertIn("Mario Bianchi", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        for pagina in (f"/ddt/{d}", f"/ddt/{d}/anteprima"):
+            self.assertNotIn("Mario Bianchi", self.c.get(pagina).get_data(as_text=True))
+        self.assertNotIn(b"Mario Bianchi", self.c.get(f"/ddt/{d}.pdf").data)
+        self.entra("carr")  # il fornitore non le vede né le cambia
+        self.assertNotIn("Mario Bianchi", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        self.assertEqual(self.c.post(f"/veicolo/{vid}/note", data={"cliente_nome": "x"}).status_code, 403)
+
+    def test_password_generata_una_volta(self):
+        aid = self._id(Utente, email="autista@t.it")
+        t = self.c.post(f"/admin/utenti/{aid}", data={"azione": "genera_password"}).get_data(as_text=True)
+        import re
+        pw = re.search(r'id="pw-generata"[^>]*value="([^"]+)"', t).group(1)
+        self.assertEqual(len(pw), 10)
+        altro = self.app.test_client()
+        altro.post("/login", data={"email": "autista@t.it", "password": pw})
+        self.assertEqual(altro.get("/ddt").status_code, 200)
+        self.assertNotIn(pw, self.c.get(f"/admin/utenti/{aid}").get_data(as_text=True))  # non si rilegge
+
+    def test_ora_di_roma(self):
+        import os, time
+        from getvingo.models import adesso
+        vecchio = os.environ.get("TZ")
+        os.environ["TZ"] = "UTC"; time.tzset()
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            atteso = datetime.now(ZoneInfo("Europe/Rome")).replace(tzinfo=None, microsecond=0)
+            self.assertLess(abs((adesso() - atteso).total_seconds()), 2)
+        finally:
+            if vecchio is None: os.environ.pop("TZ", None)
+            else: os.environ["TZ"] = vecchio
+            time.tzset()

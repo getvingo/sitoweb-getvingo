@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body {{ 'data-demo' if config.DEMO }}>
+<body class="{% block classe_pagina %}{% endblock %}" {{ 'data-demo' if config.DEMO }}>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
   <symbol id="i-cerca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
@@ -120,11 +120,13 @@
   {% if g.utente.interno %}<a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}"><span class="icona-nav">{{ i('attenzione') }}{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</span>Danni</a>{% endif %}
 </nav>
 {% endif %}
+<script>window.GETVINGO_GMAPS = {{ config.GOOGLE_MAPS_KEY|tojson }};</script>
 <script>window.DOVIN_CSRF ="{{ csrf_token() if g.utente else '' }}";</script>
 <script src="{{ url_for('static', filename='voce.js') }}"></script>
 <script src="{{ url_for('static', filename='ia.js') }}"></script>
 <script src="{{ url_for('static', filename='firma.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='mappe.js') }}"></script>
 <script src="{{ url_for('static', filename='indirizzo.js') }}"></script>
 {% block script %}{% endblock %}
 </body>

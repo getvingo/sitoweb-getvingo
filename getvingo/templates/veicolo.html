@@ -213,6 +213,23 @@
 
 <div class="col-sotto">
 
+{% if g.utente.interno %}
+<details class="scheda note-interne" id="note-interne" {{ 'open' if v.cliente_nome or v.venditore_id or v.note_interne }}>
+  <summary>{{ i('matita', 's') }} Note interne <span class="tenue piccolo">· solo concessionaria, non vanno sul DDT</span>
+    {% if v.cliente_nome or v.venditore %}<span class="note-riassunto">{{ v.cliente_nome }}{{ ' · ' if v.cliente_nome and v.venditore }}{{ ('venditore ' ~ v.venditore.nome) if v.venditore }}</span>{% endif %}</summary>
+  <form method="post" action="{{ url_for('main.note_interne', veicolo_id=v.id) }}" data-una-volta>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="griglia-2">
+      <label class="campo"><span>Cliente</span><input name="cliente_nome" value="{{ v.cliente_nome or '' }}" maxlength="200" placeholder="Es. Mario Bianchi"></label>
+      <label class="campo"><span>Venditore</span><select name="venditore_id"><option value="">—</option>
+        {% for u in venditori %}<option value="{{ u.id }}" {{ 'selected' if u.id == v.venditore_id }}>{{ u.nome }}{{ ' (venditore)' if u.ruolo == 'venditore' }}</option>{% endfor %}</select></label>
+    </div>
+    <label class="campo"><span>Note</span><textarea name="note_interne" rows="3" maxlength="2000" placeholder="Es. consegna con accessori, cliente richiama martedì">{{ v.note_interne or '' }}</textarea></label>
+    <button class="btn">{{ i('check', 's') }} Salva le note</button>
+  </form>
+</details>
+{% endif %}
+
 {% if v.lat is not none and v.stato != 'consegnato' %}
 <h2>{{ i('pin') }} Sulla mappa</h2>
 <div id="mappa" data-lat="{{ v.lat }}" data-lon="{{ v.lon }}"></div>
@@ -248,15 +265,15 @@
 {% block script %}
 {% if v.lat is not none and v.stato != 'consegnato' %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='mappe.js') }}"></script>
 <script>
   (function () {
     var el = document.getElementById('mappa');
     var p = [parseFloat(el.dataset.lat), parseFloat(el.dataset.lon)];
     var mappa = L.map(el, { zoomControl: true }).setView(p, 19);
     bloccaMappa(mappa);
-    // satellite Esri: si riconosce il punto esatto nel piazzale (OpenStreetMap blocca le richieste, errore 418)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 20, maxNativeZoom: L.Browser.retina ? 18 : 19, detectRetina: true, attribution: 'Tiles © Esri' }).addTo(mappa);
+    // sfondo realistico: si riconosce il punto esatto nel piazzale
+    GetvingoMappa.sfondo(mappa);
     L.circleMarker(p, { radius: 10, color: '#fff', weight: 3, fillColor: '#1F6FB2', fillOpacity: 1 }).addTo(mappa);
   })();
 </script>

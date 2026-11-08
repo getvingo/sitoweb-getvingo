@@ -803,7 +803,11 @@ def sposta(veicolo_id):
                 sede = servizi.destinazione_scritta(request.form["nuova_destinazione"], request.form.get("tipo"))
             else:
                 sede = db.session.get(Sede, request.form.get("a_sede_id", type=int) or 0)
-            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon)
+            causale = None
+            if request.form.get("a_sede_causale"):  # concessionario/rivenditore: luogo e causale insieme
+                sid, _, causale = request.form["a_sede_causale"].partition("|")
+                sede = db.session.get(Sede, int(sid) if sid.isdigit() else 0)
+            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale)
         except Vietato as e:
             db.session.rollback()
             flash(str(e), "errore")
@@ -1039,6 +1043,22 @@ def api_veicolo():
             "targa": v.targa}
 
 
+@bp.route("/veicolo/<int:veicolo_id>/note", methods=["POST"])
+@solo_interni
+def note_interne(veicolo_id):
+    """Note interne della concessionaria sull'auto (cliente, venditore, appunti): non vanno sul DDT
+    e i fornitori non le vedono."""
+    v = _veicolo_visibile(veicolo_id)
+    v.cliente_nome = " ".join(request.form.get("cliente_nome", "").split())[:200]
+    vid = request.form.get("venditore_id", type=int)
+    venditore = db.session.get(Utente, vid) if vid else None
+    v.venditore = venditore if venditore is not None and venditore.interno else None
+    v.note_interne = request.form.get("note_interne", "").strip()[:2000]
+    db.session.commit()
+    flash("Note interne salvate: restano nel portale, non vanno sul DDT.", "ok")
+    return redirect(url_for("main.veicolo", veicolo_id=v.id) + "#note-interne")
+
+
 @bp.route("/veicolo/<int:veicolo_id>")
 @login_richiesto
 def veicolo(veicolo_id):
@@ -1050,10 +1070,12 @@ def veicolo(veicolo_id):
     if v.sede and v.sede.esterna and ultimo:
         valori.update(a_sede_id=ultimo.da_sede_id, causale="Reso lavorazione",
                       lavorazione=Movimento.NESSUNA)
+    venditori = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno),
+                       key=lambda u: (u.ruolo != "venditore", u.nome)) if g.utente.interno else []
     simili = Veicolo.query.filter(Veicolo.marca == v.marca, Veicolo.modello == v.modello,
                                   Veicolo.id != v.id, Veicolo.stato != "consegnato").count()
     return render_template(
-        "veicolo.html", v=v, mov=mov, predisposto=v.movimento_predisposto, ultimo=ultimo,
+        "veicolo.html", v=v, mov=mov, predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
         preparazione=v.preparazione_attiva, ultima_prep=v.ultima_preparazione, simili=simili,
         puo_emettere=servizi.puo_emettere(v, g.utente),
         puo_ultimo_ddt=servizi.puo_emettere_ultimo_ddt(v, g.utente),
@@ -1471,8 +1493,18 @@ def ddt_lavorazione_completata(ddt_id):
 @bp.route("/ddt/<int:ddt_id>/annulla", methods=["POST"])
 @login_richiesto
 def ddt_annulla(ddt_id):
-    return _azione_ddt(ddt_id, lambda d: servizi.annulla_ddt(d, g.utente, request.form.get("motivo", "")),
-                       "DDT cancellato. Resta consultabile in archivio sotto “Cancellati”.")
+    """L'amministratore elimina il DDT del tutto (motivo facoltativo, non salvato)."""
+    documento = _ddt_visibile(ddt_id)
+    sigla, veicolo_id = documento.sigla, documento.movimento.veicolo_id
+    try:
+        servizi.elimina_ddt(documento, g.utente)
+        db.session.commit()
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+        return _torna_al_ddt(documento)
+    flash(f"DDT {sigla} eliminato.", "ok")
+    return redirect(url_for("main.veicolo", veicolo_id=veicolo_id))
 
 
 @bp.route("/ddt/<int:ddt_id>/anteprima")

@@ -35,7 +35,7 @@ def _conta(modello, *filtri):
 @solo_gestore
 def indice():
     org = Organizzazione.query.order_by(Organizzazione.nome).all()
-    utenti = _conta(Utente, Utente.attivo.is_(True), Utente.supporto.is_(False))
+    utenti = _conta(Utente, Utente.attivo.is_(True), Utente.supporto.is_(False), Utente.eliminato.is_(False))
     auto = _conta(Veicolo, Veicolo.stato != "consegnato")
     ddt = _conta(Ddt)
     ultimo = dict(db.session.query(Utente.org_id, func.max(Utente.ultimo_accesso_at))

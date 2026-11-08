@@ -1767,3 +1767,64 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   border-radius: var(--r); background: var(--carta); color: var(--testo-2); }
 .mappa-vuota .icona { flex: none; width: 28px; height: 28px; color: var(--segnale); }
 .mappa-vuota p { margin: 0; }
+
+.destinazione-doppia { cursor: default; }
+.scelta-causale { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+.note-interne { margin-bottom: 14px; }
+.note-interne > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.note-interne > summary::-webkit-details-marker { display: none; }
+.note-interne[open] > summary { margin-bottom: 12px; }
+.note-riassunto { width: 100%; font-weight: 600; color: var(--segnale); font-size: .9rem; }
+.note-interne textarea { width: 100%; }
+
+/* Colori di Lavorazioni e Preparazione (08/11/2026): in tempo azzurro, in ritardo rosso aranciato,
+   pronte verde, consegnate verde scuro */
+:root { --in-tempo: #0284C7; --in-tempo-tenue: #E0F2FE; --in-tempo-testo: #0369A1;
+        --in-ritardo: #DC4B3E; --in-ritardo-tenue: #FDE8E5; --in-ritardo-testo: #B42318;
+        --pronta-verde: #16A34A; --consegnata-verde: #14532D; }
+@media (prefers-color-scheme: dark) {
+  :root { --in-tempo: #38BDF8; --in-tempo-tenue: #0C2A3D; --in-tempo-testo: #7DD3FC;
+          --in-ritardo: #F87171; --in-ritardo-tenue: #3A1714; --in-ritardo-testo: #FCA5A5;
+          --pronta-verde: #4ADE80; --consegnata-verde: #22C55E; } }
+.tile-numero.corso { border-top-color: var(--in-tempo); }
+.tile-numero.corso b { color: var(--in-tempo-testo); }
+.tile-numero.ritardo { border-top-color: var(--in-ritardo); }
+.tile-numero.ritardo b { color: var(--in-ritardo-testo); }
+.tile-numero.finita { border-top-color: var(--pronta-verde); }
+.tile-numero.consegnate { border-top-color: var(--consegnata-verde); }
+.tile-numero.consegnate b { color: var(--consegnata-verde); }
+.barra-lavoro .barra-avanzamento { background: var(--in-tempo-tenue); }
+.barra-lavoro .barra-avanzamento span { background: var(--in-tempo); }
+.barra-lavoro b { color: var(--in-tempo-testo); }
+.barra-lavoro.lavoro-ritardo .barra-avanzamento { background: var(--in-ritardo-tenue); }
+.barra-lavoro.lavoro-ritardo .barra-avanzamento span { background: repeating-linear-gradient(45deg, var(--in-ritardo) 0 8px, #C2410C 8px 16px); }
+.barra-lavoro.lavoro-ritardo b { color: var(--in-ritardo-testo); }
+.barra-lavoro.lavoro-finita b { color: var(--ok); }
+.anello-lavoro .anello-fondo { stroke: var(--in-tempo-tenue); }
+.anello-lavoro .anello-pieno { stroke: var(--in-tempo); }
+.anello-lavoro .anello-testo b { color: var(--in-tempo-testo); }
+.lavoro-ritardo .anello-lavoro .anello-pieno { stroke: var(--in-ritardo); }
+.lavoro-ritardo .anello-lavoro .anello-testo b, .lavoro-ritardo .prep-ora > b { color: var(--in-ritardo-testo); }
+.pagina-lavorazioni .lavorazione { --fase: var(--in-tempo); --fase-pieno: var(--in-tempo-testo); }
+.pagina-lavorazioni .carta-lavoro.lavoro-corso { border-left-color: var(--in-tempo); }
+.pagina-lavorazioni .carta-lavoro.lavoro-ritardo { border-left-color: var(--in-ritardo); }
+.pagina-preparazione { --prep: var(--in-tempo); --prep-tenue: var(--in-tempo-tenue); --prep-2: var(--in-tempo); }
+.pagina-preparazione .preparazione { --fase: var(--in-tempo); --fase-pieno: var(--in-tempo-testo); }
+.pagina-preparazione .prep-ritardo { --fase: var(--in-ritardo); --fase-pieno: var(--in-ritardo-testo); --prep: var(--in-ritardo); }
+.pagina-preparazione .pronta { --fase: var(--pronta-verde); --fase-pieno: var(--pronta-verde); }
+.pagina-preparazione .consegnato { --fase: var(--consegnata-verde); --fase-pieno: var(--consegnata-verde); }
+.pagina-preparazione .scadenza-prep.in-ritardo, .pagina-preparazione .scadenza-prep.in-ritardo > summary { color: var(--in-ritardo-testo); }
+.pagina-preparazione .cal-auto.ev.pronta_entro, .pagina-preparazione .legenda-calendario .ev.pronta_entro { background: var(--in-tempo-tenue); color: var(--in-tempo-testo); }
+.pagina-preparazione .cal-auto.ev.ritardo, .pagina-preparazione .legenda-calendario .ev.ritardo { background: var(--in-ritardo-tenue); color: var(--in-ritardo-testo); }
+
+.cerca-luogo { margin-bottom: 6px; }
+.cerca-riga { display: flex; gap: 8px; }
+.cerca-riga input { flex: 1; min-width: 0; }
+.risultati-luogo { list-style: none; margin: -6px 0 12px; padding: 4px; border: 1px solid var(--bordo); border-radius: var(--r-s); background: var(--carta); }
+.risultati-luogo li.tenue { padding: 10px; font-size: .9rem; }
+.risultato-luogo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px; padding: 8px 10px;
+  background: none; border: 0; border-radius: 8px; text-align: left; font: inherit; color: var(--testo); cursor: pointer; }
+.risultato-luogo:hover, .risultato-luogo:focus { background: var(--superficie); }
+.risultato-luogo span { font-size: .85rem; color: var(--testo-2); }
+.password-generata { font-size: 1.4rem !important; letter-spacing: .08em; text-align: center; }

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block classe_pagina %}pagina-preparazione{% endblock %}
 {% from "_macro.html" import i, marchio, icona_fase, csrf_input, riepilogo_lavorazione, pillole, tappe_preparazione, annulla, fase_css, calendario_mese, interruttore_modo, filtro_tipologia, scegli_slot %}
 {% block titolo %}Preparazione · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
@@ -37,7 +38,7 @@
 <nav class="riepilogo-pagina tre" aria-label="Filtra per stato">
   <a class="tile-numero ritardo {{ 'attivo' if solo_ritardo }}" href="{{ url_for('main.preparazione', vista='corso', stato=none if solo_ritardo else 'ritardo', tipologia=tipologia) }}"><b>{{ conteggi.ritardo }}</b><span>in ritardo</span></a>
   <a class="tile-numero finita {{ 'attivo' if vista == 'pronte' }}" href="{{ url_for('main.preparazione', vista='pronte', tipologia=tipologia) }}"><b>{{ conteggi.pronte }}</b><span>pronte</span></a>
-  <a class="tile-numero {{ 'attivo' if vista == 'consegnate' }}" href="{{ url_for('main.preparazione', vista='consegnate', tipologia=tipologia) }}"><b>{{ conteggi.consegnate }}</b><span>consegnate</span></a>
+  <a class="tile-numero consegnate {{ 'attivo' if vista == 'consegnate' }}" href="{{ url_for('main.preparazione', vista='consegnate', tipologia=tipologia) }}"><b>{{ conteggi.consegnate }}</b><span>consegnate</span></a>
 </nav>
 {{ pillole([
   ('corso', 'In preparazione', url_for('main.preparazione', vista='corso', tipologia=tipologia), conteggi.corso, 'brilla', 'In corso'),
@@ -58,7 +59,7 @@
   {% else %}
   <div class="lista griglia">
   {% for p in preparazioni %}
-    <div class="voce apribile {{ fase_css(p.veicolo) }}" style="display:block" data-apri-url="{{ url_for('main.veicolo', veicolo_id=p.veicolo_id) }}#preparazione">
+    <div class="voce apribile {{ fase_css(p.veicolo) }} {{ 'prep-ritardo' if p.pronta_entro_at and p.pronta_entro_at|ritardo }}" style="display:block" data-apri-url="{{ url_for('main.veicolo', veicolo_id=p.veicolo_id) }}#preparazione">
       {% set fatti = p.fasi|length %}
       <div class="riga-auto prep-carta-testa">
         {{ marchio(p.veicolo) }}

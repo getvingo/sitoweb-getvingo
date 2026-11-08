@@ -50,6 +50,8 @@ def create_app(config=None):
         DEMO=os.environ.get("DOVIN_DEMO") == "1",
         # indirizzo ufficiale per Google e per le anteprime dei link (canonical, sitemap)
         SITO_URL=(os.environ.get("GETVINGO_SITO_URL") or "https://getvingo.com").rstrip("/"),
+        # chiave Google Maps (Map Tiles API e Places API): mappe realistiche e ricerca dei luoghi
+        GOOGLE_MAPS_KEY=os.environ.get("GETVINGO_GOOGLE_MAPS_KEY", ""),
         CSRF_ATTIVO=True,
         MAX_CONTENT_LENGTH=40 * 1024 * 1024,  # fino a qualche foto di danni per invio
         # archivio PDF dei DDT su storage S3 compatibile (senza bucket: cartella instance/archivio-ddt)

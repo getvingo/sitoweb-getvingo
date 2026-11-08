@@ -21,7 +21,7 @@
 
 {# "Arrivato a destinazione": il telefono manda la posizione, il server chiude se è entro il raggio #}
 {% macro form_arrivo(d, m, raggio, id='', dopo_tocco=False) %}
-<form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }} {{ 'data-senza-gps-ok' if g.utente.ruolo == 'admin' }} style="margin-top:16px">
+<form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }} {{ 'data-senza-gps-ok' if destinatario_conferma_ovunque(m, g.utente) }} style="margin-top:16px">
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
   <details class="ripiega">
     <summary>{{ i('matita', 's') }} Vuoi lasciare una nota di ricezione?</summary>
@@ -36,7 +36,7 @@
   {% endif %}
   <p class="avviso errore arrivo-esito" data-gps-errore hidden></p>
   <div class="barra-azione">
-    <p class="riepilogo">si chiude entro {{ raggio }} m da {{ m.a_sede.nome }}{% if g.utente.ruolo == 'admin' %} · da fuori, come admin, per conto del destinatario{% endif %}</p>
+    <p class="riepilogo">{% if destinatario_conferma_ovunque(m, g.utente) %}confermi tu la ricezione per {{ m.a_sede.nome }}{% else %}si chiude solo entro {{ raggio }} m da {{ m.a_sede.nome }}: il telefono controlla la posizione quando premi{% endif %}</p>
     <button type="submit" class="btn primario pieno" {{ 'disabled' if not m.lavorazione }}>{{ i('pin') }} Arrivato a destinazione</button>
   </div>
 </form>

@@ -376,10 +376,14 @@ def causale_per(da_sede, a_sede):
         return "Invio lavorazione"
     if a_sede.tipo == "esposizione":
         return "Conto esposizione"
+    if a_sede.tipo == "rivenditore":
+        return "Conto visione"
     if da_sede is not None and da_sede.esterna:
         return "Reso lavorazione"
     if da_sede is not None and da_sede.tipo == "esposizione":
         return "Reso esposizione"
+    if da_sede is not None and da_sede.tipo == "rivenditore":
+        return "Reso"
     return "Spostamento"
 
 
@@ -397,7 +401,7 @@ def destinazioni_rapide(veicolo, utente):
     return preferite, [(Sede.TIPI[t], list(gr)) for t, gr in groupby(altre, key=lambda s: s.tipo)]
 
 
-TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "esposizione")
+TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "allestitore", "esposizione", "rivenditore")
 
 
 def destinazione_scritta(nome, tipo="altro"):
@@ -421,7 +425,7 @@ def destinazione_scritta(nome, tipo="altro"):
     return sede
 
 
-def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None):
+def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None):
     """"Inizia spostamento": si sceglie solo la destinazione, il resto viene dal profilo di guida.
     La lavorazione, se la destinazione è esterna, si indica dopo (entro la chiusura del DDT)."""
     mancano = profilo_guida_mancante(utente)
@@ -429,7 +433,10 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None):
         raise Vietato("Completa il tuo profilo di guida: manca " + ", ".join(mancano) + ".")
     if a_sede is None or not a_sede.attiva:
         raise Vietato("Scegli la destinazione.")
-    dati = {"a_sede_id": a_sede.id, "causale": causale_per(veicolo.sede, a_sede),
+    # verso un concessionario/rivenditore si sceglie: conto visione (può tornare) o vendita
+    if a_sede.tipo != "rivenditore" or causale not in Movimento.CAUSALI_RIVENDITORE:
+        causale = causale_per(veicolo.sede, a_sede)
+    dati = {"a_sede_id": a_sede.id, "causale": causale,
             "vettore_id": utente.vettore_id, "conducente": utente.nome,
             "lavorazione": "" if a_sede.esterna else Movimento.NESSUNA, "lavorazione_note": "",
             "mezzo": utente.mezzo}
@@ -511,15 +518,22 @@ def _distanza_leggibile(metri):
 
 
 def puo_confermare_arrivo(mov, utente):
-    """Chiude il DDT chiunque si trovi entro RAGGIO_ARRIVO_M dalla destinazione (la posizione la
-    controlla registra_arrivo). L'admin può anche da lontano, per conto del destinatario."""
+    """Chiude il DDT chi si trova entro RAGGIO_ARRIVO_M dalla destinazione (la posizione la controlla
+    registra_arrivo); il fornitore destinatario anche da lontano."""
     return mov.stato == "aperto"
 
 
+def destinatario_conferma_ovunque(mov, utente):
+    """L'account del fornitore destinatario conferma la ricezione anche senza essere nel raggio."""
+    return utente.ruolo == "fornitore" and utente.sede_id is not None and utente.sede_id == mov.a_sede_id
+
+
 def _per_conto(mov, utente, lat, lon):
-    """False se il telefono è nell'area della destinazione; True se chiude l'admin da fuori.
-    Per tutti gli altri, fuori dall'area, l'arrivo non si può confermare."""
+    """False se il telefono è nell'area della destinazione (o chi conferma è il fornitore destinatario).
+    Per tutti gli altri, amministratore compreso, fuori dall'area l'arrivo non si può confermare."""
     dest = mov.a_sede
+    if destinatario_conferma_ovunque(mov, utente):
+        return False
     if lat is not None and dest.lat is not None:
         metri = distanza_m(lat, lon, dest.lat, dest.lon)
         if metri <= RAGGIO_ARRIVO_M:
@@ -532,8 +546,6 @@ def _per_conto(mov, utente, lat, lon):
         return False
     else:
         motivo = "Serve la posizione del telefono per confermare l'arrivo: attiva la localizzazione e riprova."
-    if utente.ruolo == "admin":
-        return True
     raise Vietato(motivo)
 
 
@@ -602,11 +614,16 @@ def modifica_ddt(ddt, nuovi, utente):
                 setattr(m, campo, dopo)
     if not cambi:
         return None
-    ddt.revisione += 1
     db.session.flush()
     for m in ddt.movimenti or [mov]:
         db.session.expire(m, ["a_sede", "vettore"])
     _fissa_controparti(ddt)
+    if utente.ruolo == "admin":
+        # l'amministratore corregge senza lasciare traccia: niente revisione, l'archivio tiene solo la versione nuova
+        from . import archivio
+        archivio.dimentica(ddt)
+        return None
+    ddt.revisione += 1
     rev = DdtRevisione(ddt=ddt, numero=ddt.revisione, utente_id=utente.id, modifiche=cambi)
     db.session.add(rev)
     return rev
@@ -637,7 +654,7 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
 
     v = mov.veicolo
     tag_id = v.tag.id if v.tag else None
-    if mov.causale == "Consegna a cliente" or sede_finale.tipo == "cliente":
+    if mov.causale in ("Consegna a cliente", "Vendita") or sede_finale.tipo == "cliente":
         _segna_consegnato(v, sede_finale)
     else:
         v.stato, v.sede = "in_sede", sede_finale
@@ -775,6 +792,36 @@ def annulla_ddt(ddt, utente, motivo):
     _annulla(ddt, utente, motivo)
     for m in ddt.movimenti or [ddt.movimento]:
         registra_azione("annullamento", utente, m.veicolo, ddt)
+
+
+def elimina_ddt(ddt, utente):
+    """Eliminazione vera, solo admin, motivo non richiesto: il DDT sparisce dal database e dall'archivio
+    come se non fosse mai stato emesso (scelta della concessionaria; la numerazione può avere un buco).
+    Se l'auto era in viaggio torna "in sede" nel luogo di partenza."""
+    from . import archivio
+    from .models import Sollecito
+    if utente.ruolo != "admin":
+        raise Vietato("Solo un amministratore può eliminare un DDT.")
+    movimenti = list(ddt.movimenti or [ddt.movimento])
+    for m in movimenti:
+        if m.stato == "aperto":
+            m.veicolo.stato, m.veicolo.sede = "in_sede", m.da_sede
+    archivio.dimentica(ddt)
+    for r in list(ddt.revisioni):
+        db.session.delete(r)
+    Azione.query.filter_by(ddt_id=ddt.id).delete()
+    Evento.query.filter_by(ddt_id=ddt.id).update({"ddt_id": None})
+    ids = [m.id for m in movimenti]
+    Sollecito.query.filter(Sollecito.movimento_id.in_(ids)).delete(synchronize_session=False)
+    Preparazione.query.filter(Preparazione.movimento_id.in_(ids)).update({"movimento_id": None}, synchronize_session=False)
+    Danno.query.filter(Danno.movimento_id.in_(ids)).update({"movimento_id": None}, synchronize_session=False)
+    for m in movimenti:
+        m.ddt_id = None
+    db.session.flush()
+    db.session.delete(ddt)
+    db.session.flush()
+    for m in movimenti:
+        db.session.delete(m)
 
 
 def elimina_veicolo(v, utente, demo=False):
@@ -1283,3 +1330,65 @@ def stima_viaggio(mov):
     minuti = max(5, round(km / VELOCITA_KMH.get(mov.mezzo, 45) * 60 * fattore + 5))  # + manovre e parcheggio
     return {"km": round(km, 1) if km < 10 else round(km), "minuti": minuti, "traffico": nota,
             "arrivo": partenza + timedelta(minutes=minuti)}
+
+
+# ---------------------------------------------------------------- eliminazione di account e fornitori
+
+def _riferimenti(oggetto, salvo=()):
+    """Quante righe di altre tabelle puntano a questo oggetto (DDT, movimenti, eventi…)."""
+    from sqlalchemy import func as f, select
+    tabella = oggetto.__table__
+    totale = 0
+    for t in db.metadata.sorted_tables:
+        if t.name in salvo:
+            continue
+        for col in t.columns:
+            if any(fk.column.table is tabella for fk in col.foreign_keys):
+                totale += db.session.execute(select(f.count()).select_from(t).where(col == oggetto.id)).scalar()
+    return totale
+
+
+def elimina_utente(u, admin):
+    """Elimina un account. Se compare nello storico resta come nome sui documenti ma non entra più,
+    non compare negli elenchi e la sua email torna libera. Ritorna True se cancellato del tutto."""
+    if admin.ruolo != "admin":
+        raise Vietato("Solo un amministratore può eliminare un account.")
+    if u.id == admin.id:
+        raise Vietato("Non puoi eliminare il tuo account.")
+    if u.supporto:
+        raise Vietato("L'accesso dell'assistenza Getvingo non si elimina da qui.")
+    if u.ruolo == "admin" and Utente.query.filter_by(ruolo="admin", attivo=True, eliminato=False, supporto=False).count() <= 1:
+        raise Vietato("È l'unico amministratore: nominane un altro prima di eliminarlo.")
+    if _riferimenti(u) == 0:
+        db.session.delete(u)
+        return True
+    u.eliminato, u.attivo, u.invito_in_attesa = True, False, False
+    u.email = f"eliminato-{u.id}-{u.email}"[:200]
+    return False
+
+
+def elimina_fornitore(sede, admin):
+    """Elimina un'azienda esterna con i suoi account. Se compare nello storico resta sui documenti
+    ma sparisce da elenchi e scelte. Ritorna True se cancellata del tutto."""
+    if admin.ruolo != "admin":
+        raise Vietato("Solo un amministratore può eliminare un fornitore.")
+    if sede.tipo == "propria":
+        raise Vietato("Le sedi della concessionaria non si eliminano: si disattivano.")
+    if any(v.stato != "consegnato" for v in Veicolo.query.filter_by(sede_id=sede.id)):
+        raise Vietato(f"Da {sede.nome} ci sono ancora auto: riportale prima di eliminarlo.")
+    for u in list(sede.utenti):
+        if not u.eliminato:
+            elimina_utente(u, admin)
+    db.session.flush()
+    vettore = Vettore.query.filter_by(sede_id=sede.id).first()
+    if vettore is not None and _riferimenti(vettore, salvo=("utente",)) == 0:
+        Utente.query.filter_by(vettore_id=vettore.id).update({"vettore_id": None})
+        db.session.delete(vettore)
+        db.session.flush()
+    if _riferimenti(sede) == 0:
+        db.session.delete(sede)
+        return True
+    sede.eliminata, sede.attiva = True, False
+    if vettore is not None and vettore in db.session:
+        vettore.attivo = False
+    return False

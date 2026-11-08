@@ -15,7 +15,7 @@
   <a class="voce" href="{{ url_for('admin.gruppo_fornitore', sede_id=s.id) }}">
     <span class="tondo lavorazione">{{ i('chiave') }}</span>
     <div class="corpo"><h3>{{ s.nome }}</h3>
-      <div class="tratta">{{ s.TIPI[s.tipo] }} · {{ s.utenti|length }} {{ 'utente' if s.utenti|length == 1 else 'utenti' }} · {{ 'firma ✓' if s.firma else 'firma mancante' }}</div></div>
+      {% set attivi = s.utenti|rejectattr('eliminato')|list %}<div class="tratta">{{ s.TIPI[s.tipo].split(' (')[0] }} · {{ attivi|length }} {{ 'utente' if attivi|length == 1 else 'utenti' }} · {{ 'firma ✓' if s.firma else 'firma mancante' }}</div></div>
     {{ i('chevron') }}
   </a>
   {% endfor %}

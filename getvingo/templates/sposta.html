@@ -2,9 +2,19 @@
 {% from "_macro.html" import campi_indirizzo, campi_fiscali, i, csrf_input, gps, indietro %}
 {% block titolo %}Inizia spostamento · Getvingo{% endblock %}
 {% macro destinazione(s) %}
+{% if s.tipo == 'rivenditore' %}
+<div class="destinazione-btn destinazione-doppia">
+  <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b><small>{{ s.indirizzo_completo }}</small>
+    <span class="scelta-causale">
+      <button type="submit" name="a_sede_causale" value="{{ s.id }}|Conto visione" class="btn piccolo">Conto visione</button>
+      <button type="submit" name="a_sede_causale" value="{{ s.id }}|Vendita" class="btn piccolo">Vendita</button>
+    </span></span>
+</div>
+{% else %}
 <button type="submit" name="a_sede_id" value="{{ s.id }}" class="destinazione-btn">
   <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b>{% if s.indirizzo or s.comune %}<small>{{ s.indirizzo_completo }}</small>{% endif %}{% if s.lat is none %}<small>Posizione sulla mappa fissata al primo arrivo</small>{% endif %}</span>
 </button>
+{% endif %}
 {% endmacro %}
 {% block contenuto %}
 {{ indietro(url_for('main.tocco_scelta', veicolo_id=v.id)) }}
@@ -42,6 +52,8 @@
     <label><input type="radio" name="tipo" value="cliente" checked> Cliente</label>
     <label><input type="radio" name="tipo" value="carrozzeria"> Carrozzeria</label>
     <label><input type="radio" name="tipo" value="officina"> Officina</label>
+    <label><input type="radio" name="tipo" value="allestitore"> Allestitore</label>
+    <label><input type="radio" name="tipo" value="rivenditore"> Concessionario</label>
     <label><input type="radio" name="tipo" value="esposizione"> Esposizione</label>
     <label><input type="radio" name="tipo" value="altro"> Altro fornitore</label>
   </div>

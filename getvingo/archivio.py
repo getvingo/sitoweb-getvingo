@@ -29,6 +29,12 @@ class _Cartella:
     def descrizione(self):
         return "cartella " + self.cartella
 
+    def elimina(self, chiave):
+        try:
+            os.remove(os.path.join(self.cartella, chiave))
+        except OSError:
+            pass
+
 
 class _S3:
     def __init__(self, bucket, endpoint, regione, chiave_id, segreto):
@@ -42,6 +48,12 @@ class _S3:
 
     def descrizione(self):
         return "S3 bucket " + self.bucket
+
+    def elimina(self, chiave):
+        try:  # con la conservazione bloccata (retention) lo storage può rifiutare: la copia resta lì
+            self.client.delete_object(Bucket=self.bucket, Key=chiave)
+        except Exception:
+            pass
 
 
 def destinazione():
@@ -70,6 +82,14 @@ def archivia(ddt, dest=None):
     riga = DdtArchivio(ddt=ddt, org_id=ddt.org_id, at=ora, impronta=impronta, chiave=chiave)
     db.session.add(riga)
     return riga
+
+
+def dimentica(ddt):
+    """Toglie le copie archiviate del DDT (eliminazione o modifica dell'admin senza traccia)."""
+    dest = destinazione()
+    for riga in list(ddt.archiviazioni):
+        dest.elimina(riga.chiave)
+        db.session.delete(riga)
 
 
 def archivia_tutti():

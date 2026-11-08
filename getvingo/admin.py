@@ -146,10 +146,12 @@ def elimina_chiusura(chiuso_id):
 GRUPPI_LUOGHI = {
     "proprie": ("Sedi e piazzali", "I luoghi della concessionaria: sede legale, sedi e piazzali dove stanno le auto.",
                 ("propria",)),
-    "esterne": ("Destinazioni esterne", "Fornitori per le lavorazioni, esposizioni e clienti: dove le auto vanno e da dove tornano.",
-                ("carrozzeria", "officina", "altro", "esposizione", "cliente")),
+    "esterne": ("Destinazioni esterne", "Fornitori per le lavorazioni, allestitori, altri concessionari, esposizioni e clienti: dove le auto vanno e da dove tornano.",
+                ("carrozzeria", "officina", "allestitore", "altro", "rivenditore", "esposizione", "cliente")),
 }
 SEZIONI_ESTERNE = [("Fornitori per le lavorazioni", ("carrozzeria", "officina", "altro")),
+                   ("Allestitori (veicoli commerciali)", ("allestitore",)),
+                   ("Concessionari e rivenditori", ("rivenditore",)),
                    ("Esposizioni", ("esposizione",)), ("Clienti", ("cliente",))]
 
 
@@ -199,7 +201,7 @@ def sedi_esterne():
 
 
 def _sezioni(gruppo):
-    tutte = Sede.query.order_by(Sede.nome).all()
+    tutte = [x for x in Sede.query.order_by(Sede.nome) if not x.eliminata]
     if gruppo == "proprie":
         return [("", [x for x in tutte if x.tipo == "propria"])]
     return [(t, [x for x in tutte if x.tipo in tipi]) for t, tipi in SEZIONI_ESTERNE]
@@ -347,9 +349,9 @@ def _esito_link(u, scopo):
 @bp.route("/aziende")
 @ruolo_richiesto("admin")
 def aziende():
-    fornitori = [s for s in Sede.query.order_by(Sede.nome) if s.esterna]
+    fornitori = [s for s in Sede.query.order_by(Sede.nome) if s.esterna and not s.eliminata]
     return render_template("admin/aziende.html", azienda=Azienda.query.first(), fornitori=fornitori,
-                           interni=[u for u in Utente.query.all() if u.interno and not u.supporto])
+                           interni=[u for u in Utente.query.all() if u.interno and not u.supporto and not u.eliminato])
 
 
 @bp.route("/aziende/concessionaria", methods=["GET", "POST"])
@@ -371,7 +373,7 @@ def gruppo_concessionaria():
             db.session.commit()
             flash("Dati e firma della concessionaria salvati: valgono per tutti i suoi utenti.", "ok")
         return redirect(url_for("admin.gruppo_concessionaria"))
-    utenti = sorted((u for u in Utente.query.all() if u.interno), key=lambda u: (u.supporto, u.nome))
+    utenti = sorted((u for u in Utente.query.all() if u.interno and not u.eliminato), key=lambda u: (u.supporto, u.nome))
     return render_template("admin/gruppo.html", tipo="concessionaria", nome=a.ragione_sociale or "Concessionaria",
                            dati=a, utenti=utenti, ruoli=RUOLI_INTERNI)
 
@@ -382,6 +384,18 @@ def gruppo_fornitore(sede_id):
     sede = db.get_or_404(Sede, sede_id)
     if not sede.esterna:
         return redirect(url_for("admin.gruppo_concessionaria"))
+    if request.method == "POST" and request.form.get("azione") == "elimina_fornitore":
+        nome = sede.nome
+        try:
+            del_tutto = servizi.elimina_fornitore(sede, g.utente)
+            db.session.commit()
+        except servizi.Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
+            return redirect(url_for("admin.gruppo_fornitore", sede_id=sede.id))
+        flash(f"{nome} eliminato con i suoi account." + ("" if del_tutto else
+              " Resta solo sui DDT già emessi."), "ok")
+        return redirect(url_for("admin.aziende"))
     if request.method == "POST":
         if request.form.get("azione") == "utente":
             esito = _crea_utente("fornitore", sede.id)
@@ -403,18 +417,44 @@ def gruppo_fornitore(sede_id):
             flash(f"Dati e firma di {sede.nome} salvati: valgono per tutti i suoi utenti.", "ok")
         return redirect(url_for("admin.gruppo_fornitore", sede_id=sede.id))
     return render_template("admin/gruppo.html", tipo="fornitore", nome=sede.nome, dati=sede,
-                           utenti=sorted(sede.utenti, key=lambda u: u.nome), ruoli={"fornitore": "Fornitore"})
+                           utenti=sorted((u for u in sede.utenti if not u.eliminato), key=lambda u: u.nome),
+                           ruoli={"fornitore": "Fornitore"})
 
 
 @bp.route("/utenti/<int:utente_id>", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def utente(utente_id):
     u = db.get_or_404(Utente, utente_id)
+    if u.eliminato:
+        return redirect(url_for("admin.aziende"))
     if u.supporto:  # l'accesso del gestore Getvingo non si modifica né si usa dalla concessionaria
         flash("“Supporto Getvingo” è l'accesso del gestore della piattaforma: non si modifica da qui.", "errore")
         return redirect(url_for("admin.gruppo_concessionaria"))
     torna = url_for("admin.gruppo_fornitore", sede_id=u.sede_id) if u.ruolo == "fornitore" and u.sede_id \
         else url_for("admin.gruppo_concessionaria")
+    if request.method == "POST" and request.form.get("azione") == "genera_password":
+        if u.id == g.utente.id or not u.attivo:
+            flash("Per il tuo account usa Cambia password; un account disattivato va prima riattivato.", "errore")
+            return redirect(url_for("admin.utente", utente_id=u.id))
+        # leggibile a voce: niente 0/O, 1/l/I
+        alfabeto = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        nuova = "".join(secrets.choice(alfabeto) for _ in range(10))
+        u.imposta_password(nuova)
+        u.invito_in_attesa = False
+        db.session.commit()  # gli altri dispositivi di quell'account si scollegano (impronta cambiata)
+        return render_template("admin/password_generata.html", u=u, password=nuova, torna=torna)
+    if request.method == "POST" and request.form.get("azione") == "elimina":
+        nome = u.nome
+        try:
+            del_tutto = servizi.elimina_utente(u, g.utente)
+            db.session.commit()
+        except servizi.Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
+            return redirect(url_for("admin.utente", utente_id=u.id))
+        flash(f"Account di {nome} eliminato." + ("" if del_tutto else
+              " Il nome resta sui DDT e nella cronologia già registrati; l'email torna libera."), "ok")
+        return redirect(torna)
     if request.method == "POST" and request.form.get("azione") == "link":
         if not u.attivo:
             flash("L'account è disattivato: riattivalo prima di mandare il link.", "errore")

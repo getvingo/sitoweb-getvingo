@@ -265,6 +265,12 @@
 {% macro campi_indirizzo(o=None, etichetta='Indirizzo', obbligatorio=True) %}
 <fieldset class="indirizzo" data-indirizzo {{ 'data-obbligatorio' if obbligatorio }}>
   <legend>{{ etichetta }}</legend>
+  <div class="cerca-luogo">
+    <label class="campo"><span>Cerca un luogo {{ 'su Google Maps' if config.GOOGLE_MAPS_KEY else 'sulla mappa' }}</span>
+      <span class="cerca-riga"><input type="search" data-cerca placeholder="Es. Carrozzeria Rossi Ponzano, oppure Via Roma 12 Treviso" autocomplete="off" enterkeyhint="search">
+      <button type="button" class="btn piccolo" data-cerca-vai>{{ i('cerca', 's') }} Cerca</button></span></label>
+    <ul class="risultati-luogo" data-risultati hidden></ul>
+  </div>
   <label class="campo"><span>Via e numero civico</span>
     <input name="indirizzo" value="{{ (o.indirizzo or '') if o else '' }}" {{ 'required' if obbligatorio }} autocomplete="street-address" placeholder="Es. Via Roma 12" data-campo="indirizzo"></label>
   <div class="griglia-indirizzo">
@@ -280,7 +286,7 @@
     <span class="indirizzo-esito" data-esito role="status"></span>
   </div>
   <div class="indirizzo-mappa" data-mappa aria-label="Mappa: tocca il punto per compilare l'indirizzo"></div>
-  <small class="tenue">Tocca la mappa sul punto esatto per compilare l'indirizzo · ricerca indirizzi © OpenStreetMap</small>
+  <small class="tenue">Tocca la mappa o trascina il segnaposto sul punto esatto: se via e civico sono già scritti restano quelli, cambia solo la posizione.{{ '' if config.GOOGLE_MAPS_KEY else ' Ricerca © OpenStreetMap.' }}</small>
 </fieldset>
 {% endmacro %}
 

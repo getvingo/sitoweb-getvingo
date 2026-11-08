@@ -185,13 +185,13 @@
 
 {% if puo_annullare %}
 <details class="ripiega zona-pericolo" style="margin-top:24px">
-  <summary>Cancella questo DDT</summary>
-  <form method="post" action="{{ url_for('main.ddt_annulla', ddt_id=d.id) }}" class="scheda" data-una-volta>
+  <summary>Elimina questo DDT</summary>
+  <form method="post" action="{{ url_for('main.ddt_annulla', ddt_id=d.id) }}" class="scheda" data-una-volta
+        onsubmit="return confirm('Eliminare il DDT {{ d.sigla }}? Sparisce del tutto, anche dall\'archivio, e non si può recuperare.')">
     {{ csrf_input() }}
-    <p class="tenue piccolo" style="margin-top:0">Il DDT sparisce dagli elenchi ma resta in archivio sotto “Cancellati”, con il tuo nome e il motivo: la numerazione fiscale non deve avere buchi senza spiegazione.
+    <p class="tenue piccolo" style="margin-top:0">Il DDT sparisce del tutto, anche dall'archivio dei PDF, e non si può recuperare. Il numero {{ d.sigla }} resta saltato nella numerazione.
       {% if m.stato == 'aperto' %}{{ 'Le auto torneranno' if d.multiplo else "L'auto tornerà" }} “in sede” presso {{ m.da_sede.nome if m.da_sede else 'la sede di partenza' }}.{% endif %}</p>
-    <label class="campo"><span>Motivo</span><input name="motivo" required maxlength="300" placeholder="Es. creato per errore, auto sbagliata"></label>
-    <button class="btn pericolo">Cancella DDT {{ d.sigla }}</button>
+    <button class="btn pericolo">Elimina DDT {{ d.sigla }}</button>
   </form>
 </details>
 {% endif %}

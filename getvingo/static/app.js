@@ -41,7 +41,8 @@
   var riepilogo = document.querySelector('[data-riepilogo]');
   var toccata = false;
   var SUGGERITE = { propria: 'Spostamento', carrozzeria: 'Invio lavorazione', officina: 'Invio lavorazione',
-                    altro: 'Invio lavorazione', esposizione: 'Conto esposizione', cliente: 'Consegna a cliente' };
+                    altro: 'Invio lavorazione', allestitore: 'Invio lavorazione', esposizione: 'Conto esposizione',
+                    rivenditore: 'Conto visione', cliente: 'Consegna a cliente' };
   if (causale) causale.addEventListener('change', function () { toccata = true; });
   function aggiorna(suggerisci) {
     if (!dest) return;
@@ -130,7 +131,7 @@
         f.dataset.posizione = '1';
         if (f.requestSubmit) f.requestSubmit(bottone); else f.submit();
       }, function (err) {
-        if (f.hasAttribute('data-senza-gps-ok')) {  // l'admin conferma anche da lontano, per conto
+        if (f.hasAttribute('data-senza-gps-ok')) {  // il fornitore destinatario conferma anche da lontano
           f.dataset.posizione = '1';
           if (f.requestSubmit) f.requestSubmit(bottone); else f.submit();
           return;

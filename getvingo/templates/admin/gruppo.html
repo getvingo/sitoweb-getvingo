@@ -51,4 +51,15 @@
   <button class="btn primario pieno">Salva dati e firma</button>
 </form>
 {% endif %}
+
+{% if tipo == 'fornitore' %}
+<details class="ripiega zona-pericolo">
+  <summary>Elimina {{ nome }}</summary>
+  <form method="post" class="scheda" data-una-volta onsubmit="return confirm('Eliminare {{ nome }} e tutti i suoi account?')">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="azione" value="elimina_fornitore">
+    <p class="tenue piccolo" style="margin-top:0">Spariscono il fornitore e tutti i suoi account (le email tornano libere). Se ha già DDT, resta solo su quei documenti. Non si può se da lui ci sono ancora auto.</p>
+    <button class="btn pericolo">Elimina fornitore e account</button>
+  </form>
+</details>
+{% endif %}
 {% endblock %}
