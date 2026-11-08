@@ -70,7 +70,7 @@
         {% if m and m.con_lavorazione %}{{ avanzamento_lavoro(m) }}{% endif %}
       </div>
       {% elif gr.chiave == 'pronte' %}
-      <div class="stato-zona piccolo">{{ i('bandiera', 's') }} {% if v.consegna_sede %}Consegna a <b>{{ v.consegna_sede.nome }}</b>{% if v.consegna_prevista_at %} · {{ v.consegna_prevista_at|slot }}{% else %} · orario da fissare{% endif %}{% if v.sede_id != v.consegna_sede_id %} · ora a {{ v.sede.nome }}, serve l'ultimo DDT{% endif %}{% else %}Pronta a {{ v.sede.nome }} · <b>sede e appuntamento da fissare</b>{% endif %}{% if not v.targa %} · senza targa{% endif %}</div>
+      <div class="stato-zona piccolo">{{ i('bandiera', 's') }} {% if v.consegna_sede %}Consegna a <b>{{ v.consegna_sede.nome }}</b>{% if v.sede_id != v.consegna_sede_id %} · ora a {{ v.sede.nome }}, serve l'ultimo DDT{% endif %}{% else %}Pronta a {{ v.sede.nome }} · <b>sede di consegna da indicare</b>{% endif %}{% if not v.targa %} · senza targa{% endif %}</div>
       {% elif gr.chiave == 'viaggio' %}{% set m = v.movimento_aperto %}
       {% if m %}<div class="stato-zona piccolo">{{ i('camion', 's') }} {{ m.da_sede.nome if m.da_sede else '—' }} → <b>{{ m.a_sede.nome }}</b> · in viaggio da {{ in_viaggio_da(m) }}{% if v.verso_consegna %} · <b>ultimo DDT, poi consegna</b>{% endif %}</div>{% endif %}
       {% endif %}

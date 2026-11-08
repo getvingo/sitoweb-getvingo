@@ -1640,7 +1640,7 @@ class TestConsegna(Base):
             db.session.add(altra)
             db.session.commit()
             eid = altra.id
-        self.c.post(f"/veicolo/{vid}/consegna/sede", data={"sede_id": eid, "prevista": "2026-11-20T10:30"})
+        self.c.post(f"/veicolo/{vid}/consegna/sede", data={"sede_id": eid})
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
         self.assertIn("Emetti l'ultimo DDT", pagina)
         self.parti(vid, "Carrozzeria B")  # un'auto pronta non va altrove
@@ -1699,24 +1699,18 @@ class TestRegole0311Sera(Base):
         self.assertIn("In preparazione da", pagina)
         self.assertIn("VW Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
 
-    def test_appuntamento_consegna_uno_slot_per_sede(self):
+    def test_consegna_senza_appuntamento(self):
+        """Getvingo calendarizza solo le preparazioni: per la consegna si indica la sede, il giorno lo
+        fissa la concessionaria in un altro portale."""
         vid = TestConsegna.pronta(self)
-        with self.app.app_context():
-            sede = Sede.query.filter_by(nome="Sede A").one()
-            altra = Veicolo(vin="WVWZZZ1KZAW999999", marca="Fiat", modello="Panda", sede_id=sede.id,
-                            consegna_sede_id=sede.id, consegna_prevista_at=datetime(2030, 1, 7, 9, 0))
-            db.session.add(altra)
-            db.session.commit()
-            sid = sede.id
+        sid = self._id(Sede, nome="Sede A")
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
-        self.assertIn("data-scegli-slot", pagina)
-        self.c.post(f"/veicolo/{vid}/consegna/sede", data={"sede_id": sid, "prevista": "2030-01-07T09:00"})
-        with self.app.app_context():
-            self.assertIsNone(db.session.get(Veicolo, vid).consegna_prevista_at)  # slot già preso
+        self.assertNotIn("data-scegli-slot", pagina)
+        self.assertIn("Indica la sede di consegna", pagina)
         self.c.post(f"/veicolo/{vid}/consegna/sede", data={"sede_id": sid, "prevista": "2030-01-07T09:30"})
         with self.app.app_context():
-            self.assertEqual(db.session.get(Veicolo, vid).consegna_prevista_at, datetime(2030, 1, 7, 9, 30))
-        # il calendario della preparazione mostra solo quando le auto devono essere pronte, non le consegne
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.consegna_sede_id, v.consegna_prevista_at), (sid, None))
         cal = self.c.get("/preparazione?vista=corso&modo=calendario&mese=2030-01").get_data(as_text=True)
         self.assertNotIn("consegna_prevista", cal)
         self.assertNotIn("Consegna prevista", self.c.get("/").get_data(as_text=True))
@@ -2716,3 +2710,32 @@ class TestNovitaAdmin(Base):
             if vecchio is None: os.environ.pop("TZ", None)
             else: os.environ["TZ"] = vecchio
             time.tzset()
+
+    def test_concessionario_e_rivenditore_distinti(self):
+        conc = self._sede("Concessionaria Verdi", "concessionario")
+        with self.app.app_context():
+            a, c = Sede.query.filter_by(nome="Sede A").one(), db.session.get(Sede, conc)
+            self.assertEqual(Sede.TIPI["concessionario"], "Concessionario")
+            self.assertEqual(Sede.TIPI["rivenditore"], "Rivenditore")
+            self.assertEqual((servizi.causale_per(a, c), servizi.causale_per(c, a)), ("Conto visione", "Reso"))
+            self.assertTrue(c.societa)
+        esterne = self.c.get("/admin/sedi?gruppo=esterne").get_data(as_text=True)
+        self.assertIn('value="concessionario"', esterne)
+        self.assertIn('value="rivenditore"', esterne)
+        self.assertIn("<h2>Concessionari</h2>", esterne)
+        self.assertIn("<h2>Rivenditori</h2>", esterne)
+
+    def test_preparazione_in_tempo(self):
+        with self.app.app_context():
+            sede = Sede.query.filter_by(nome="Sede A").one()
+            for n, entro in enumerate((adesso() + timedelta(days=3), adesso() - timedelta(days=1))):
+                v = Veicolo(vin=f"WVWZZZ1KZAW00{n}999", marca="VW", modello=f"Prova{n}", sede=sede, stato="in_sede")
+                db.session.add(v); db.session.flush()
+                db.session.add(Preparazione(veicolo=v, pronta_entro_at=entro))
+            db.session.commit()
+        t = self.c.get("/preparazione").get_data(as_text=True)
+        self.assertIn("<b>1</b><span>in tempo</span>", t)
+        self.assertIn("<b>1</b><span>in ritardo</span>", t)
+        tempo = self.c.get("/preparazione?vista=corso&stato=tempo").get_data(as_text=True)
+        self.assertIn("Prova0", tempo)
+        self.assertNotIn("Prova1", tempo)

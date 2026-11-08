@@ -1828,3 +1828,5 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 .risultato-luogo:hover, .risultato-luogo:focus { background: var(--superficie); }
 .risultato-luogo span { font-size: .85rem; color: var(--testo-2); }
 .password-generata { font-size: 1.4rem !important; letter-spacing: .08em; text-align: center; }
+.riepilogo-pagina.quattro { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 420px) { .riepilogo-pagina.quattro .tile-numero { padding: 10px 8px; } .riepilogo-pagina.quattro .tile-numero span { font-size: .75rem; } }

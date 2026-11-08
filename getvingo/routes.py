@@ -143,15 +143,6 @@ def _scelta_slot(occupati, giorni_lavorativi=15):
             for giorno, slot in servizi.giorni_con_slot(giorni_lavorativi=giorni_lavorativi)]
 
 
-def _consegne_fissate(escludi=None):
-    """Appuntamenti di consegna già presi: {inizio: {sede_id: auto}} (uno per slot e per sede)."""
-    out = {}
-    for v in Veicolo.query.filter(Veicolo.stato != "consegnato", Veicolo.consegna_prevista_at.isnot(None)):
-        if v is not escludi and v.consegna_sede_id:
-            out.setdefault(v.consegna_prevista_at, {})[v.consegna_sede_id] = v.descrizione
-    return out
-
-
 def _per_fase(*fasi):
     """Veicoli (non consegnati) nelle fasi indicate, calcolate sul momento."""
     attivi = Veicolo.query.filter(Veicolo.stato != "consegnato").order_by(Veicolo.id).all()
@@ -399,18 +390,21 @@ def preparazione():
     preparazioni = [p for p in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at)
                     if del_tipo(p.veicolo)]
     in_ritardo = [p for p in preparazioni if p.pronta_entro_at and p.pronta_entro_at < adesso()]
-    solo_ritardo = request.args.get("stato") == "ritardo"
+    in_tempo = [p for p in preparazioni if p not in in_ritardo]
+    # i numeri in cima filtrano: in tempo / in ritardo (toccandoli di nuovo si torna a tutte)
+    stato_prep = request.args.get("stato") if request.args.get("stato") in ("ritardo", "tempo") else None
     pronte = [v for v in _da_consegnare() if del_tipo(v)]
     tutte_consegnate = [v for v in Veicolo.query.filter_by(stato="consegnato").order_by(Veicolo.consegnato_at.desc())
                         if del_tipo(v)]
     fc = {k: request.args.get(k, "").strip() for k in ("q", "sede", "dal", "al")}
     consegnate = _filtra_consegnate(tutte_consegnate, fc)
-    conteggi = {"corso": len(preparazioni), "ritardo": len(in_ritardo), "pronte": len(pronte),
+    conteggi = {"corso": len(preparazioni), "ritardo": len(in_ritardo), "tempo": len(in_tempo), "pronte": len(pronte),
                 "consegnate": len(tutte_consegnate)}
     if vista not in ("corso", "pronte", "consegnate"):
         vista = "corso"
     if vista != "corso":
-        solo_ritardo = False
+        stato_prep = None
+    solo_ritardo = stato_prep == "ritardo"
     da_preparare = [v for v in Veicolo.query.filter_by(stato="in_sede").order_by(Veicolo.marca, Veicolo.modello)
                     if v.fase == "in_sede" and v.sede and v.sede.tipo == "propria" and v.movimento_predisposto is None]
     modo = "calendario" if request.args.get("modo") == "calendario" else "elenco"
@@ -423,7 +417,8 @@ def preparazione():
         calendario = _calendario([e for e in _eventi_preparazione() if del_tipo(e["v"])], request.args.get("mese"),
                                  verso_il_futuro=True)
     return render_template("preparazione.html", vista=vista, conteggi=conteggi,
-                           preparazioni=in_ritardo if solo_ritardo else preparazioni, solo_ritardo=solo_ritardo,
+                           preparazioni={"ritardo": in_ritardo, "tempo": in_tempo}.get(stato_prep, preparazioni),
+                           solo_ritardo=solo_ritardo, stato_prep=stato_prep,
                            slot_prep=_scelta_slot({s: p.veicolo.descrizione for s, p in
                                                    servizi.slot_occupati_preparazione().items()}, 20),
                            da_preparare=da_preparare, pronte=pronte, consegnate=consegnate[:500], fc=fc, modo=modo,
@@ -619,19 +614,13 @@ def scadenza_preparazione(prep_id):
 @bp.route("/veicolo/<int:veicolo_id>/consegna/sede", methods=["POST"])
 @solo_interni
 def sede_consegna(veicolo_id):
-    """Auto pronta: in quale sede verrà consegnata al cliente e quando (facoltativo)."""
+    """Auto pronta: in quale sede verrà consegnata al cliente. L'appuntamento con il cliente non si
+    fissa qui: lo gestisce il portale delle consegne della concessionaria."""
     v = db.get_or_404(Veicolo, veicolo_id)
     try:
-        prevista = request.form.get("prevista", "").strip()
-        prevista_at = datetime.strptime(prevista, "%Y-%m-%dT%H:%M") if prevista else None
-    except ValueError:
-        prevista_at = None
-    try:
-        servizi.imposta_consegna(v, g.utente, db.session.get(Sede, request.form.get("sede_id", type=int) or 0),
-                                 prevista_at)
+        servizi.imposta_consegna(v, g.utente, db.session.get(Sede, request.form.get("sede_id", type=int) or 0))
         db.session.commit()
-        flash(f"Consegna presso {v.consegna_sede.nome}"
-              + (f" il {prevista_at:%d/%m alle %H:%M}." if prevista_at else ".")
+        flash(f"Consegna presso {v.consegna_sede.nome}."
               + ("" if v.sede_id == v.consegna_sede_id else " Ora emetti l'ultimo DDT per portarla lì."), "ok")
     except Vietato as e:
         db.session.rollback()
@@ -1080,7 +1069,6 @@ def veicolo(veicolo_id):
         puo_emettere=servizi.puo_emettere(v, g.utente),
         puo_ultimo_ddt=servizi.puo_emettere_ultimo_ddt(v, g.utente),
         sedi_consegna=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
-        slot_consegna=_scelta_slot(_consegne_fissate(escludi=v)) if v.fase == "pronta" else None,
         puo_predisporre=servizi.puo_predisporre(v, g.utente),
         puo_consegnare=servizi.puo_consegnare(v, g.utente),
         puo_lavorazione=ultimo is not None and servizi.puo_completare_lavorazione(ultimo, g.utente),

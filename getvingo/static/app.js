@@ -42,7 +42,7 @@
   var toccata = false;
   var SUGGERITE = { propria: 'Spostamento', carrozzeria: 'Invio lavorazione', officina: 'Invio lavorazione',
                     altro: 'Invio lavorazione', allestitore: 'Invio lavorazione', esposizione: 'Conto esposizione',
-                    rivenditore: 'Conto visione', cliente: 'Consegna a cliente' };
+                    concessionario: 'Conto visione', rivenditore: 'Conto visione', cliente: 'Consegna a cliente' };
   if (causale) causale.addEventListener('change', function () { toccata = true; });
   function aggiorna(suggerisci) {
     if (!dest) return;

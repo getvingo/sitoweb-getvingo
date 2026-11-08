@@ -2,7 +2,7 @@
 {% from "_macro.html" import campi_indirizzo, campi_fiscali, i, csrf_input, gps, indietro %}
 {% block titolo %}Inizia spostamento · Getvingo{% endblock %}
 {% macro destinazione(s) %}
-{% if s.tipo == 'rivenditore' %}
+{% if s.tipo in ('concessionario', 'rivenditore') %}
 <div class="destinazione-btn destinazione-doppia">
   <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b><small>{{ s.indirizzo_completo }}</small>
     <span class="scelta-causale">
@@ -53,7 +53,8 @@
     <label><input type="radio" name="tipo" value="carrozzeria"> Carrozzeria</label>
     <label><input type="radio" name="tipo" value="officina"> Officina</label>
     <label><input type="radio" name="tipo" value="allestitore"> Allestitore</label>
-    <label><input type="radio" name="tipo" value="rivenditore"> Concessionario</label>
+    <label><input type="radio" name="tipo" value="concessionario"> Concessionario</label>
+    <label><input type="radio" name="tipo" value="rivenditore"> Rivenditore</label>
     <label><input type="radio" name="tipo" value="esposizione"> Esposizione</label>
     <label><input type="radio" name="tipo" value="altro"> Altro fornitore</label>
   </div>

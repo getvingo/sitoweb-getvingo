@@ -51,7 +51,7 @@
       ultima = chiave;
       stato('Cerco l’indirizzo…');
       if (GetvingoMappa.google) {
-        return cercaGoogle(via + ', ' + comune + ', ' + (c('stato').value || 'Italia')).then(function (ris) {
+        return cercaGoogle(via + ', ' + comune + ', ' + (c('stato').value || 'Italia'), null, true).then(function (ris) {
           var r = ris[0];
           if (!r || !r.via) { verificato(null); return stato('Via non trovata a ' + comune + ': controlla come è scritta, oppure tocca il punto sulla mappa.', 'errore'); }
           c('comune').value = r.comune || comune; c('cap').value = r.cap || c('cap').value;
@@ -114,11 +114,30 @@
       return { via: [t.route, t.street_number].filter(Boolean).join(' '), cap: t.postal_code,
                comune: t.administrative_area_level_3 || t.locality, provincia: breve.administrative_area_level_2, stato: t.country };
     }
-    function cercaGoogle(q) {
+    // punto da cui cercare i luoghi più vicini: segnaposto, poi la zona della mappa guardata, poi il telefono
+    var mappaMossa = false;
+    function riferimento() {
+      if (segnaposto) { var p = segnaposto.getLatLng(); return Promise.resolve([p.lat, p.lng]); }
+      if (mappa && mappaMossa) { var c0 = mappa.getCenter(); return Promise.resolve([c0.lat, c0.lng]); }
+      return new Promise(function (ok) {
+        if (!navigator.geolocation) return ok(mappa ? [mappa.getCenter().lat, mappa.getCenter().lng] : null);
+        navigator.geolocation.getCurrentPosition(function (p) { ok([p.coords.latitude, p.coords.longitude]); },
+          function () { ok(mappa ? [mappa.getCenter().lat, mappa.getCenter().lng] : null); },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 });
+      });
+    }
+    function km(a, b) {
+      var r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r;
+      var h = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+      return 12742 * Math.asin(Math.sqrt(h));
+    }
+    function cercaGoogle(q, rif, perVerifica) {
+      var corpo = { textQuery: q, languageCode: 'it', regionCode: 'IT', maxResultCount: perVerifica ? 1 : 20 };
+      if (rif && !perVerifica) corpo.locationBias = { circle: { center: { latitude: rif[0], longitude: rif[1] }, radius: 50000 } };
       return fetch('https://places.googleapis.com/v1/places:searchText', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GetvingoMappa.chiave,
           'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.addressComponents,places.location' },
-        body: JSON.stringify({ textQuery: q, languageCode: 'it', regionCode: 'IT', maxResultCount: 6 })
+        body: JSON.stringify(corpo)
       }).then(function (r) { return r.json(); }).then(function (d) {
         return (d.places || []).map(function (p) {
           var a = componenti(p.addressComponents);
@@ -127,11 +146,21 @@
         });
       });
     }
-    function cercaOsm(q) {
-      var u = NOMINATIM + 'search?' + new URLSearchParams({ format: 'jsonv2', addressdetails: 1, limit: 6,
-                                                          'accept-language': 'it', q: q });
-      return fetch(u).then(function (r) { return r.json(); }).then(function (ris) {
-        return ris.map(function (r) {
+    function cercaOsm(q, rif) {
+      // prima solo nella zona intorno al punto di riferimento (circa 40 km); se lì c'è poco, ovunque
+      function chiedi(zona) {
+        var parametri = { format: 'jsonv2', addressdetails: 1, limit: 20, 'accept-language': 'it', q: q };
+        if (zona) {
+          parametri.viewbox = [rif[1] - 0.5, rif[0] + 0.35, rif[1] + 0.5, rif[0] - 0.35].join(',');
+          parametri.bounded = 1;
+        }
+        return fetch(NOMINATIM + 'search?' + new URLSearchParams(parametri)).then(function (r) { return r.json(); });
+      }
+      return (rif ? chiedi(true) : Promise.resolve([])).then(function (vicini) {
+        return vicini.length >= 3 ? vicini : chiedi(false).then(function (altri) { return vicini.concat(altri); });
+      }).then(function (ris) {
+        var visti = {};
+        return ris.filter(function (r) { return !visti[r.place_id] && (visti[r.place_id] = 1); }).map(function (r) {
           var a = r.address || {};
           return { nome: r.name, testo: r.display_name, via: [a.road, a.house_number].filter(Boolean).join(' '),
                    cap: a.postcode, comune: comuneDi(a), provincia: provincia(a), stato: a.country, lat: r.lat, lon: r.lon };
@@ -141,15 +170,25 @@
     function cercaLuogo() {
       var q = cercaIn.value.trim();
       if (q.length < 3) return;
-      lista.hidden = false; lista.innerHTML = '<li class="tenue">Cerco…</li>';
-      (GetvingoMappa.google ? cercaGoogle(q) : cercaOsm(q)).then(function (ris) {
+      lista.hidden = false; lista.innerHTML = '<li class="tenue">Cerco i luoghi più vicini…</li>';
+      var rif = null;
+      riferimento().then(function (p) {
+        rif = p;
+        return GetvingoMappa.google ? cercaGoogle(q, rif) : cercaOsm(q, rif);
+      }).then(function (ris) {
         lista.innerHTML = '';
-        if (!ris.length) { lista.innerHTML = '<li class="tenue">Nessun luogo trovato: prova con nome e comune.</li>'; return; }
-        ris.forEach(function (r) {
+        if (!ris.length) { lista.innerHTML = '<li class="tenue">Nessun luogo trovato: prova con altre parole o con il comune.</li>'; return; }
+        if (rif) {  // dal più vicino al più lontano
+          ris.forEach(function (r) { r.km = km(rif, [Number(r.lat), Number(r.lon)]); });
+          ris.sort(function (a, b) { return a.km - b.km; });
+        }
+        ris.slice(0, 10).forEach(function (r) {
           var li = document.createElement('li'), b = document.createElement('button');
           b.type = 'button'; b.className = 'risultato-luogo';
           var t = document.createElement('b'); t.textContent = r.nome || r.via; b.appendChild(t);
-          var s2 = document.createElement('span'); s2.textContent = r.testo; b.appendChild(s2);
+          var s2 = document.createElement('span');
+          s2.textContent = (r.km != null ? (r.km < 1 ? Math.round(r.km * 1000) + ' m' : r.km.toFixed(1).replace('.', ',') + ' km') + ' · ' : '') + r.testo;
+          b.appendChild(s2);
           b.addEventListener('click', function () { riempi(r); });
           li.appendChild(b); lista.appendChild(li);
         });
@@ -165,6 +204,7 @@
       mappa = L.map(div, { zoomControl: true, scrollWheelZoom: false }).setView([45.67, 12.24], 9);
       GetvingoMappa.sfondo(mappa);
       mappa.on('click', function (e) { daPunto(e.latlng.lat, e.latlng.lng); });
+      mappa.on('dragend zoomend', function () { mappaMossa = true; });
       if (lat.value && lon.value) { verificato(lat.value, lon.value); stato('Indirizzo sulla mappa ✓', 'ok'); }
       else if (c('indirizzo').value && c('comune').value) cerca();
     });

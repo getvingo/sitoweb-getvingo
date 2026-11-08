@@ -33,9 +33,10 @@
   </form>
 </section>
 {% endif %}
-{# i 4 numeri sono filtri: toccandoli si vede solo quel gruppo #}
+{# i 4 numeri sono filtri (in tempo, in ritardo, pronte, consegnate): toccandoli si vede solo quel gruppo #}
 {# il totale in preparazione non serve: è già nella scheda "In preparazione" qui sotto #}
-<nav class="riepilogo-pagina tre" aria-label="Filtra per stato">
+<nav class="riepilogo-pagina quattro" aria-label="Filtra per stato">
+  <a class="tile-numero corso {{ 'attivo' if stato_prep == 'tempo' }}" href="{{ url_for('main.preparazione', vista='corso', stato=none if stato_prep == 'tempo' else 'tempo', tipologia=tipologia) }}"><b>{{ conteggi.tempo }}</b><span>in tempo</span></a>
   <a class="tile-numero ritardo {{ 'attivo' if solo_ritardo }}" href="{{ url_for('main.preparazione', vista='corso', stato=none if solo_ritardo else 'ritardo', tipologia=tipologia) }}"><b>{{ conteggi.ritardo }}</b><span>in ritardo</span></a>
   <a class="tile-numero finita {{ 'attivo' if vista == 'pronte' }}" href="{{ url_for('main.preparazione', vista='pronte', tipologia=tipologia) }}"><b>{{ conteggi.pronte }}</b><span>pronte</span></a>
   <a class="tile-numero consegnate {{ 'attivo' if vista == 'consegnate' }}" href="{{ url_for('main.preparazione', vista='consegnate', tipologia=tipologia) }}"><b>{{ conteggi.consegnate }}</b><span>consegnate</span></a>
@@ -45,13 +46,13 @@
   ('pronte', 'Pronte per la consegna', url_for('main.preparazione', vista='pronte', tipologia=tipologia), conteggi.pronte, 'bandiera', 'Pronte'),
   ('consegnate', 'Consegnate', url_for('main.preparazione', vista='consegnate', tipologia=tipologia), conteggi.consegnate, 'archivio', 'Consegnate'),
 ], vista, a_destra=('consegnate',), una_riga=True) }}
-{{ filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato='ritardo' if solo_ritardo else none) }}
+{{ filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato=stato_prep) }}
 
 {% if vista == 'corso' %}
-  {% set st = 'ritardo' if solo_ritardo else none %}
+  {% set st = stato_prep %}
   {{ interruttore_modo(modo, url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='elenco'), url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='calendario'),
-                       preparazioni|length ~ (' in ritardo' if solo_ritardo else ' auto in preparazione'),
-                       url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo) if solo_ritardo else none) }}
+                       preparazioni|length ~ ({'ritardo': ' in ritardo', 'tempo': ' in tempo'}.get(stato_prep) or ' auto in preparazione'),
+                       url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo) if stato_prep else none) }}
   {% if modo == 'calendario' %}
   <p class="legenda-calendario"><span class="ev pronta_entro">Pronta entro</span> <span class="ev ritardo">In ritardo</span></p>
   {{ calendario_mese(calendario, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo='calendario', mese=calendario.prec),
@@ -115,10 +116,10 @@
           <div class="tenue piccolo">{{ v.vin|vin }}</div></a>
       </div>
       <p class="stato-consegna">{{ i('bandiera', 's') }}
-        {% if v.verso_consegna %}{% set m = v.movimento_aperto %}<span>In viaggio verso <b>{{ v.consegna_sede.nome }}</b> con l'ultimo DDT {{ m.ddt.sigla }}{% if v.consegna_prevista_at %} · consegna {{ v.consegna_prevista_at|slot }}{% endif %}</span>
+        {% if v.verso_consegna %}{% set m = v.movimento_aperto %}<span>In viaggio verso <b>{{ v.consegna_sede.nome }}</b> con l'ultimo DDT {{ m.ddt.sigla }}</span>
         {% elif not v.consegna_sede %}<span><b>Sede di consegna da indicare</b></span>
-        {% elif v.sede_id != v.consegna_sede_id %}<span>Consegna a <b>{{ v.consegna_sede.nome }}</b>{% if v.consegna_prevista_at %} · {{ v.consegna_prevista_at|slot }}{% endif %} · ora è a {{ v.sede.nome }}: serve l'ultimo DDT</span>
-        {% else %}<span>Pronta a <b>{{ v.consegna_sede.nome }}</b>{% if v.consegna_prevista_at %} · consegna {{ v.consegna_prevista_at|slot }}{% endif %}</span>{% endif %}</p>
+        {% elif v.sede_id != v.consegna_sede_id %}<span>Consegna a <b>{{ v.consegna_sede.nome }}</b> · ora è a {{ v.sede.nome }}: serve l'ultimo DDT</span>
+        {% else %}<span>Pronta a <b>{{ v.consegna_sede.nome }}</b></span>{% endif %}</p>
       {% if not v.targa %}<p class="tenue piccolo" style="margin:4px 0 0">{{ i('attenzione', 's') }} Senza targa: va inserita prima della consegna.</p>{% endif %}
       {{ riepilogo_lavorazione(v.ultima_preparazione) }}
       {% if v.verso_consegna %}
@@ -126,7 +127,7 @@
       {% else %}
       {{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=v.ultima_preparazione.id), 'Non è ancora pronta: annulla “Pronta”', url_for('main.preparazione', vista='pronte', tipologia=tipologia)) }}
       <a class="btn primario pieno" style="margin-top:12px" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{{ i('bandiera') }}
-        {% if not v.consegna_sede %}Fissa sede e appuntamento{% elif v.sede_id != v.consegna_sede_id %}Emetti l'ultimo DDT{% elif not v.targa %}Inserisci la targa e consegna{% else %}Vai alla consegna{% endif %}</a>
+        {% if not v.consegna_sede %}Indica la sede di consegna{% elif v.sede_id != v.consegna_sede_id %}Emetti l'ultimo DDT{% elif not v.targa %}Inserisci la targa e consegna{% else %}Vai alla consegna{% endif %}</a>
       {% endif %}
     </div>
   {% else %}

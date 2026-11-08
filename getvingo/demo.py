@@ -240,12 +240,11 @@ def carica():
     prep = rientro_in_sede(yaris, carrozzeria, utenti["carrozzeria"], giorni_fa=8, giorni_lav=4, ore_attesa=26)
     passi(prep, 4)                                                                           # pronta, sede da indicare
     pronta_diretta(renegade, 4)
-    servizi.imposta_consegna(renegade, utenti["ufficio"], villorba,                          # serve l'ultimo DDT
-                             (adesso() + timedelta(days=1)).replace(hour=10, minute=30))
+    servizi.imposta_consegna(renegade, utenti["ufficio"], villorba)                          # serve l'ultimo DDT
     pronta_diretta(classe_a, 3)
-    servizi.imposta_consegna(classe_a, utenti["ufficio"], treviso, oggi_tardi)  # da consegnare oggi (o al primo slot utile)
+    servizi.imposta_consegna(classe_a, utenti["ufficio"], treviso)
     pronta_diretta(troc, 3)                         # già in viaggio con l'ultimo DDT: resta tra le pronte fino alla consegna
-    servizi.imposta_consegna(troc, utenti["ufficio"], villorba, (adesso() + timedelta(days=1)).replace(hour=15, minute=0))
+    servizi.imposta_consegna(troc, utenti["ufficio"], villorba)
     viaggio(troc, villorba, "Spostamento", Movimento.NESSUNA, "", _indietro(minutes=35))
 
     # ------------------------------------------------------------- DAI FORNITORI

@@ -93,8 +93,8 @@
 <section class="scheda consegna" id="consegna">
   <h3>{{ i('bandiera', 's') }} Consegna al cliente</h3>
   <ol class="passi-consegna">
-    <li class="{{ 'fatto' if v.consegna_sede }}"><b>Dove e quando</b>
-      {% if v.consegna_sede %}<span>{{ v.consegna_sede.nome }}{% if v.consegna_prevista_at %} · {{ v.consegna_prevista_at|slot }}{% else %} · orario da fissare{% endif %}</span>{% endif %}</li>
+    <li class="{{ 'fatto' if v.consegna_sede }}"><b>Sede di consegna</b>
+      {% if v.consegna_sede %}<span>{{ v.consegna_sede.nome }}</span>{% else %}<span>da indicare</span>{% endif %}</li>
     <li class="{{ 'fatto' if nella_sede else ('ora' if v.verso_consegna) }}"><b>Auto nella sede di consegna</b>
       {% if v.verso_consegna %}<span>in viaggio con l'ultimo DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=mov.ddt.id) }}">{{ mov.ddt.sigla }}</a> · da {{ in_viaggio_da(mov) }}</span>
       {% elif v.consegna_sede and not nella_sede %}<span>ora è a {{ v.sede.nome }}: serve l'ultimo DDT</span>{% endif %}</li>
@@ -105,13 +105,12 @@
 
   {% if v.fase == 'pronta' %}
   <details class="ripiega" {{ 'open' if not v.consegna_sede }} style="margin:12px 0 0">
-    <summary>{{ i('orologio', 's') }} {{ 'Cambia sede o appuntamento' if v.consegna_sede else 'Fissa sede e appuntamento di consegna' }}</summary>
+    <summary>{{ i('bandiera', 's') }} {{ 'Cambia la sede di consegna' if v.consegna_sede else 'Indica la sede di consegna' }}</summary>
     <form method="post" action="{{ url_for('main.sede_consegna', veicolo_id=v.id) }}" data-una-volta>
       {{ csrf_input() }}
       <label class="campo" style="max-width:420px"><span>Sede di consegna</span>
         <select name="sede_id" required>{% for s in sedi_consegna %}<option value="{{ s.id }}" {{ 'selected' if s.id == (v.consegna_sede_id or v.sede_id) }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}{{ ' (qui)' if s.id == v.sede_id }}</option>{% endfor %}</select></label>
-      <div class="campo"><span>Appuntamento con il cliente <span class="tenue">(facoltativo · slot di 30 minuti, uno per sede)</span></span>
-        {{ scegli_slot('prevista', slot_consegna, v.consegna_prevista_at, per_sede='sede_id', vuoto='Orario da fissare') }}</div>
+      <p class="tenue piccolo">Il giorno della consegna lo fissate con il cliente nel vostro portale delle consegne.</p>
       <button class="btn primario">{{ i('check', 's') }} Conferma</button>
     </form>
   </details>

@@ -157,11 +157,13 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
         "officina": "Officina",
         "allestitore": "Allestitore (veicoli commerciali)",
         "esposizione": "Esposizione (fiera, showroom esterno)",
-        "rivenditore": "Concessionario / rivenditore",
+        "concessionario": "Concessionario",
+        "rivenditore": "Rivenditore",
         "cliente": "Cliente",
         "altro": "Altro fornitore",
     }
     FORNITORI = ("carrozzeria", "officina", "allestitore", "altro")  # luoghi dove le auto vanno in lavorazione
+    COMMERCIO = ("concessionario", "rivenditore")  # altri concessionari e rivenditori: conto visione o vendita
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
@@ -192,7 +194,7 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     @property
     def societa(self):
         """Luogo di un'altra azienda (fornitore, esposizione): servono P. IVA e codice fiscale."""
-        return self.tipo in self.FORNITORI + ("esposizione", "rivenditore")
+        return self.tipo in self.FORNITORI + self.COMMERCIO + ("esposizione",)
 
     @property
     def dove(self):

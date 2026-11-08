@@ -376,13 +376,13 @@ def causale_per(da_sede, a_sede):
         return "Invio lavorazione"
     if a_sede.tipo == "esposizione":
         return "Conto esposizione"
-    if a_sede.tipo == "rivenditore":
+    if a_sede.tipo in Sede.COMMERCIO:
         return "Conto visione"
     if da_sede is not None and da_sede.esterna:
         return "Reso lavorazione"
     if da_sede is not None and da_sede.tipo == "esposizione":
         return "Reso esposizione"
-    if da_sede is not None and da_sede.tipo == "rivenditore":
+    if da_sede is not None and da_sede.tipo in Sede.COMMERCIO:
         return "Reso"
     return "Spostamento"
 
@@ -401,7 +401,8 @@ def destinazioni_rapide(veicolo, utente):
     return preferite, [(Sede.TIPI[t], list(gr)) for t, gr in groupby(altre, key=lambda s: s.tipo)]
 
 
-TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "allestitore", "esposizione", "rivenditore")
+TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "allestitore", "esposizione", "concessionario",
+                           "rivenditore")
 
 
 def destinazione_scritta(nome, tipo="altro"):
@@ -434,7 +435,7 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None):
     if a_sede is None or not a_sede.attiva:
         raise Vietato("Scegli la destinazione.")
     # verso un concessionario/rivenditore si sceglie: conto visione (può tornare) o vendita
-    if a_sede.tipo != "rivenditore" or causale not in Movimento.CAUSALI_RIVENDITORE:
+    if a_sede.tipo not in Sede.COMMERCIO or causale not in Movimento.CAUSALI_RIVENDITORE:
         causale = causale_per(veicolo.sede, a_sede)
     dati = {"a_sede_id": a_sede.id, "causale": causale,
             "vettore_id": utente.vettore_id, "conducente": utente.nome,
@@ -691,23 +692,17 @@ def puo_consegnare(v, utente):
             and v.consegna_sede_id is not None and v.sede_id == v.consegna_sede_id)
 
 
-def imposta_consegna(v, utente, sede, prevista_at=None):
-    """Sede (propria) in cui l'auto pronta verrà consegnata al cliente, e quando (facoltativo)."""
+def imposta_consegna(v, utente, sede):
+    """Sede (propria) in cui l'auto pronta verrà consegnata al cliente. Il giorno della consegna si
+    fissa con il cliente in un altro portale: Getvingo calendarizza solo le preparazioni."""
     if not utente.interno:
         raise Vietato("La consegna la organizza la concessionaria.")
     if v.fase != "pronta":
         raise Vietato("La sede di consegna si indica quando l'auto è pronta per la consegna.")
     if sede is None or sede.tipo != "propria" or not sede.attiva:
         raise Vietato("Scegli una sede della concessionaria.")
-    if prevista_at is not None:
-        occupata = Veicolo.query.filter(Veicolo.id != v.id, Veicolo.stato != "consegnato",
-                                        Veicolo.consegna_sede_id == sede.id,
-                                        Veicolo.consegna_prevista_at == prevista_at).first()
-        if occupata:
-            raise Vietato(f"Alle {prevista_at:%H:%M} del {prevista_at:%d/%m} a {sede.nome} c'è già la consegna "
-                          f"di {occupata.descrizione}: scegli un altro orario.")
     # anche l'id subito: chi controlla la sede nella stessa operazione (es. consegna) lo trova già
-    v.consegna_sede, v.consegna_sede_id, v.consegna_prevista_at = sede, sede.id, prevista_at
+    v.consegna_sede, v.consegna_sede_id, v.consegna_prevista_at = sede, sede.id, None
 
 
 def verso_il_cliente(a_sede_id, causale):

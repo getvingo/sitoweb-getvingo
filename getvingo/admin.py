@@ -147,11 +147,11 @@ GRUPPI_LUOGHI = {
     "proprie": ("Sedi e piazzali", "I luoghi della concessionaria: sede legale, sedi e piazzali dove stanno le auto.",
                 ("propria",)),
     "esterne": ("Destinazioni esterne", "Fornitori per le lavorazioni, allestitori, altri concessionari, esposizioni e clienti: dove le auto vanno e da dove tornano.",
-                ("carrozzeria", "officina", "allestitore", "altro", "rivenditore", "esposizione", "cliente")),
+                ("carrozzeria", "officina", "allestitore", "altro", "concessionario", "rivenditore", "esposizione", "cliente")),
 }
 SEZIONI_ESTERNE = [("Fornitori per le lavorazioni", ("carrozzeria", "officina", "altro")),
                    ("Allestitori (veicoli commerciali)", ("allestitore",)),
-                   ("Concessionari e rivenditori", ("rivenditore",)),
+                   ("Concessionari", ("concessionario",)), ("Rivenditori", ("rivenditore",)),
                    ("Esposizioni", ("esposizione",)), ("Clienti", ("cliente",))]
 
 
