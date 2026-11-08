@@ -1,0 +1,7 @@
+{% extends "email/_base.html" %}
+{% block corpo %}
+<p style="margin:0 0 12px">Ciao {{ utente.nome }},</p>
+<p style="margin:0 0 12px">l'assistenza Getvingo (<b>{{ gestore }}</b>) è entrata nel portale di <b>{{ azienda }}</b> il <b>{{ quando.strftime('%d/%m/%Y alle %H:%M') }}</b>, come consentito dalla vostra impostazione “Assistenza Getvingo”.</p>
+<p style="margin:0 0 12px">Le eventuali modifiche risultano firmate “Supporto Getvingo”.</p>
+{% endblock %}
+{% block nota %}Puoi vedere tutti gli accessi, o togliere il consenso in qualsiasi momento, in <b>Gestione → Assistenza Getvingo</b>.{% endblock %}

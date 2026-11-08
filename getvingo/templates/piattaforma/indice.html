@@ -5,7 +5,7 @@
 {% block contenuto %}
 <div class="titolo-pagina">
   <div><div class="sopratitolo">Gestore della piattaforma</div><h1>Pannello Getvingo</h1>
-    <p class="descrizione-pagina">Le concessionarie clienti: ognuna ha dati completamente separati. Qui ne crei di nuove, inviti il loro amministratore e ne sospendi l'accesso. Con “Entra” lavori dentro una concessionaria come suo amministratore: ogni modifica resta firmata “Supporto Getvingo”.</p></div>
+    <p class="descrizione-pagina">Le concessionarie clienti: ognuna ha dati completamente separati. Qui ne crei di nuove, inviti il loro amministratore e ne sospendi l'accesso. Puoi entrare in una concessionaria per assistenza solo se il cliente lo ha consentito: ogni ingresso resta registrato e visibile a lui.</p></div>
   <a class="btn primario" href="{{ url_for('piattaforma.nuova') }}">{{ i('utente', 's') }} Nuova concessionaria</a>
 </div>
 
@@ -18,10 +18,15 @@
       <span class="stato-cliente {{ 'attivo' if o.attiva else 'sospeso' }}">{{ 'Attivo' if o.attiva else 'Sospeso' }}</span>
     </div>
     {% if o.id != g.utente.org_id %}
-    <form method="post" action="{{ url_for('piattaforma.entra', org_id=o.id) }}" class="cliente-entra">
-      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      <button class="btn primario pieno">{{ i('freccia', 's') }} Entra in {{ o.nome }}</button>
-    </form>
+      {% if o.assistenza_consentita %}
+      <form method="post" action="{{ url_for('piattaforma.entra', org_id=o.id) }}" class="cliente-entra">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn primario pieno">{{ i('freccia', 's') }} Entra in {{ o.nome }} per assistenza</button>
+      </form>
+      <p class="tenue piccolo" style="margin:6px 0 0">Assistenza consentita dal cliente{% if o.assistenza_cambiata_at %} dal {{ o.assistenza_cambiata_at|data('%d/%m/%Y') }}{% endif %}.</p>
+      {% else %}
+      <p class="assistenza-chiusa">{{ i('chiave', 's') }} Assistenza non consentita: per entrare serve che il cliente la attivi in Gestione → Assistenza Getvingo.</p>
+      {% endif %}
     {% endif %}
     <dl class="cliente-numeri">
       <div><dt>Utenti attivi</dt><dd>{{ utenti.get(o.id, 0) }}</dd></div>

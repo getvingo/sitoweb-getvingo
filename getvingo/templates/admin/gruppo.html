@@ -9,7 +9,7 @@
   {% if u.supporto %}
   <div class="voce voce-supporto">
     <span class="avatar">{{ i('chiave', 's') }}</span>
-    <div class="corpo"><h3>Supporto Getvingo</h3><div class="tratta">Accesso del gestore della piattaforma per assistenza · Amministratore</div>
+    <div class="corpo"><h3>Supporto Getvingo</h3><div class="tratta">Accesso dell'assistenza Getvingo · entra solo se lo consenti in <a href="{{ url_for('admin.assistenza') }}">Assistenza Getvingo</a></div>
       <div class="tenue piccolo">{% if u.ultimo_accesso_at %}Ultimo accesso {{ u.ultimo_accesso_at|da_quanto }}{% else %}Mai entrato{% endif %} · le sue modifiche sono firmate Supporto Getvingo</div></div>
   </div>
   {% else %}

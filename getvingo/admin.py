@@ -9,7 +9,7 @@ from . import vin as vin_mod
 from .auth import ruolo_richiesto
 from datetime import datetime, timedelta
 
-from .models import Azienda, GiornoChiuso, Sede, Tag, Utente, Veicolo, Vettore, adesso, db
+from .models import AccessoSupporto, Azienda, GiornoChiuso, Sede, Tag, Utente, Veicolo, Vettore, adesso, db
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -161,6 +161,25 @@ def attiva(tipo, oggetto_id):
     setattr(oggetto, campo, not getattr(oggetto, campo))
     db.session.commit()
     return redirect(url_for(pagina))
+
+
+@bp.route("/assistenza", methods=["GET", "POST"])
+@ruolo_richiesto("admin")
+def assistenza():
+    """Il cliente decide se il gestore Getvingo può entrare per assistenza e vede ogni suo ingresso."""
+    org = g.utente.organizzazione
+    if request.method == "POST":
+        if g.utente.supporto:
+            flash("Il consenso all'assistenza lo decide solo un amministratore della concessionaria.", "errore")
+        else:
+            org.assistenza_consentita = request.form.get("consenti") == "1"
+            org.assistenza_cambiata_at = adesso()
+            db.session.commit()
+            flash("Assistenza Getvingo consentita: potrà entrare finché non la togli." if org.assistenza_consentita
+                  else "Assistenza Getvingo non consentita: da ora non può entrare.", "ok")
+        return redirect(url_for("admin.assistenza"))
+    accessi_supporto = AccessoSupporto.query.order_by(AccessoSupporto.at.desc()).limit(100).all()
+    return render_template("admin/assistenza.html", org=org, accessi_supporto=accessi_supporto)
 
 
 @bp.route("/utenti")

@@ -2112,6 +2112,8 @@ class TestUtenzaMaster(Base):
             db.session.add(Veicolo(vin="ZFA31200000123456", marca="Fiat", modello="Panda", condizione="nuovo",
                                    sede=Sede.query.filter_by(nome="Sede Altra").first(), stato="in_sede"))
             db.session.commit()
+            org2.assistenza_consentita = True  # il cliente ha consentito l'assistenza (test del consenso a parte)
+            db.session.commit()
             self.org2 = org2.id
             self.v2 = Veicolo.query.filter_by(vin="ZFA31200000123456").one().id
 
@@ -2136,7 +2138,7 @@ class TestUtenzaMaster(Base):
             self.assertEqual((sup.org_id, sup.ruolo, sup.nome), (self.org2, "admin", "Supporto Getvingo"))
         # il cliente vede il supporto nel suo elenco, ma non può aprirlo
         gruppo = self.c.get("/admin/aziende/concessionaria").get_data(as_text=True)
-        self.assertIn("Accesso del gestore della piattaforma", gruppo)
+        self.assertIn("Accesso dell'assistenza Getvingo", gruppo)
         self.assertEqual(self.c.get(f"/admin/utenti/{sup.id}").status_code, 302)
         # torna al Pannello con il proprio account
         self.assertEqual(self.c.post("/piattaforma/torna").headers["Location"], "/piattaforma/")
@@ -2184,3 +2186,56 @@ class TestUtenzaMaster(Base):
         self.c.post("/piattaforma/torna")
         pannello = self.c.get("/piattaforma/").get_data(as_text=True)
         self.assertNotIn("supporto-", pannello)
+
+    def _cliente(self):
+        c = self.app.test_client()
+        c.post("/login", data={"email": "admin@altra.it", "password": "password2"})
+        return c
+
+    def test_senza_consenso_non_si_entra(self):
+        cliente = self._cliente()
+        cliente.post("/admin/assistenza", data={"consenti": "0"})
+        r = self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.assertEqual(r.headers["Location"], "/piattaforma/")
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 404)
+        self.assertIn("Assistenza non consentita", self.c.get("/piattaforma/").get_data(as_text=True))
+        # il cliente lo riattiva: si entra
+        cliente.post("/admin/assistenza", data={"consenti": "1"})
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 200)
+
+    def test_tolto_il_consenso_il_gestore_torna_al_suo_account(self):
+        self.abbina()
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self._cliente().post("/admin/assistenza", data={"consenti": "0"})
+        r = self.c.get("/stock")
+        self.assertEqual(r.status_code, 200)
+        testo = r.get_data(as_text=True)
+        self.assertIn("Golf", testo)            # di nuovo nella sua concessionaria
+        self.assertNotIn("Panda", testo)
+        self.assertIn("ha tolto il consenso", testo)
+
+    def test_ingressi_registrati_e_visibili_al_cliente(self):
+        self.app.config["POSTA_ATTIVA"] = True
+        posta = self.app.extensions.setdefault("posta_inviata", [])
+        posta.clear()
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.assertEqual([m["a"] for m in posta], ["admin@altra.it"])
+        self.assertIn("accesso dell'assistenza", posta[0]["oggetto"])
+        self.c.post("/piattaforma/torna")
+        pagina = self._cliente().get("/admin/assistenza").get_data(as_text=True)
+        self.assertIn("admin@t.it", pagina)
+        self.assertIn("Assistenza consentita", pagina)
+        # il registro è del cliente: non compare nella concessionaria del gestore
+        self.assertNotIn("admin@t.it</span>", self.c.get("/admin/assistenza").get_data(as_text=True))
+
+    def test_il_supporto_non_cambia_il_consenso(self):
+        self.c.post(f"/piattaforma/{self.org2}/entra")
+        self.c.post("/admin/assistenza", data={"consenti": "0"})
+        with self.app.app_context():
+            self.assertTrue(db.session.get(Organizzazione, self.org2).assistenza_consentita)
+
+    def test_consenso_spento_di_base(self):
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Nuova S.r.l.", "nome": "N", "email": "n@nuova.it"})
+        with self.app.app_context():
+            self.assertFalse(Organizzazione.query.filter_by(nome="Nuova S.r.l.").one().assistenza_consentita)

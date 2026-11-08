@@ -1709,3 +1709,14 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 .cliente-entra { margin: 12px 0 0; }
 .voce-supporto { border-style: dashed; }
 .voce-supporto .avatar { background: var(--arancio-tenue); color: var(--arancio-testo); }
+.assistenza-chiusa { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; padding: 10px 12px; border-radius: var(--r-s);
+  background: var(--spento-tenue); color: var(--testo-2); font-size: .9rem; }
+.assistenza-chiusa .icona { flex: none; margin-top: 2px; }
+.assistenza-riga { display: flex; gap: 12px; align-items: flex-start; }
+.assistenza-icona { flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  background: var(--spento-tenue); color: var(--testo-2); }
+.assistenza-stato.aperta { border-color: var(--ok); }
+.assistenza-stato.aperta .assistenza-icona { background: var(--ok-tenue); color: var(--ok); }
+.elenco-accessi { list-style: none; margin: 0; padding: 0; }
+.elenco-accessi li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--bordo); }
+.elenco-accessi li:first-child { border-top: 0; }

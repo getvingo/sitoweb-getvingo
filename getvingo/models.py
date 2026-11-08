@@ -22,6 +22,9 @@ class Organizzazione(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     attiva = db.Column(db.Boolean, default=True)
     creata_at = db.Column(db.DateTime, default=adesso)
+    # il cliente consente al gestore Getvingo di entrare per assistenza (lo decide il suo admin in Gestione)
+    assistenza_consentita = db.Column(db.Boolean, default=False)
+    assistenza_cambiata_at = db.Column(db.DateTime)
 
 
 def org_attiva():
@@ -47,6 +50,13 @@ def _solo_la_propria_organizzazione(stato):
         return
     stato.statement = stato.statement.options(with_loader_criteria(
         PerOrganizzazione, lambda cls: cls.org_id == org, include_aliases=True))
+
+
+class AccessoSupporto(PerOrganizzazione, db.Model):
+    """Registro degli ingressi del gestore Getvingo nella concessionaria (visibile al cliente)."""
+    id = db.Column(db.Integer, primary_key=True)
+    at = db.Column(db.DateTime, nullable=False, default=adesso)
+    gestore = db.Column(db.String(200), nullable=False)  # email del gestore che è entrato
 
 
 class Azienda(PerOrganizzazione, db.Model):

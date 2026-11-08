@@ -8,9 +8,9 @@ from functools import wraps
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from sqlalchemy import func
 
-from . import accessi, servizi
+from . import accessi, posta, servizi
 from .auth import gestore, login_richiesto
-from .models import Azienda, Ddt, Organizzazione, Utente, Veicolo, adesso, db
+from .models import AccessoSupporto, Azienda, Ddt, Organizzazione, Utente, Veicolo, adesso, db
 
 bp = Blueprint("piattaforma", __name__, url_prefix="/piattaforma")
 
@@ -140,6 +140,19 @@ def _utente_supporto(org):
     return u
 
 
+def _avvisa_amministratori(org, gestore_email):
+    """Email agli amministratori del cliente a ogni ingresso dell'assistenza (se la posta è attiva)."""
+    if not posta.configurata():
+        return
+    for a in Utente.query.filter_by(org_id=org.id, ruolo="admin", attivo=True, supporto=False) \
+            .execution_options(tutte_le_organizzazioni=True):
+        try:
+            posta.invia(a.email, "Getvingo: accesso dell'assistenza", "accesso_supporto", utente=a,
+                        azienda=org.nome, gestore=gestore_email, quando=adesso())
+        except posta.ErrorePosta:
+            pass
+
+
 @bp.route("/<int:org_id>/entra", methods=["POST"])
 @solo_gestore
 def entra(org_id):
@@ -148,10 +161,16 @@ def entra(org_id):
     org = _organizzazione(org_id)
     if org.id == g.utente.org_id:
         return redirect(url_for("main.home"))
-    gestore_id, gestore_ph = g.utente.id, g.utente.password_hash[-16:]
+    if not org.assistenza_consentita:
+        flash(f"{org.nome} non ha consentito l'assistenza Getvingo: può attivarla il suo amministratore "
+              "in Gestione → Assistenza Getvingo.", "errore")
+        return redirect(url_for("piattaforma.indice"))
+    gestore_id, gestore_ph, gestore_email = g.utente.id, g.utente.password_hash[-16:], g.utente.email
     supporto = _utente_supporto(org)
     supporto.ultimo_accesso_at = adesso()
+    db.session.add(AccessoSupporto(org_id=org.id, gestore=gestore_email))
     db.session.commit()
+    _avvisa_amministratori(org, gestore_email)
     current_app.logger.warning("Gestore %s entra in %s (n. %s) come Supporto Getvingo",
                                g.utente.email, org.nome, org.id)
     session.clear()

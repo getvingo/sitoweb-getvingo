@@ -1,0 +1,7 @@
+Ciao {{ utente.nome }},
+
+l'assistenza Getvingo ({{ gestore }}) è entrata nel portale di {{ azienda }} il {{ quando.strftime('%d/%m/%Y alle %H:%M') }}, come consentito dalla vostra impostazione "Assistenza Getvingo".
+
+Le eventuali modifiche risultano firmate "Supporto Getvingo". Puoi vedere tutti gli accessi, o togliere il consenso, in Gestione → Assistenza Getvingo.
+-- 
+Getvingo · email automatica, non rispondere.

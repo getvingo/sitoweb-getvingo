@@ -64,6 +64,14 @@ def init_app(app):
                     or g.utente is None or not g.utente.supporto:
                 session.clear()
                 g.utente = None
+            elif not g.utente.organizzazione.assistenza_consentita:
+                # il cliente ha tolto il consenso: il gestore torna subito al suo account
+                session.clear()
+                session.permanent = True
+                session.update(uid=orig.id, ph=orig.password_hash[-16:])
+                flash(f"{g.utente.organizzazione.nome} ha tolto il consenso all'assistenza: sei tornato al tuo account.",
+                      "errore")
+                g.utente = orig
             else:
                 g.gestore_originale = orig
         elif g.utente is not None and g.utente.supporto:  # il supporto si usa solo dal Pannello Getvingo

@@ -58,6 +58,12 @@ def aggiungi_colonne():
     if "movimento" not in ispettore.get_table_names():
         return []
     aggiunte = []
+    colonne_org = [c["name"] for c in ispettore.get_columns("organizzazione")]
+    for nome, tipo in (("assistenza_consentita", "BOOLEAN DEFAULT FALSE"), ("assistenza_cambiata_at", "TIMESTAMP")):
+        if nome not in colonne_org:  # consenso del cliente all'assistenza del gestore Getvingo
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE organizzazione ADD COLUMN {nome} {tipo}")
+            aggiunte.append("organizzazione." + nome)
     if "ddt_id" not in [c["name"] for c in ispettore.get_columns("movimento")]:
         # DDT multiplo: il movimento indica il suo DDT (prima solo il DDT indicava il movimento)
         with db.engine.begin() as conn:

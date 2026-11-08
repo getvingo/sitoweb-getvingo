@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}Assistenza Getvingo · Gestione{% endblock %}
+{% block contenuto %}
+{{ indietro(url_for('admin.indice')) }}
+<div class="titolo-pagina"><div><h1>Assistenza Getvingo</h1>
+  <p class="descrizione-pagina">Decidi tu se l'assistenza Getvingo può entrare nel vostro portale, per esempio per aiutarvi o correggere un dato. Senza il vostro consenso non può vedere né modificare nulla.</p></div></div>
+
+<form method="post" class="scheda assistenza-stato {{ 'aperta' if org.assistenza_consentita else '' }}" data-una-volta>
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <div class="assistenza-riga">
+    <span class="assistenza-icona">{{ i('chiave') }}</span>
+    <div>
+      <h3 style="margin:0 0 4px">{{ 'Assistenza consentita' if org.assistenza_consentita else 'Assistenza non consentita' }}</h3>
+      <p class="tenue piccolo" style="margin:0">
+        {% if org.assistenza_consentita %}L'assistenza Getvingo può entrare come amministratore: vede e modifica i dati, e ogni sua modifica resta firmata “Supporto Getvingo”.{% if org.assistenza_cambiata_at %} Attiva dal {{ org.assistenza_cambiata_at|data('%d/%m/%Y alle %H:%M') }}.{% endif %}
+        {% else %}L'assistenza Getvingo non può entrare. Attivala solo quando vi serve aiuto, e spegnila quando avete finito.{% endif %}
+      </p>
+    </div>
+  </div>
+  {% if g.utente.supporto %}
+  <p class="avviso info" style="margin:12px 0 0">{{ i('attenzione') }}<span>Lo può cambiare solo un amministratore della concessionaria.</span></p>
+  {% else %}
+  <input type="hidden" name="consenti" value="{{ '0' if org.assistenza_consentita else '1' }}">
+  <button class="btn {{ '' if org.assistenza_consentita else 'primario' }} pieno" style="margin-top:14px">
+    {{ i('chiave', 's') }} {{ 'Togli il consenso' if org.assistenza_consentita else 'Consenti l’assistenza Getvingo' }}</button>
+  {% endif %}
+</form>
+
+<h2>{{ i('orologio') }} Ingressi dell'assistenza</h2>
+{% if accessi_supporto %}
+<div class="scheda">
+  <ul class="elenco-accessi">
+    {% for a in accessi_supporto %}<li><b>{{ a.at|data('%d/%m/%Y alle %H:%M') }}</b><span class="tenue">{{ a.gestore }}</span></li>{% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="vuoto">L'assistenza Getvingo non è mai entrata.</div>
+{% endif %}
+<p class="tenue piccolo">A ogni ingresso gli amministratori ricevono anche un'email.</p>
+{% endblock %}
