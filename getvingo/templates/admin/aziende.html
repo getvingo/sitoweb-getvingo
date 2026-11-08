@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, indietro %}
+{% block titolo %}Utenti e fornitori · Getvingo{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<h1>Aziende e utenti</h1></div></div>
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Persone e accessi</div><h1>Utenti e fornitori</h1></div></div>
 <p class="tenue">Ogni azienda è un gruppo: dati e firma si inseriscono una volta sola e valgono per tutti i suoi utenti.</p>
 <div class="lista">
   <a class="voce" href="{{ url_for('admin.gruppo_concessionaria') }}">

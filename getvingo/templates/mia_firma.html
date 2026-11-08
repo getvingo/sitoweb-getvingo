@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% from "_macro.html" import csrf_input, firma_pad, indietro %}
+{% block titolo %}Firma dell'azienda · Getvingo{% endblock %}
 {% block contenuto %}
-{{ indietro(url_for('main.home')) }}
-<div class="titolo-pagina"><div><div class="sopratitolo">{{ sede.nome }}</div><h1>Firma predefinita</h1></div></div>
-<p class="tenue">Viene apposta in automatico ogni volta che confermate la ricezione di un'auto. La disegnate una volta sola.</p>
+{{ indietro(url_for('main.profilo'), 'Il mio profilo') }}
+<div class="titolo-pagina"><div><div class="sopratitolo">Il mio profilo · La tua azienda</div><h1>Firma di {{ sede.nome }}</h1></div></div>
+<p class="tenue">È la firma dell'azienda, non la tua personale: viene apposta in automatico ogni volta che confermate la ricezione di un'auto e vale per tutti gli utenti di {{ sede.nome }}. La tua firma da conducente sta nel Profilo di guida.</p>
 <form method="post" data-una-volta>
   {{ csrf_input() }}
   <div class="scheda">{{ firma_pad("Firma del destinatario", obbligatoria=True, attuale=sede.firma) }}</div>

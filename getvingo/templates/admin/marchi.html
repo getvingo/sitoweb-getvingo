@@ -2,8 +2,8 @@
 {% from "_macro.html" import i, csrf_input, indietro %}
 {% block titolo %}Loghi delle marche · Getvingo{% endblock %}
 {% block contenuto %}
-{{ indietro(url_for('admin.indice')) }}
-<div class="titolo-pagina"><div><h1>Loghi delle marche</h1>
+{{ indietro(url_for('admin.azienda'), 'Dati aziendali') }}
+<div class="titolo-pagina"><div><div class="sopratitolo">Gestione · Dati aziendali</div><h1>Loghi delle marche</h1>
   <p class="descrizione-pagina">I loghi sono marchi delle case auto: la fonte corretta è la loro sala stampa (media kit).
     Scarica da lì il logo e caricalo qui: ha la precedenza su tutti gli altri.</p></div></div>
 

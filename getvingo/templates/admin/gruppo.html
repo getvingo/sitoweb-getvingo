@@ -37,6 +37,9 @@
 </form>
 </details>
 
+{% if tipo == 'concessionaria' %}
+<a class="voce" href="{{ url_for('admin.azienda') }}" style="margin-top:16px">{{ i('doc') }}<div class="corpo"><h3>Dati e firma della concessionaria</h3><div class="tenue piccolo">Ragione sociale, P. IVA e firma del mittente sui DDT: in Gestione → Dati aziendali</div></div>{{ i('freccia', 's') }}</a>
+{% else %}
 <h2>{{ i('doc') }} Dati e firma dell'azienda</h2>
 <form method="post" class="scheda" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="azione" value="dati">
@@ -49,4 +52,5 @@
   {{ firma_pad("Firma unica dell'azienda (usata da tutti i suoi utenti)", attuale=dati.firma) }}
   <button class="btn primario pieno">Salva dati e firma</button>
 </form>
+{% endif %}
 {% endblock %}

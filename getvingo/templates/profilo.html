@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}Il mio profilo · Getvingo{% endblock %}
+{% block contenuto %}
+{{ indietro(url_for('main.home')) }}
+<div class="titolo-pagina"><div><h1>Il mio profilo</h1>
+  <p class="descrizione-pagina">Tutto quello che riguarda te: chi sei nel portale, come sposti le auto e la tua password.</p></div></div>
+
+<section class="scheda profilo-chi">
+  <span class="avatar grande">{{ u.nome|iniziali }}</span>
+  <div>
+    <h2 class="profilo-nome">{{ u.nome }}</h2>
+    <div class="tenue">{{ u.RUOLI[u.ruolo] }} · {{ u.sede.nome if u.ruolo == 'fornitore' and u.sede else u.organizzazione.nome }}</div>
+    <div class="profilo-email">{{ u.email }}</div>
+    {% if u.ultimo_accesso_at %}<div class="tenue piccolo">Ultimo accesso: {{ u.ultimo_accesso_at|data('%d/%m/%Y alle %H:%M') }}</div>{% endif %}
+  </div>
+</section>
+<p class="tenue piccolo">Nome ed email li cambia l'amministratore della tua azienda.</p>
+
+<h2>{{ i('camion') }} Quando sposti un'auto</h2>
+<a class="voce profilo-voce" href="{{ url_for('main.profilo_guida', poi=url_for('main.profilo')) }}">
+  {{ i('camion') }}
+  <div class="corpo"><h3>Profilo di guida e firma da conducente</h3>
+    {% if not guida.mancano %}
+    <div class="tenue piccolo">{{ guida.vettore }} · {{ guida.mezzo }} · firma salvata</div>
+    {% else %}
+    <div class="piccolo"><span class="stato-accesso attesa">Da completare</span> serve per partire con un tocco: {{ guida.mancano|join(', ') }}</div>
+    {% endif %}
+  </div>{{ i('freccia', 's') }}</a>
+
+{% if u.ruolo == 'fornitore' and u.sede %}
+<h2>{{ i('sede') }} La tua azienda</h2>
+<a class="voce profilo-voce" href="{{ url_for('main.mia_firma') }}">
+  {{ i('firma') }}
+  <div class="corpo"><h3>Firma di {{ u.sede.nome }}</h3>
+    <div class="tenue piccolo">{{ 'Salvata · ' if u.sede.firma else '' }}Apposta in automatico quando confermate un arrivo; vale per tutti i vostri utenti</div></div>{{ i('freccia', 's') }}</a>
+{% endif %}
+
+<h2>{{ i('chiave') }} Sicurezza</h2>
+<a class="voce profilo-voce" href="{{ url_for('auth.cambia_password') }}">
+  {{ i('chiave') }}
+  <div class="corpo"><h3>Cambia password</h3><div class="tenue piccolo">Gli altri dispositivi collegati con il tuo account vengono scollegati</div></div>{{ i('freccia', 's') }}</a>
+<form method="post" action="{{ url_for('auth.logout') }}" class="profilo-esci">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <button class="btn pieno">{{ i('esci', 's') }} Esci da Getvingo</button>
+</form>
+{% endblock %}

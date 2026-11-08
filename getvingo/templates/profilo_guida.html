@@ -2,8 +2,8 @@
 {% from "_macro.html" import i, csrf_input, firma_pad, indietro %}
 {% block titolo %}Profilo di guida · Getvingo{% endblock %}
 {% block contenuto %}
-{{ indietro(poi or url_for('main.home')) }}
-<div class="titolo-pagina"><div><div class="sopratitolo">{{ g.utente.nome }}</div><h1>Profilo di guida</h1></div></div>
+{{ indietro(poi or url_for('main.profilo')) }}
+<div class="titolo-pagina"><div><div class="sopratitolo">Il mio profilo</div><h1>Profilo di guida</h1></div></div>
 <p class="tenue">Si imposta una volta sola. Quando tocchi l'adesivo di un'auto e premi “Inizia spostamento” scegli solo la destinazione: vettore, modalità di trasporto, conducente (tu) e firma li prende da qui.</p>
 <form method="post" data-una-volta>
   {{ csrf_input() }}<input type="hidden" name="poi" value="{{ poi }}">

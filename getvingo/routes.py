@@ -1491,9 +1491,21 @@ def mia_firma():
         else:
             sede.firma = firma
             db.session.commit()
-            flash("Firma predefinita salvata.", "ok")
-            return redirect(url_for("main.home"))
+            flash(f"Firma di {sede.nome} salvata: vale per tutti i suoi utenti.", "ok")
+            return redirect(url_for("main.profilo"))
     return render_template("mia_firma.html", sede=sede)
+
+
+@bp.route("/profilo")
+@login_richiesto
+def profilo():
+    """Il mio profilo: chi sono, profilo di guida con la firma da conducente, password e, per i
+    fornitori, la firma della loro azienda. Tutto ciò che riguarda me in un posto solo."""
+    u = g.utente
+    guida = {"vettore": u.vettore.nome if u.vettore else None, "mezzo": u.mezzo or None, "firma": bool(u.firma)}
+    guida["mancano"] = [n for n, ok in (("vettore", guida["vettore"]), ("modalità di trasporto", guida["mezzo"]),
+                                         ("firma", guida["firma"])) if not ok]
+    return render_template("profilo.html", u=u, guida=guida)
 
 
 # ---------------------------------------------------------------- assistente IA

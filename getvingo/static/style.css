@@ -1720,3 +1720,24 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 .elenco-accessi { list-style: none; margin: 0; padding: 0; }
 .elenco-accessi li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--bordo); }
 .elenco-accessi li:first-child { border-top: 0; }
+
+/* Gestione divisa per argomento */
+.gruppi-gestione { display: grid; gap: 8px; }
+.gruppo-gestione h2 { margin-top: 12px; }
+@media (min-width: 1024px) {
+  .gruppi-gestione { grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+  .gruppo-gestione .menu-gestione { grid-template-columns: 1fr; }
+}
+.sotto-voci { margin-bottom: 8px; }
+
+/* Menu dell'avatar: chi sono, poi il mio profilo, poi azienda/piattaforma, infine Esci */
+.menu-chi .menu-email { display: block; margin-top: 2px; font-size: .78rem; word-break: break-all; }
+.menu-separatore { height: 1px; background: var(--bordo); margin: 6px 0; }
+/* Il mio profilo */
+.profilo-chi { display: flex; gap: 16px; align-items: center; }
+.avatar.grande { width: 64px; height: 64px; font-size: 1.4rem; flex: none; }
+.profilo-nome { margin: 0 0 2px; font-size: 1.25rem; text-transform: none; letter-spacing: 0; color: var(--testo); }
+.profilo-email { font-weight: 600; word-break: break-all; margin: 2px 0; }
+.profilo-voce { margin-bottom: 10px; }
+.profilo-voce > .icona { color: var(--segnale); width: 26px; height: 26px; flex: none; }
+.profilo-esci { margin-top: 12px; }

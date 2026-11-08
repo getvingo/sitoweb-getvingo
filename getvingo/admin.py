@@ -56,10 +56,28 @@ def marchi_auto():
     return render_template("admin/marchi.html", elenco=elenco)
 
 
-@bp.route("/azienda")
+@bp.route("/azienda", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def azienda():
-    return redirect(url_for("admin.gruppo_concessionaria"))
+    """Dati aziendali: ragione sociale, indirizzo, P. IVA e firma del mittente sui DDT; da qui anche
+    giorni di chiusura e loghi delle marche (impostazioni della concessionaria)."""
+    a = Azienda.query.first() or Azienda(ragione_sociale="")
+    if request.method == "POST":
+        if not _testo("ragione_sociale"):
+            flash("La ragione sociale è obbligatoria.", "errore")
+        else:
+            a.ragione_sociale, a.indirizzo, a.piva = _testo("ragione_sociale"), _testo("indirizzo"), _testo("piva")
+            firma = servizi.firma_valida(request.form.get("firma"))
+            if firma:
+                a.firma = firma
+            db.session.add(a)
+            db.session.commit()
+            flash("Dati aziendali salvati: compaiono sui prossimi DDT. Quelli già emessi non cambiano.", "ok")
+            return redirect(url_for("admin.azienda"))
+    oggi = adesso().date()
+    chiusure = GiornoChiuso.query.filter(GiornoChiuso.data >= oggi).order_by(GiornoChiuso.data).all()
+    marche = {v.marca.strip().lower() for v in Veicolo.query if v.marca and v.marca.strip()}
+    return render_template("admin/azienda.html", a=a, chiusure=chiusure, n_marche=len(marche))
 
 
 @bp.route("/chiusure", methods=["GET", "POST"])

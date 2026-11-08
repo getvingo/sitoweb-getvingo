@@ -2227,7 +2227,7 @@ class TestUtenzaMaster(Base):
         self.assertIn("admin@t.it", pagina)
         self.assertIn("Assistenza consentita", pagina)
         # il registro è del cliente: non compare nella concessionaria del gestore
-        self.assertNotIn("admin@t.it</span>", self.c.get("/admin/assistenza").get_data(as_text=True))
+        self.assertIn("L'assistenza Getvingo non è mai entrata", self.c.get("/admin/assistenza").get_data(as_text=True))
 
     def test_il_supporto_non_cambia_il_consenso(self):
         self.c.post(f"/piattaforma/{self.org2}/entra")
@@ -2277,3 +2277,54 @@ class TestGoogle(Base):
         r = self.c.get("/favicon.ico")
         self.assertEqual(r.status_code, 200)
         r.close()
+
+
+class TestProfiloEGestione(Base):
+    """Menu dell'avatar con "Il mio profilo"; Gestione divisa per argomento; dati aziendali con chiusure e loghi."""
+    def test_menu_e_il_mio_profilo_per_ogni_ruolo(self):
+        for chi in ("admin", "ufficio", "autista", "carr"):
+            self.entra(chi)
+            home = self.c.get("/").get_data(as_text=True)
+            self.assertIn("Il mio profilo", home, chi)
+            self.assertIn(f"{chi}@t.it", home, chi)  # email nell'intestazione del menu
+            self.assertEqual("Gestione</a>" in home, chi == "admin", chi)
+            r = self.c.get("/profilo")
+            self.assertEqual(r.status_code, 200, chi)
+            t = r.get_data(as_text=True)
+            self.assertIn("Profilo di guida e firma da conducente", t)
+            self.assertIn("Da completare", t)  # profilo di guida non ancora impostato
+            self.assertEqual("Firma di Carrozzeria B" in t, chi == "carr", chi)
+
+    def test_firma_del_fornitore_torna_al_profilo(self):
+        self.entra("carr")
+        r = self.c.post("/mia-firma", data={"firma": FIRMA})
+        self.assertEqual(r.headers["Location"], "/profilo")
+
+    def test_dati_aziendali(self):
+        r = self.c.get("/admin/azienda")
+        t = r.get_data(as_text=True)
+        self.assertIn("Giorni di chiusura", t)
+        self.assertIn("Loghi delle marche", t)
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuova Ragione S.p.A.", "indirizzo": "Via Nuova 2",
+                                            "piva": "IT123"})
+        with self.app.app_context():
+            a = Azienda.query.one()
+            self.assertEqual((a.ragione_sociale, a.indirizzo, a.piva), ("Nuova Ragione S.p.A.", "Via Nuova 2", "IT123"))
+            self.assertEqual(a.firma, FIRMA)  # senza una firma nuova resta quella di prima
+        self.c.post("/admin/azienda", data={"ragione_sociale": ""})
+        with self.app.app_context():
+            self.assertEqual(Azienda.query.one().ragione_sociale, "Nuova Ragione S.p.A.")
+        # i dati non stanno più nella pagina degli utenti della concessionaria, che rimanda qui
+        gruppo = self.c.get("/admin/aziende/concessionaria").get_data(as_text=True)
+        self.assertNotIn('name="ragione_sociale"', gruppo)
+        self.assertIn("/admin/azienda", gruppo)
+        # chiusure e loghi tornano ai dati aziendali
+        self.assertIn('href="/admin/azienda"', self.c.get("/admin/chiusure").get_data(as_text=True))
+        self.assertIn('href="/admin/azienda"', self.c.get("/admin/marchi").get_data(as_text=True))
+
+    def test_gestione_divisa_per_argomento(self):
+        t = self.c.get("/admin/").get_data(as_text=True)
+        for gruppo in ("Azienda", "Persone e accessi", "Operatività"):
+            self.assertIn(gruppo, t)
+        self.entra("ufficio")
+        self.assertEqual(self.c.get("/admin/azienda").status_code, 403)
