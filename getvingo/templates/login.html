@@ -1,5 +1,29 @@
 {% extends "base.html" %}
-{% block titolo %}Accedi · Getvingo{% endblock %}
+{% block titolo %}Getvingo · Gestione auto con il VIN per concessionarie{% endblock %}
+{% block head %}
+{% set sito = config.SITO_URL %}
+{% set descrizione = "Spostamenti con DDT automatico, lavorazioni esterne, preparazione alla consegna e posizione in piazzale: ogni auto, sempre al suo posto." %}
+<meta name="description" content="{{ descrizione }}">
+<link rel="canonical" href="{{ sito }}/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Getvingo">
+<meta property="og:locale" content="it_IT">
+<meta property="og:url" content="{{ sito }}/">
+<meta property="og:title" content="Getvingo · Gestione auto con il VIN per concessionarie">
+<meta property="og:description" content="{{ descrizione }}">
+<meta property="og:image" content="{{ sito }}{{ url_for('static', filename='icone/anteprima-condivisione.png') }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Getvingo · Gestione auto con il VIN per concessionarie">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@graph": [
+  {"@type": "WebSite", "name": "Getvingo", "alternateName": "getVINgo", "url": "{{ sito }}/"},
+  {"@type": "Organization", "name": "Getvingo", "url": "{{ sito }}/",
+   "logo": "{{ sito }}{{ url_for('static', filename='icone/icona-512.png') }}"}
+]}
+</script>
+{% endblock %}
 {% block corpo %}
 <div class="accesso">
   <div style="width:100%;max-width:400px">
@@ -9,7 +33,7 @@
       {% for categoria, messaggio in get_flashed_messages(with_categories=true) %}
         <div class="avviso {{ categoria }}">{{ messaggio }}</div>
       {% endfor %}
-      <form method="post">
+      <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) if request.args.get('next') else url_for('auth.login') }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <label class="campo"><span>Email</span><input type="email" name="email" required autofocus autocomplete="username"></label>
         <label class="campo"><span>Password</span><input type="password" name="password" required autocomplete="current-password"></label>

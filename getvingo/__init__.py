@@ -48,6 +48,8 @@ def create_app(config=None):
         BASE_URL=os.environ.get("DOVIN_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL", ""),
         # demo: l'admin può eliminare anche auto con DDT (in produzione i DDT non si cancellano mai)
         DEMO=os.environ.get("DOVIN_DEMO") == "1",
+        # indirizzo ufficiale per Google e per le anteprime dei link (canonical, sitemap)
+        SITO_URL=(os.environ.get("GETVINGO_SITO_URL") or "https://getvingo.com").rstrip("/"),
         CSRF_ATTIVO=True,
         MAX_CONTENT_LENGTH=40 * 1024 * 1024,  # fino a qualche foto di danni per invio
         # archivio PDF dei DDT su storage S3 compatibile (senza bucket: cartella instance/archivio-ddt)

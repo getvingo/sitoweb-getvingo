@@ -3,8 +3,8 @@ import secrets
 import time
 from functools import wraps
 
-from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, Response, abort, current_app, flash, g, redirect, render_template,
+                   request, send_from_directory, session, url_for)
 
 from . import accessi, posta
 from .models import Utente, adesso, db
@@ -120,13 +120,23 @@ def init_app(app):
         # (es. "Nuova auto" non deve riproporre un adesivo appena abbinato)
         if risposta.mimetype == "text/html":
             risposta.headers.setdefault("Cache-Control", "no-store")
+        # Google indicizza solo la pagina d'ingresso e la privacy, mai le pagine interne o i link personali
+        pubblica = request.endpoint in PAGINE_PUBBLICHE and g.get("utente") is None and request.method == "GET"
+        if not pubblica and request.endpoint not in ("static", "auth.robots", "auth.sitemap", "auth.favicon"):
+            risposta.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
         return risposta
+
+
+# pagine che Google può mostrare nei risultati; tutte le altre hanno "noindex"
+PAGINE_PUBBLICHE = {"auth.login", "auth.privacy", "main.home"}
 
 
 def login_richiesto(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if g.utente is None:
+            if request.path == "/":  # getvingo.com: la pagina d'ingresso, senza rimandi (è quella che vede Google)
+                return render_template("login.html")
             return redirect(url_for("auth.login", next=request.full_path))
         return view(*args, **kwargs)
     return wrapper
@@ -240,6 +250,30 @@ def imposta_password(token):
             flash(f"Benvenuto in Getvingo, {u.nome}." if primo else "Password impostata: sei dentro.", "ok")
             return redirect(url_for("main.home"))
     return render_template("imposta_password.html", u=u, scopo=scopo)
+
+
+@bp.route("/robots.txt")
+def robots():
+    sito = current_app.config["SITO_URL"]
+    if request.host != sito.split("://", 1)[-1]:
+        # indirizzi tecnici (es. getvingo.onrender.com): Google non deve indicizzarli, vale solo getvingo.com
+        return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+    return Response("User-agent: *\nAllow: /$\nAllow: /privacy\nAllow: /static/\nDisallow: /\n\n"
+                    f"Sitemap: {sito}/sitemap.xml\n", mimetype="text/plain")
+
+
+@bp.route("/sitemap.xml")
+def sitemap():
+    sito = current_app.config["SITO_URL"]
+    voci = "".join(f"<url><loc>{sito}{p}</loc></url>" for p in ("/", "/privacy"))
+    return Response('<?xml version="1.0" encoding="UTF-8"?>'
+                    f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{voci}</urlset>',
+                    mimetype="application/xml")
+
+
+@bp.route("/favicon.ico")
+def favicon():
+    return send_from_directory(current_app.static_folder, "icone/favicon.ico", max_age=7 * 86400)
 
 
 @bp.route("/privacy")

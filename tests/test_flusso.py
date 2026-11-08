@@ -1964,7 +1964,7 @@ class TestAccessi(Base):
         self.assertIn("già stato usato", r.get_data(as_text=True))
         self.c.post("/logout")
         self.c.post("/login", data={"email": "autista@t.it", "password": "pw"})
-        self.assertEqual(self.c.get("/").status_code, 302)
+        self.assertEqual(self.c.get("/ddt").status_code, 302)
         self.c.post("/login", data={"email": "autista@t.it", "password": "nuovapass1"})
         self.assertEqual(self.c.get("/").status_code, 200)
 
@@ -2041,7 +2041,7 @@ class TestAccessi(Base):
         self.assertEqual(altro.get("/").status_code, 200)
         self.c.post("/password", data={"attuale": "pw", "nuova": "nuovapw12", "conferma": "nuovapw12"})
         self.assertEqual(self.c.get("/").status_code, 200)   # chi l'ha cambiata resta dentro
-        self.assertEqual(altro.get("/").status_code, 302)    # l'altro dispositivo no
+        self.assertEqual(altro.get("/ddt").status_code, 302)    # l'altro dispositivo no
 
     def test_pannello_solo_per_il_gestore(self):
         self.entra("ufficio")
@@ -2078,7 +2078,7 @@ class TestAccessi(Base):
         self.assertEqual(mara.get("/piattaforma/").status_code, 404)
         # sospesa: fuori subito, non rientra e i link non valgono
         self.c.post(f"/piattaforma/{org_id}/stato")
-        self.assertEqual(mara.get("/").status_code, 302)
+        self.assertEqual(mara.get("/ddt").status_code, 302)
         r = mara.post("/login", data={"email": "mara@rossi.it", "password": "marapass1"})
         self.assertIn("sospeso", r.get_data(as_text=True))
         self.c.post("/password-dimenticata", data={"email": "mara@rossi.it"})
@@ -2160,7 +2160,7 @@ class TestUtenzaMaster(Base):
             email = sup.email
         altro = self.app.test_client()
         altro.post("/login", data={"email": email, "password": "conosciuta1"})
-        self.assertEqual(altro.get("/").status_code, 302)
+        self.assertEqual(altro.get("/ddt").status_code, 302)
         self.app.config["POSTA_ATTIVA"] = True
         self.app.extensions.setdefault("posta_inviata", []).clear()
         altro.post("/password-dimenticata", data={"email": email})
@@ -2169,7 +2169,7 @@ class TestUtenzaMaster(Base):
     def test_se_non_e_piu_gestore_esce_subito(self):
         self.c.post(f"/piattaforma/{self.org2}/entra")
         self.app.config["GESTORI"] = ""
-        self.assertEqual(self.c.get("/").status_code, 302)
+        self.assertEqual(self.c.get("/ddt").status_code, 302)
         self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 302)
 
     def test_entra_anche_in_un_cliente_sospeso(self):
@@ -2179,7 +2179,7 @@ class TestUtenzaMaster(Base):
         self.assertIn("accesso sospeso", testo)
         cliente = self.app.test_client()
         cliente.post("/login", data={"email": "admin@altra.it", "password": "password2"})
-        self.assertEqual(cliente.get("/").status_code, 302)  # il cliente resta fuori
+        self.assertEqual(cliente.get("/ddt").status_code, 302)  # il cliente resta fuori
 
     def test_supporto_non_conta_tra_gli_utenti_del_cliente(self):
         self.c.post(f"/piattaforma/{self.org2}/entra")
@@ -2239,3 +2239,41 @@ class TestUtenzaMaster(Base):
         r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Nuova S.r.l.", "nome": "N", "email": "n@nuova.it"})
         with self.app.app_context():
             self.assertFalse(Organizzazione.query.filter_by(nome="Nuova S.r.l.").one().assistenza_consentita)
+
+
+class TestGoogle(Base):
+    """Anteprima nei risultati di Google: la pagina d'ingresso è pubblica e descritta, il resto no."""
+    def test_pagina_principale_con_testi_per_google(self):
+        self.c.post("/logout")
+        r = self.c.get("/")
+        self.assertEqual(r.status_code, 200)  # niente rimando a /login: Google vede getvingo.com
+        t = r.get_data(as_text=True)
+        self.assertIn("<title>Getvingo · Gestione auto con il VIN per concessionarie</title>", t)
+        self.assertIn('<meta name="description" content="Spostamenti con DDT automatico', t)
+        self.assertIn('<link rel="canonical" href="https://getvingo.com/">', t)
+        self.assertIn('"@type": "WebSite", "name": "Getvingo"', t)
+        self.assertIn('og:image" content="https://getvingo.com/static/icone/anteprima-condivisione.png"', t)
+        self.assertNotIn("X-Robots-Tag", r.headers)
+        # il modulo della pagina principale entra davvero
+        r = self.c.post("/login", data={"email": "admin@t.it", "password": "pw"})
+        self.assertEqual(r.headers["Location"], "/")
+        self.assertEqual(self.c.get("/").status_code, 200)
+
+    def test_pagine_interne_e_link_personali_mai_indicizzati(self):
+        self.assertEqual(self.c.get("/").headers.get("X-Robots-Tag"), "noindex, nofollow")  # collegato
+        self.assertEqual(self.c.get("/ddt").headers.get("X-Robots-Tag"), "noindex, nofollow")
+        self.c.post("/logout")
+        self.assertEqual(self.c.get("/imposta-password/qualcosa").headers.get("X-Robots-Tag"), "noindex, nofollow")
+        self.assertEqual(self.c.get("/password-dimenticata").headers.get("X-Robots-Tag"), "noindex, nofollow")
+        self.assertIsNone(self.c.get("/privacy").headers.get("X-Robots-Tag"))
+
+    def test_robots_sitemap_favicon(self):
+        r = self.c.get("/robots.txt", base_url="https://getvingo.com")
+        self.assertIn("Allow: /$", r.get_data(as_text=True))
+        self.assertIn("Sitemap: https://getvingo.com/sitemap.xml", r.get_data(as_text=True))
+        tecnico = self.c.get("/robots.txt", base_url="https://getvingo.onrender.com").get_data(as_text=True)
+        self.assertEqual(tecnico, "User-agent: *\nDisallow: /\n")
+        self.assertIn("<loc>https://getvingo.com/</loc>", self.c.get("/sitemap.xml").get_data(as_text=True))
+        r = self.c.get("/favicon.ico")
+        self.assertEqual(r.status_code, 200)
+        r.close()
