@@ -137,15 +137,15 @@ def aggiungi_colonne():
                 aggiunte.append(f"{tabella}.{nome}")
     if "sede.provincia" in aggiunte:
         # il comune era scritto "Villorba (TV)": si separa la provincia
+        # (parametri sempre separati dal testo SQL: con Postgres un "%" scritto nella query è un errore)
         import re
+        from sqlalchemy import text
         with db.engine.begin() as conn:
-            for sid, comune in conn.exec_driver_sql("SELECT id, comune FROM sede WHERE comune LIKE '%(%)'").fetchall():
+            for sid, comune in conn.execute(text("SELECT id, comune FROM sede")).fetchall():
                 m = re.fullmatch(r"\s*(.+?)\s*\((\w{2})\)\s*", comune or "")
                 if m:
-                    conn.exec_driver_sql("UPDATE sede SET comune = %s, provincia = %s WHERE id = %s"
-                                         if db.engine.dialect.name == "postgresql" else
-                                         "UPDATE sede SET comune = ?, provincia = ? WHERE id = ?",
-                                         (m.group(1), m.group(2).upper(), sid))
+                    conn.execute(text("UPDATE sede SET comune = :c, provincia = :p WHERE id = :i"),
+                                 {"c": m.group(1), "p": m.group(2).upper(), "i": sid})
     colonne_vettore = [c["name"] for c in ispettore.get_columns("vettore")]
     for nome, tipo in (("proprio", "BOOLEAN DEFAULT FALSE"), ("sede_id", "INTEGER REFERENCES sede(id)")):
         if nome not in colonne_vettore:  # vettore della concessionaria / di un fornitore
