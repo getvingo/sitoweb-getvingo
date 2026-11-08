@@ -12,11 +12,27 @@
     {% elif u.id != g.utente.id %}
     <label class="campo"><span>Ruolo</span><select name="ruolo">{% for k, n in ruoli.items() %}<option value="{{ k }}" {{ 'selected' if k == u.ruolo }}>{{ n }}</option>{% endfor %}</select></label>
     {% endif %}
-    <label class="campo"><span>Nuova password <span class="tenue">(lascia vuoto per non cambiarla)</span></span><input type="password" name="password" minlength="8" autocomplete="new-password"></label>
+    <label class="campo"><span>Nuova password <span class="tenue">(lascia vuoto per non cambiarla)</span></span><input type="password" name="password" minlength="8" autocomplete="new-password"><small>Meglio mandare il link qui sotto: la sceglie lui e tu non la conosci.</small></label>
   </div>
   {% if u.id != g.utente.id %}
   <label class="spunta"><input type="checkbox" name="attivo" value="1" {{ 'checked' if u.attivo }}><span><b>Account attivo</b>: togli la spunta per bloccare l'accesso senza perdere lo storico.</span></label>
   {% endif %}
   <button class="btn primario pieno">Salva</button>
 </form>
+
+<h2>{{ i('chiave') }} Accesso</h2>
+<div class="scheda">
+  <p style="margin-top:0">{% if u.invito_in_attesa %}<span class="stato-accesso attesa">Invito in attesa</span> {{ u.nome }} non ha ancora scelto la password.
+    {% elif u.ultimo_accesso_at %}Ultimo accesso: <b>{{ u.ultimo_accesso_at|data('%d/%m/%Y alle %H:%M') }}</b>.
+    {% else %}Non è ancora entrato in Getvingo.{% endif %}</p>
+  {% if u.attivo %}
+  <form method="post" data-una-volta>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="azione" value="link">
+    <button class="btn">{{ i('chiave', 's') }} {{ 'Rimanda l’invito' if u.invito_in_attesa else 'Manda un link per scegliere una nuova password' }}</button>
+  </form>
+  <p class="tenue piccolo" style="margin-bottom:0">{% if posta_attiva %}Gli arriva per email; se serve, potrai anche copiarlo e mandarlo tu.{% else %}L'invio delle email non è attivo: avrai un link da copiare e mandare tu.{% endif %}</p>
+  {% else %}
+  <p class="tenue piccolo" style="margin-bottom:0">Account disattivato: riattivalo per mandare un link.</p>
+  {% endif %}
+</div>
 {% endblock %}

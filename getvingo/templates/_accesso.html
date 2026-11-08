@@ -1,0 +1,16 @@
+{# Cornice delle pagine senza accesso (login, recupero password, scelta della password) #}
+{% macro cornice() %}
+<div class="accesso">
+  <div style="width:100%;max-width:400px">
+    <div class="marchio"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="Getvingo"></div>
+    <p class="payoff">Ogni auto, sempre al suo posto.</p>
+    <div class="scheda">
+      {% for categoria, messaggio in get_flashed_messages(with_categories=true) %}
+        <div class="avviso {{ categoria }}">{{ messaggio }}</div>
+      {% endfor %}
+      {{ caller() }}
+    </div>
+    <p class="payoff" style="margin:18px 0 0"><a href="{{ url_for('auth.privacy') }}" style="color:inherit;text-decoration:underline">Informativa privacy</a></p>
+  </div>
+</div>
+{% endmacro %}

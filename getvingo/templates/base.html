@@ -72,6 +72,7 @@
       <div class="menu-tendina">
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }}{% if g.utente.sede %} · {{ g.utente.sede.nome }}{% endif %}</span></div>
         {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
+        {% if gestore() %}<a href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}
         <a href="{{ url_for('main.profilo_guida') }}">{{ i('camion', 's') }} Profilo di guida</a>
         {% if g.utente.ruolo == 'fornitore' %}<a href="{{ url_for('main.mia_firma') }}">{{ i('firma', 's') }} La mia firma</a>{% endif %}
         <a href="{{ url_for('auth.cambia_password') }}">{{ i('chiave', 's') }} Cambia password</a>

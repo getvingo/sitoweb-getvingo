@@ -15,6 +15,7 @@
         <label class="campo"><span>Password</span><input type="password" name="password" required autocomplete="current-password"></label>
         <button class="btn primario pieno">Accedi</button>
       </form>
+      <p class="link-accesso"><a href="{{ url_for('auth.password_dimenticata') }}">Password dimenticata?</a></p>
     </div>
     <p class="payoff" style="margin:18px 0 0"><a href="{{ url_for('auth.privacy') }}" style="color:inherit;text-decoration:underline">Informativa privacy</a></p>
   </div>

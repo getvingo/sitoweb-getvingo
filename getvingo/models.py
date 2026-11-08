@@ -75,6 +75,9 @@ class Utente(PerOrganizzazione, db.Model):
     vettore_id = db.Column(db.Integer, db.ForeignKey("vettore.id"))
     mezzo = db.Column(db.String(40), default="")  # modalità di trasporto abituale (Movimento.MEZZI)
     firma = db.Column(db.Text)  # firma personale salvata, apposta come firma del conducente
+    # accessi: invito mandato ma password non ancora scelta; ultimo ingresso nel portale
+    invito_in_attesa = db.Column(db.Boolean, default=False)
+    ultimo_accesso_at = db.Column(db.DateTime)
 
     sede = db.relationship("Sede", backref="utenti")
     vettore = db.relationship("Vettore")

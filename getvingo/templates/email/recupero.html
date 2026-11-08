@@ -1,0 +1,7 @@
+{% extends "email/_base.html" %}{% from "email/_pulsante.html" import pulsante %}
+{% block corpo %}
+<p style="margin:0 0 12px">Ciao {{ utente.nome }},</p>
+<p style="margin:0">abbiamo ricevuto una richiesta per reimpostare la password del tuo account Getvingo (<b>{{ utente.email }}</b>).</p>
+{{ pulsante(link, "Scegli una nuova password") }}
+{% endblock %}
+{% block nota %}Il link vale un'ora e si usa una volta sola.<br>Non sei stato tu? Ignora questa email: la tua password resta quella di prima.{% endblock %}

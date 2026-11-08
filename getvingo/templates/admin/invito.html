@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}{{ 'Invito' if scopo == 'invito' else 'Nuova password' }} · {{ u.nome }} · Getvingo{% endblock %}
+{% block contenuto %}
+{{ indietro(torna) }}
+<div class="titolo-pagina"><div><div class="sopratitolo">{{ u.email }}</div>
+  <h1>{{ 'Invito per ' ~ u.nome if scopo == 'invito' else 'Nuova password per ' ~ u.nome }}</h1></div></div>
+
+{% if inviata %}
+<div class="avviso ok" role="status" data-vibra="ok">{{ i('check') }}<span>Email mandata a <b>{{ u.email }}</b>.
+  {{ u.nome }} {{ 'sceglie la sua password dal link e può entrare subito' if scopo == 'invito' else 'sceglie una nuova password dal link' }}.</span></div>
+{% elif errore %}
+<div class="avviso errore" role="status">{{ i('attenzione') }}<span>{{ errore }} Puoi mandare tu il link qui sotto.</span></div>
+{% else %}
+<div class="avviso info" role="status">{{ i('attenzione') }}<span>L'invio delle email non è ancora attivo: manda tu questo link a {{ u.nome }} (WhatsApp, SMS o email).</span></div>
+{% endif %}
+
+<div class="scheda link-invito">
+  <span class="etichetta">Link personale di {{ u.nome }}</span>
+  <input id="link-invito" class="input-link" value="{{ link }}" readonly aria-label="Link personale">
+  <div class="azioni-link">
+    <button type="button" class="btn" data-copia="#link-invito">{{ i('doc', 's') }} Copia il link</button>
+    <a class="btn" href="https://wa.me/?text={{ ('Ciao ' ~ u.nome ~ ', ecco il link per ' ~ ('entrare in Getvingo e scegliere la tua password' if scopo == 'invito' else 'scegliere la nuova password di Getvingo') ~ ': ' ~ link)|urlencode }}" target="_blank" rel="noopener">{{ i('chat', 's') }} Manda su WhatsApp</a>
+  </div>
+  <p class="tenue piccolo" style="margin-bottom:0">Vale {{ '7 giorni' if scopo == 'invito' else "un'ora" }} e si usa una volta sola. È personale: chi lo apre sceglie la password di questo account, quindi mandalo solo a {{ u.nome }}.</p>
+</div>
+<a class="btn primario pieno" href="{{ torna }}">{{ i('check') }} Fatto</a>
+{% endblock %}
+{% block script %}
+<script>
+  document.querySelectorAll('[data-copia]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var campo = document.querySelector(b.dataset.copia);
+      var fatto = function () { b.lastChild.textContent = ' Copiato'; };
+      if (navigator.clipboard) navigator.clipboard.writeText(campo.value).then(fatto, function () { campo.select(); });
+      else { campo.select(); document.execCommand('copy'); fatto(); }
+    });
+  });
+</script>
+{% endblock %}

@@ -99,6 +99,15 @@ con DDT. Senza demo si eliminano solo auto senza DDT.
 
 Online stabile su VPS Hostinger (dominio fisso, HTTPS): deploy/GUIDA-HOSTINGER.txt
 
+ACCESSI E EMAIL
+---------------
+Inviti (l'utente sceglie la password dal link), "Password dimenticata?",
+Pannello Getvingo per il gestore della piattaforma. Variabili:
+  GETVINGO_SMTP_HOST / _PORTA / _UTENTE / _PASSWORD, GETVINGO_MITTENTE
+  GETVINGO_GESTORI   email dei gestori (separate da virgola)
+Senza server di posta i link si copiano dalla pagina. Guida completa:
+../guida-accessi-email-v1.txt
+
 ASSISTENTE IA (Claude)
 ----------------------
 Detta del DDT ("sono Luca e porto l'auto a fare i cerchi neri dalla

@@ -1,0 +1,8 @@
+{% extends "email/_base.html" %}{% from "email/_pulsante.html" import pulsante %}
+{% block corpo %}
+<p style="margin:0 0 12px">Ciao {{ utente.nome }},</p>
+<p style="margin:0 0 12px">{% if invitato_da %}{{ invitato_da }} ti ha aggiunto{% else %}sei stato aggiunto{% endif %} a <b>Getvingo</b> per <b>{{ azienda }}</b>. Getvingo è il portale con cui si spostano e si ritrovano le auto: DDT automatici, lavorazioni e posizione in piazzale.</p>
+<p style="margin:0">Per entrare scegli la tua password:</p>
+{{ pulsante(link, "Scegli la password") }}
+{% endblock %}
+{% block nota %}Il link vale {{ giorni }} giorni e si usa una volta sola. Entrerai con questa email: <b>{{ utente.email }}</b>.<br>Non ti aspettavi questo invito? Puoi ignorare l'email.{% endblock %}

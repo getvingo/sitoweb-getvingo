@@ -8,7 +8,8 @@
 {% for u in utenti %}
   <a class="voce" href="{{ url_for('admin.utente', utente_id=u.id) }}" style="{{ 'opacity:.5' if not u.attivo }}">
     <span class="avatar">{{ u.nome|iniziali }}</span>
-    <div class="corpo"><h3>{{ u.nome }}</h3><div class="tratta">{{ u.email }} · {{ u.RUOLI[u.ruolo] }}{{ ' · disattivato' if not u.attivo }}</div></div>
+    <div class="corpo"><h3>{{ u.nome }}</h3><div class="tratta">{{ u.email }} · {{ u.RUOLI[u.ruolo] }}{{ ' · disattivato' if not u.attivo }}</div>
+      <div class="tenue piccolo">{% if u.invito_in_attesa %}<span class="stato-accesso attesa">Invito in attesa</span>{% elif u.ultimo_accesso_at %}Ultimo accesso {{ u.ultimo_accesso_at|da_quanto }}{% else %}Mai entrato{% endif %}</div></div>
     <span class="tenue piccolo">{{ i('matita', 's') }} Modifica</span>
   </a>
 {% else %}
@@ -21,10 +22,10 @@
   <div class="griglia-2">
     <label class="campo"><span>Nome e cognome</span><input name="nome" required></label>
     <label class="campo"><span>Email</span><input type="email" name="email" required></label>
-    <label class="campo"><span>Password iniziale</span><input type="password" name="password" required minlength="8"></label>
+    <label class="campo"><span>Password <span class="tenue">(facoltativa)</span></span><input type="password" name="password" minlength="8" autocomplete="new-password"><small>Consigliato: lasciala vuota. Riceve un invito e sceglie la sua.</small></label>
     {% if ruoli|length > 1 %}<label class="campo"><span>Ruolo</span><select name="ruolo">{% for k, n in ruoli.items() %}<option value="{{ k }}" {{ 'selected' if k == 'autista' }}>{{ n }}</option>{% endfor %}</select></label>{% endif %}
   </div>
-  <button class="btn primario">Aggiungi</button>
+  <button class="btn primario">{{ i('utente', 's') }} Aggiungi e invita</button>
 </form>
 </details>
 

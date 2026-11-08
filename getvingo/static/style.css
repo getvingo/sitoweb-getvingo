@@ -1665,3 +1665,37 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
   .portami .icona { display: none; }
 }
 
+
+/* Pagine di accesso: titolo, link sotto il modulo, email non modificabile */
+.titolo-accesso { font-size: 1.3rem; margin: 0 0 8px; text-transform: none; letter-spacing: 0; color: var(--testo); }
+.link-accesso { margin: 16px 0 0; text-align: center; }
+.link-accesso a { display: inline-flex; align-items: center; min-height: 44px; }
+.campo-fisso { display: flex; flex-direction: column; gap: 2px; margin: 0 0 14px; }
+.campo-fisso span { font-size: .85rem; font-weight: 650; color: var(--testo-2); }
+.campo-fisso b { word-break: break-all; }
+
+/* Inviti e accessi */
+.stato-accesso { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .75rem; font-weight: 750; }
+.stato-accesso.attesa { background: var(--arancio-tenue); color: var(--arancio-testo); }
+.link-invito .input-link { width: 100%; margin: 6px 0 12px; font-family: var(--mono); font-size: .85rem; }
+.azioni-link { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+@media (max-width: 400px) { .azioni-link { grid-template-columns: 1fr; } }
+
+/* Pannello Getvingo: una scheda per concessionaria cliente */
+.lista-clienti { display: grid; gap: 12px; }
+@media (min-width: 1024px) { .lista-clienti { grid-template-columns: 1fr 1fr; } }
+.cliente { margin: 0; }
+.cliente.sospeso { opacity: .75; border-style: dashed; }
+.cliente-testa { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.cliente-testa h3 { margin: 0 0 2px; }
+.stato-cliente { flex: none; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 750; }
+.stato-cliente.attivo { background: var(--ok-tenue); color: var(--ok); }
+.stato-cliente.sospeso { background: var(--errore-tenue); color: var(--errore); }
+.cliente-numeri { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+@media (max-width: 560px) { .cliente-numeri { grid-template-columns: 1fr 1fr; } }
+.cliente-numeri div { background: var(--superficie); border-radius: var(--r-s); padding: 8px 10px; }
+.cliente-numeri dt { font-size: .75rem; color: var(--testo-2); }
+.cliente-numeri dd { margin: 2px 0 0; font-weight: 750; font-size: 1.1rem; }
+.cliente-numeri dd.piccolo { font-size: .9rem; }
+.cliente-admin-riga { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--bordo); }
+.cliente-stato { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bordo); text-align: right; }

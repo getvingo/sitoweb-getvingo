@@ -1927,3 +1927,174 @@ class TestPagineDemoPulite(unittest.TestCase):
                 self.assertNotRegex(testo, r"\bNone\b|\bundefined\b|\bnan\b", f"{ruolo} {p}")
                 if ruolo in ("carrozzeria", "officina") and p.startswith("/veicolo/"):
                     self.assertNotIn('class="torna-indietro" href="/stock"', r.get_data(as_text=True))
+
+
+class TestAccessi(Base):
+    """Recupero password, inviti, sessioni dopo il cambio password, Pannello Getvingo e sospensione."""
+    def setUp(self):
+        super().setUp()
+        self.app.config.update(POSTA_ATTIVA=True, GESTORI="admin@t.it", BASE_URL="https://getvingo.com")
+        self.posta = self.app.extensions.setdefault("posta_inviata", [])
+        self.posta.clear()
+
+    def _link(self, email):
+        import re
+        ultima = [m for m in self.posta if m["a"] == email][-1]
+        return re.search(r"https://getvingo\.com(/imposta-password/\S+)", ultima["testo"]).group(1)
+
+    def test_recupero_password(self):
+        self.c.post("/logout")
+        r = self.c.post("/password-dimenticata", data={"email": "Autista@t.it"})
+        self.assertIn("tra poco ti arriva", r.get_data(as_text=True))
+        link = self._link("autista@t.it")
+        # stessa risposta per un'email sconosciuta, e nessuna email
+        n = len(self.posta)
+        r = self.c.post("/password-dimenticata", data={"email": "nessuno@t.it"})
+        self.assertIn("tra poco ti arriva", r.get_data(as_text=True))
+        self.assertEqual(len(self.posta), n)
+        self.assertEqual(self.c.get(link).status_code, 200)
+        self.assertEqual(self.c.post(link, data={"nuova": "corta", "conferma": "corta"}).status_code, 200)
+        r = self.c.post(link, data={"nuova": "nuovapass1", "conferma": "nuovapass1"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.c.get("/").status_code, 200)  # è dentro
+        self.assertEqual(self.posta[-1]["oggetto"], "Getvingo: la tua password è stata cambiata")
+        # il link si usa una volta sola, la vecchia password non vale più, la nuova sì
+        r = self.c.get(link)
+        self.assertEqual(r.status_code, 410)
+        self.assertIn("già stato usato", r.get_data(as_text=True))
+        self.c.post("/logout")
+        self.c.post("/login", data={"email": "autista@t.it", "password": "pw"})
+        self.assertEqual(self.c.get("/").status_code, 302)
+        self.c.post("/login", data={"email": "autista@t.it", "password": "nuovapass1"})
+        self.assertEqual(self.c.get("/").status_code, 200)
+
+    def test_link_scaduto_e_falso(self):
+        from getvingo import accessi
+        self.c.post("/password-dimenticata", data={"email": "autista@t.it"})
+        link = self._link("autista@t.it")
+        vecchia = accessi.DURATA["recupero"]
+        accessi.DURATA["recupero"] = -1
+        try:
+            self.assertIn("scaduto", self.c.get(link).get_data(as_text=True))
+        finally:
+            accessi.DURATA["recupero"] = vecchia
+        self.assertEqual(self.c.get(link[:-3] + "abc").status_code, 410)
+
+    def test_link_sempre_con_indirizzo_pubblico(self):
+        """Un Host falso nella richiesta non deve finire nel link dell'email."""
+        self.c.post("/password-dimenticata", data={"email": "autista@t.it"}, headers={"Host": "sito-falso.com",
+                                                                                    "X-Forwarded-Host": "sito-falso.com"})
+        self.assertNotIn("sito-falso", self.posta[-1]["testo"])
+        self.assertIn("https://getvingo.com/imposta-password/", self.posta[-1]["testo"])
+
+    def test_senza_email_configurata(self):
+        self.app.config["POSTA_ATTIVA"] = False
+        r = self.c.get("/password-dimenticata")
+        self.assertIn("Chiedi all'amministratore", r.get_data(as_text=True))
+        self.c.post("/password-dimenticata", data={"email": "autista@t.it"})
+        self.assertEqual(self.posta, [])
+        # l'admin crea un utente: niente email, ma il link da copiare
+        r = self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo Autista",
+                                                              "email": "nuovo@t.it", "ruolo": "autista"})
+        testo = r.get_data(as_text=True)
+        self.assertIn("non è ancora attivo", testo)
+        self.assertIn("https://getvingo.com/imposta-password/", testo)
+
+    def test_invito_utente_nuovo(self):
+        r = self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Luca Bianchi",
+                                                              "email": "Luca@t.it", "ruolo": "ufficio"})
+        self.assertIn("Email mandata", r.get_data(as_text=True))
+        with self.app.app_context():
+            u = Utente.query.filter_by(email="luca@t.it").one()
+            self.assertTrue(u.invito_in_attesa)
+            self.assertEqual(u.ruolo, "ufficio")
+        self.assertIn("Invito in attesa", self.c.get("/admin/aziende/concessionaria").get_data(as_text=True))
+        link = self._link("luca@t.it")
+        self.c.post("/logout")
+        self.assertIn("Benvenuto, Luca Bianchi", self.c.get(link).get_data(as_text=True))
+        n = len(self.posta)
+        self.c.post(link, data={"nuova": "lucapass1", "conferma": "lucapass1"})
+        self.assertEqual(len(self.posta), n)  # al primo accesso niente avviso di "password cambiata"
+        self.assertEqual(self.c.get("/").status_code, 200)
+        with self.app.app_context():
+            u = Utente.query.filter_by(email="luca@t.it").one()
+            self.assertFalse(u.invito_in_attesa)
+            self.assertIsNotNone(u.ultimo_accesso_at)
+
+    def test_invito_fornitore_e_rinvio(self):
+        carr = self._id(Sede, nome="Carrozzeria B")
+        self.c.post(f"/admin/aziende/fornitore/{carr}", data={"azione": "utente", "nome": "Gino", "email": "gino@t.it"})
+        uid = self._id(Utente, email="gino@t.it")
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Utente, uid).ruolo, "fornitore")
+            self.assertEqual(db.session.get(Utente, uid).sede_id, carr)
+        r = self.c.post(f"/admin/utenti/{uid}", data={"azione": "link"})
+        self.assertIn("Invito per Gino", r.get_data(as_text=True))
+        # utente già entrato: il link è per una nuova password
+        r = self.c.post(f"/admin/utenti/{self._id(Utente, email='autista@t.it')}", data={"azione": "link"})
+        self.assertIn("Nuova password per Autista", r.get_data(as_text=True))
+        self.assertEqual(self.posta[-1]["oggetto"], "Getvingo: reimposta la tua password")
+
+    def test_cambio_password_scollega_gli_altri_dispositivi(self):
+        altro = self.app.test_client()
+        altro.post("/login", data={"email": "admin@t.it", "password": "pw"})
+        self.assertEqual(altro.get("/").status_code, 200)
+        self.c.post("/password", data={"attuale": "pw", "nuova": "nuovapw12", "conferma": "nuovapw12"})
+        self.assertEqual(self.c.get("/").status_code, 200)   # chi l'ha cambiata resta dentro
+        self.assertEqual(altro.get("/").status_code, 302)    # l'altro dispositivo no
+
+    def test_pannello_solo_per_il_gestore(self):
+        self.entra("ufficio")
+        self.assertEqual(self.c.get("/piattaforma/").status_code, 404)
+        self.assertNotIn("Pannello Getvingo", self.c.get("/").get_data(as_text=True))
+        self.entra("admin")
+        self.assertIn("Pannello Getvingo", self.c.get("/").get_data(as_text=True))
+        self.assertEqual(self.c.get("/piattaforma/").status_code, 200)
+
+    def test_nuova_concessionaria_separata_e_sospesa(self):
+        self.abbina()  # un'auto nella concessionaria del gestore
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Rossi Auto S.r.l.", "piva": "IT999",
+                                                    "indirizzo": "Via Roma 1", "nome": "Mara Rossi",
+                                                    "email": "mara@rossi.it"})
+        self.assertIn("Invito per Mara Rossi", r.get_data(as_text=True))
+        with self.app.app_context():
+            org = Organizzazione.query.filter_by(nome="Rossi Auto S.r.l.").one()
+            admin = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(email="mara@rossi.it").one()
+            self.assertEqual((admin.org_id, admin.ruolo, admin.invito_in_attesa), (org.id, "admin", True))
+            az = Azienda.query.execution_options(tutte_le_organizzazioni=True).filter_by(org_id=org.id).one()
+            self.assertEqual((az.piva, az.indirizzo), ("IT999", "Via Roma 1"))
+            org_id = org.id
+        # il gestore resta nella sua concessionaria
+        self.assertIn("Golf", self.c.get("/stock").get_data(as_text=True))
+        pannello = self.c.get("/piattaforma/").get_data(as_text=True)
+        self.assertIn("Rossi Auto S.r.l.", pannello)
+        # l'amministratore nuovo entra dal link e non vede nulla dell'altra concessionaria
+        link = self._link("mara@rossi.it")
+        mara = self.app.test_client()
+        mara.post(link, data={"nuova": "marapass1", "conferma": "marapass1"})
+        self.assertEqual(mara.get("/").status_code, 200)
+        self.assertNotIn("Golf", mara.get("/stock").get_data(as_text=True))
+        self.assertEqual(mara.get(f"/veicolo/{self._id(Veicolo, vin=VIN)}").status_code, 404)
+        self.assertEqual(mara.get("/piattaforma/").status_code, 404)
+        # sospesa: fuori subito, non rientra e i link non valgono
+        self.c.post(f"/piattaforma/{org_id}/stato")
+        self.assertEqual(mara.get("/").status_code, 302)
+        r = mara.post("/login", data={"email": "mara@rossi.it", "password": "marapass1"})
+        self.assertIn("sospeso", r.get_data(as_text=True))
+        self.c.post("/password-dimenticata", data={"email": "mara@rossi.it"})
+        self.assertEqual(len([m for m in self.posta if m["a"] == "mara@rossi.it"]), 1)  # solo l'invito iniziale
+        # riattivata: rientra
+        self.c.post(f"/piattaforma/{org_id}/stato")
+        mara.post("/login", data={"email": "mara@rossi.it", "password": "marapass1"})
+        self.assertEqual(mara.get("/").status_code, 200)
+
+    def test_il_gestore_non_sospende_la_propria(self):
+        self.c.post("/piattaforma/1/stato")
+        with self.app.app_context():
+            self.assertTrue(db.session.get(Organizzazione, 1).attiva)
+
+    def test_email_duplicata_nuova_concessionaria(self):
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Doppia", "nome": "X", "email": "autista@t.it"})
+        self.assertIn("Email già registrata", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertIsNone(Organizzazione.query.filter_by(nome="Doppia").first())

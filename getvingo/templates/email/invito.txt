@@ -1,0 +1,13 @@
+Ciao {{ utente.nome }},
+
+{% if invitato_da %}{{ invitato_da }} ti ha aggiunto{% else %}sei stato aggiunto{% endif %} a Getvingo per {{ azienda }}.
+
+Per entrare scegli la tua password da questo link:
+{{ link }}
+
+Il link vale {{ giorni }} giorni e si usa una volta sola.
+Entrerai con questa email: {{ utente.email }}
+
+Non ti aspettavi questo invito? Puoi ignorare l'email.
+-- 
+Getvingo · email automatica, non rispondere.

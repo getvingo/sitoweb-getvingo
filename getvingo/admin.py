@@ -4,7 +4,7 @@ import secrets
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 
-from . import servizi
+from . import accessi, posta, servizi
 from . import vin as vin_mod
 from .auth import ruolo_richiesto
 from datetime import datetime, timedelta
@@ -177,22 +177,50 @@ RUOLI_INTERNI = {k: v for k, v in Utente.RUOLI.items() if k != "fornitore"}
 
 
 def _crea_utente(ruolo, sede_id=None):
+    """Nuovo utente del gruppo. Senza password riceve l'invito per sceglierla da sé (consigliato):
+    ritorna la pagina con l'esito dell'invito; altrimenti None (si torna al gruppo)."""
     email = _testo("email").lower()
-    if not (_testo("nome") and email and request.form.get("password")):
-        flash("Nome, email e password sono obbligatori.", "errore")
-        return False
-    if len(request.form["password"]) < 8:
-        flash("La password deve avere almeno 8 caratteri.", "errore")
-        return False
+    password = request.form.get("password", "")
+    if not (_testo("nome") and email):
+        flash("Nome ed email sono obbligatori.", "errore")
+        return None
+    if password and len(password) < 8:
+        flash("La password deve avere almeno 8 caratteri (oppure lasciala vuota e mandiamo l'invito).", "errore")
+        return None
     if Utente.query.filter_by(email=email).execution_options(tutte_le_organizzazioni=True).first():
         flash("Email già registrata.", "errore")
-        return False
-    u = Utente(nome=_testo("nome"), email=email, ruolo=ruolo, sede_id=sede_id)
-    u.imposta_password(request.form["password"])
-    db.session.add(u)
+        return None
+    if password:
+        u = Utente(nome=_testo("nome"), email=email, ruolo=ruolo, sede_id=sede_id)
+        u.imposta_password(password)
+        db.session.add(u)
+        db.session.commit()
+        flash(f"{u.nome} aggiunto: comunicagli tu la password, potrà cambiarla dal suo menu.", "ok")
+        return None
+    u = accessi.nuovo_utente_invitato(_testo("nome"), email, ruolo, sede_id)
+    u.invito_in_attesa = True
     db.session.commit()
-    flash(f"{u.nome} aggiunto al gruppo.", "ok")
-    return True
+    return _esito_link(u, "invito")
+
+
+def _esito_link(u, scopo):
+    """Manda il link (invito o nuova password) e mostra cosa è successo, con il link da copiare
+    se l'email non è partita o non è configurata."""
+    errore = None
+    if scopo == "invito":
+        link, inviata, errore = accessi.invia_invito(u, invitato_da=g.utente.nome)
+    else:
+        link, inviata = accessi.crea_link(u, "recupero"), False
+        if posta.configurata():
+            try:
+                accessi.invia_recupero(u)
+                inviata = True
+            except posta.ErrorePosta as e:
+                errore = str(e)
+    torna = url_for("admin.gruppo_fornitore", sede_id=u.sede_id) if u.ruolo == "fornitore" and u.sede_id \
+        else url_for("admin.gruppo_concessionaria")
+    return render_template("admin/invito.html", u=u, scopo=scopo, link=link, inviata=inviata, errore=errore,
+                           torna=torna, durata_ore=accessi.DURATA[scopo] // 3600)
 
 
 @bp.route("/aziende")
@@ -210,7 +238,9 @@ def gruppo_concessionaria():
     if request.method == "POST":
         if request.form.get("azione") == "utente":
             ruolo = request.form.get("ruolo") if request.form.get("ruolo") in RUOLI_INTERNI else "autista"
-            _crea_utente(ruolo)
+            esito = _crea_utente(ruolo)
+            if esito is not None:
+                return esito
         else:
             a.ragione_sociale, a.indirizzo, a.piva = _testo("ragione_sociale"), _testo("indirizzo"), _testo("piva")
             firma = servizi.firma_valida(request.form.get("firma"))
@@ -233,7 +263,9 @@ def gruppo_fornitore(sede_id):
         return redirect(url_for("admin.gruppo_concessionaria"))
     if request.method == "POST":
         if request.form.get("azione") == "utente":
-            _crea_utente("fornitore", sede.id)
+            esito = _crea_utente("fornitore", sede.id)
+            if esito is not None:
+                return esito
         else:
             sede.nome = _testo("ragione_sociale") or sede.nome
             sede.indirizzo, sede.piva = _testo("indirizzo"), _testo("piva")
@@ -253,6 +285,11 @@ def utente(utente_id):
     u = db.get_or_404(Utente, utente_id)
     torna = url_for("admin.gruppo_fornitore", sede_id=u.sede_id) if u.ruolo == "fornitore" and u.sede_id \
         else url_for("admin.gruppo_concessionaria")
+    if request.method == "POST" and request.form.get("azione") == "link":
+        if not u.attivo:
+            flash("L'account è disattivato: riattivalo prima di mandare il link.", "errore")
+            return redirect(url_for("admin.utente", utente_id=u.id))
+        return _esito_link(u, "invito" if u.invito_in_attesa else "recupero")
     if request.method == "POST":
         email = _testo("email").lower()
         if not _testo("nome") or not email:
@@ -274,10 +311,11 @@ def utente(utente_id):
                 u.attivo = request.form.get("attivo") == "1"
             if request.form.get("password"):
                 u.imposta_password(request.form["password"])
+                u.invito_in_attesa = False
             db.session.commit()
             flash("Utente aggiornato.", "ok")
             return redirect(torna)
-    return render_template("admin/utente.html", u=u, ruoli=RUOLI_INTERNI, torna=torna,
+    return render_template("admin/utente.html", u=u, ruoli=RUOLI_INTERNI, torna=torna, posta_attiva=posta.configurata(),
                            fornitori=[s for s in Sede.query.order_by(Sede.nome) if s.esterna])
 
 

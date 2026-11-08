@@ -107,6 +107,11 @@ def aggiungi_colonne():
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
             aggiunte.append("utente." + nome)
+    for nome, tipo in (("invito_in_attesa", "BOOLEAN DEFAULT FALSE"), ("ultimo_accesso_at", "TIMESTAMP")):
+        if nome not in colonne_utente:  # inviti e ultimo accesso
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
+            aggiunte.append("utente." + nome)
     if "firma_salvata" not in [c["name"] for c in ispettore.get_columns("movimento")]:
         with db.engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE movimento ADD COLUMN firma_salvata BOOLEAN DEFAULT FALSE")

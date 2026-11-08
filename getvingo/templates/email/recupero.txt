@@ -1,0 +1,11 @@
+Ciao {{ utente.nome }},
+
+abbiamo ricevuto una richiesta per reimpostare la password del tuo account Getvingo ({{ utente.email }}).
+
+Scegli una nuova password da questo link:
+{{ link }}
+
+Il link vale un'ora e si usa una volta sola.
+Non sei stato tu? Ignora questa email: la tua password resta quella di prima.
+-- 
+Getvingo · email automatica, non rispondere.

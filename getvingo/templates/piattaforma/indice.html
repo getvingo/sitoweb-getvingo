@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}Pannello Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{% block contenuto %}
+<div class="titolo-pagina">
+  <div><div class="sopratitolo">Gestore della piattaforma</div><h1>Pannello Getvingo</h1>
+    <p class="descrizione-pagina">Le concessionarie clienti: ognuna ha dati completamente separati. Qui ne crei di nuove, inviti il loro amministratore e ne sospendi l'accesso. I loro dati non si vedono da qui, solo i numeri.</p></div>
+  <a class="btn primario" href="{{ url_for('piattaforma.nuova') }}">{{ i('utente', 's') }} Nuova concessionaria</a>
+</div>
+
+<div class="lista-clienti">
+{% for o in organizzazioni %}
+  <section class="scheda cliente {{ '' if o.attiva else 'sospeso' }}">
+    <div class="cliente-testa">
+      <div><h3>{{ o.nome }}</h3>
+        <div class="tenue piccolo">Cliente n. {{ o.id }} · dal {{ o.creata_at|data('%d/%m/%Y') if o.creata_at else '—' }}{% if o.id == g.utente.org_id %} · <b>la tua</b>{% endif %}</div></div>
+      <span class="stato-cliente {{ 'attivo' if o.attiva else 'sospeso' }}">{{ 'Attivo' if o.attiva else 'Sospeso' }}</span>
+    </div>
+    <dl class="cliente-numeri">
+      <div><dt>Utenti attivi</dt><dd>{{ utenti.get(o.id, 0) }}</dd></div>
+      <div><dt>Auto in gestione</dt><dd>{{ auto.get(o.id, 0) }}</dd></div>
+      <div><dt>DDT emessi</dt><dd>{{ ddt.get(o.id, 0) }}</dd></div>
+      <div><dt>Ultimo accesso</dt><dd class="piccolo">{{ ultimo.get(o.id)|da_quanto if ultimo.get(o.id) else 'mai' }}</dd></div>
+    </dl>
+    <div class="cliente-admin">
+      <span class="etichetta">Amministratori</span>
+      {% for a in admin.get(o.id, []) %}
+      <div class="cliente-admin-riga">
+        <span><b>{{ a.nome }}</b> · {{ a.email }}{% if a.invito_in_attesa %} <span class="stato-accesso attesa">Invito in attesa</span>{% elif not a.attivo %} · disattivato{% endif %}</span>
+        {% if a.attivo and o.attiva %}
+        <form method="post" action="{{ url_for('piattaforma.rimanda_invito', org_id=o.id, utente_id=a.id) }}" data-una-volta>
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn piccolo">{{ 'Rimanda invito' if a.invito_in_attesa else 'Link nuova password' }}</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}<div class="tenue piccolo">Nessun amministratore.</div>{% endfor %}
+    </div>
+    {% if o.id != g.utente.org_id %}
+    <form method="post" action="{{ url_for('piattaforma.cambia_stato', org_id=o.id) }}" class="cliente-stato"
+          onsubmit="return confirm('{{ 'Sospendere ' ~ o.nome ~ '? Nessuno dei suoi utenti potrà più entrare finché non la riattivi. I dati restano.' if o.attiva else 'Riattivare ' ~ o.nome ~ '?' }}')">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="btn piccolo {{ 'pericolo' if o.attiva }}">{{ 'Sospendi accesso' if o.attiva else 'Riattiva accesso' }}</button>
+    </form>
+    {% endif %}
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

@@ -86,10 +86,11 @@ def create_app(config=None):
             except OperationalError:
                 pass
 
-    from . import admin, archivio, auth, filtri, routes
+    from . import admin, archivio, auth, filtri, piattaforma, routes
     app.register_blueprint(auth.bp)
     app.register_blueprint(routes.bp)
     app.register_blueprint(admin.bp)
+    app.register_blueprint(piattaforma.bp)
     auth.init_app(app)
     archivio.init_app(app)
     filtri.init_app(app)
