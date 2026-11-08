@@ -121,7 +121,7 @@ def init_app(app):
         if risposta.mimetype == "text/html":
             risposta.headers.setdefault("Cache-Control", "no-store")
         # Google indicizza solo la pagina d'ingresso e la privacy, mai le pagine interne o i link personali
-        pubblica = request.endpoint in PAGINE_PUBBLICHE and g.get("utente") is None and request.method == "GET"
+        pubblica = request.endpoint in PAGINE_PUBBLICHE and g.get("utente") is None and request.method in ("GET", "HEAD")
         if not pubblica and request.endpoint not in ("static", "auth.robots", "auth.sitemap", "auth.favicon"):
             risposta.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
         return risposta
