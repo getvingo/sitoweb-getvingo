@@ -444,7 +444,7 @@ h2 .icona { width: 16px; height: 16px; }
 .da-fare .voce.l1 .tratta { color: var(--liv-1-testo); font-weight: 700; }
 .da-fare .voce.l2 { border-left-color: var(--liv-2); background: var(--arancio-tenue); }
 .da-fare .voce.l2 .tratta { color: var(--arancio-testo); font-weight: 650; }
-.liv { display: inline-block; font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+.liv { display: inline-block; font-size: .75rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
   padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
 .liv.l1 { background: var(--liv-1); color: #fff; }
 .liv.l2 { background: var(--liv-2); color: #fff; }
@@ -606,12 +606,18 @@ a, button, summary, label { -webkit-tap-highlight-color: transparent; }
   .firme { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .firma-box { padding: 6px; }
   .firma-box img, .firma-box > span { height: 44px; }
-  .firma-box .etichetta { font-size: .64rem; letter-spacing: .04em; }
+  .firma-box .etichetta { font-size: .75rem; letter-spacing: .02em; }
 
   /* Azioni in testa al DDT: tre bottoni uguali su una riga */
   .azioni-testa { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
   .azioni-testa .btn { padding: 0 6px; gap: 6px; font-size: .86rem; white-space: nowrap; min-width: 0; overflow: hidden; }
   .azioni-testa .btn .icona { width: 16px; height: 16px; }
+  /* quattro azioni (admin: c'è anche Modifica) non ci stanno su una riga: due righe da due */
+  .azioni-testa:has(> :nth-child(4)) { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 400px) {
+  /* telefoni stretti: senza icona la scritta resta intera */
+  .azioni-testa:not(:has(> :nth-child(4))) .btn .icona { display: none; }
 
   #mappa-piazzale { height: 300px; }
   h1 { font-size: 1.35rem; }
@@ -686,7 +692,7 @@ a, button, summary, label { -webkit-tap-highlight-color: transparent; }
 .nav-conta { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
   background: var(--danno); color: #fff; font-size: .72rem; font-weight: 800; line-height: 1; }
 .icona-nav { position: relative; display: inline-flex; }
-.nav-basso .nav-conta { position: absolute; top: -6px; right: -12px; min-width: 18px; height: 18px; font-size: .66rem;
+.nav-basso .nav-conta { position: absolute; top: -7px; right: -13px; min-width: 20px; height: 20px; font-size: .75rem;
   border: 2px solid var(--carta); }
 
 /* Panoramica */
@@ -998,7 +1004,7 @@ details.zona-pericolo > summary { color: var(--danno-scuro); font-weight: 650; }
 @media (max-width: 559px) { .gruppo-fare { padding: 10px 10px 12px; } }
 
 /* Nuovo / Usato */
-.condizione { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: .68rem; font-weight: 800;
+.condizione { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: .75rem; font-weight: 800;
   letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; border: 1px solid; }
 .condizione.nuovo { color: var(--segnale); border-color: var(--segnale); background: var(--segnale-tenue); }
 .condizione.usato { color: var(--testo-2); border-color: var(--bordo-forte); background: var(--spento-tenue); }
@@ -1294,7 +1300,7 @@ a.destinazione-btn { text-decoration: none; }
 .anteprima-stato.chiuso { background: var(--ok-tenue); color: var(--ok); }
 .foglio-ddt { background: #fff; color: #1b1530; border-radius: 6px; padding: 20px; box-shadow: 0 6px 24px rgba(20,10,50,.18);
   border-top: 6px solid #2C1A5C; }
-.foglio-ddt small { display: block; color: #6b6585; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+.foglio-ddt small { display: block; color: #6b6585; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
 .foglio-ddt b { display: block; }
 .foglio-ddt span { display: block; color: #4a4560; font-size: .88rem; }
 .foglio-ddt section { margin-top: 16px; }

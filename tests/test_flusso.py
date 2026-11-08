@@ -1899,3 +1899,31 @@ class TestDemo(unittest.TestCase):
                                     "consegnato"})
             self.assertTrue(any(d.multiplo for d in Ddt.query))
             self.assertEqual({v.condizione for v in Veicolo.query}, {"nuovo", "usato"})
+
+
+class TestPagineDemoPulite(unittest.TestCase):
+    """Ogni ruolo apre le pagine principali e le schede delle auto che vede: niente errori né "None" a video,
+    e il pulsante Indietro del fornitore non porta allo Stock (che per lui è vietato)."""
+    def test_pagine_per_ruolo(self):
+        import re
+        from getvingo import demo
+        app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "t",
+                          "CSRF_ATTIVO": False, "FOTO_DIR": tempfile.mkdtemp(), "ARCHIVIO_DIR": tempfile.mkdtemp()})
+        with app.app_context():
+            demo.carica()
+        auth._falliti.clear()
+        for ruolo in ("admin", "ufficio", "autista", "carrozzeria", "officina"):
+            c = app.test_client()
+            c.post("/login", data={"email": f"{ruolo}@demo.it", "password": "demo"})
+            home = c.get("/").get_data(as_text=True)
+            pagine = ["/", "/ddt", "/password"] + (["/stock", "/lavorazioni", "/preparazione", "/danni"]
+                                                  if ruolo not in ("carrozzeria", "officina") else [])
+            pagine += sorted(set(re.findall(r'href="(/veicolo/\d+)"', home)))[:8]
+            pagine += sorted(set(re.findall(r'href="(/ddt/\d+)"', c.get("/ddt").get_data(as_text=True))))[:8]
+            for p in pagine:
+                r = c.get(p)
+                self.assertEqual(r.status_code, 200, f"{ruolo} {p}")
+                testo = re.sub(r"<[^>]+>", " ", r.get_data(as_text=True))
+                self.assertNotRegex(testo, r"\bNone\b|\bundefined\b|\bnan\b", f"{ruolo} {p}")
+                if ruolo in ("carrozzeria", "officina") and p.startswith("/veicolo/"):
+                    self.assertNotIn('class="torna-indietro" href="/stock"', r.get_data(as_text=True))

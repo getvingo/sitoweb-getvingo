@@ -6,7 +6,7 @@
 {% block titolo %}{{ v.descrizione }} · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
-{{ indietro(url_for('main.piazzale')) }}
+{{ indietro(url_for('main.piazzale') if g.utente.interno else url_for('main.home')) }}
 <div class="scheda-auto-testa">
   {{ carta_auto(v, targa_da_aggiungere=g.utente.interno and not v.targa) }}
   {{ info_auto(v) }}
