@@ -2,7 +2,7 @@
 {% from "_macro.html" import i, indietro %}
 {% block larghezza %}{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<h1>Adesivi NFC</h1></div></div>
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Adesivi NFC</h1></div></div>
 <div class="contatori" style="grid-template-columns:1fr 1fr;margin:0 0 16px">
   <a><strong>{{ abbinati }}</strong><span>In uso sulle auto</span></a>
   <a><strong>{{ liberi|length }}</strong><span>Liberi, pronti da scrivere</span></a>
@@ -14,7 +14,7 @@ Apri questa pagina dall'indirizzo pubblico (es. quello del tunnel https://…try
 <div class="scheda" style="margin-bottom:16px">
   <h3>Come si prepara un adesivo</h3>
   <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">
-    <li>Crea i codici qui sotto.</li>
+    <li>Crea i codici qui sotto: sono progressivi e iniziano con la sigla della concessionaria (<b>{{ sigla or '—' }}</b>, si cambia in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>), es. {{ (sigla or 'SIGLA') ~ '-0001' }}.</li>
     <li>Con l'app gratuita “NFC Tools” scrivi su ogni adesivo il suo link (record di tipo URL).</li>
     <li>Attacca l'adesivo sul lato interno del parabrezza, in un angolo.</li>
     <li>Al primo tocco il portale chiede di abbinarlo al VIN.</li>

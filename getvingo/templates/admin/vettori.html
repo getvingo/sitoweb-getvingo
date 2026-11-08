@@ -20,7 +20,7 @@
   <tbody>
   {% for vt in vettori %}
     <tr class="{{ '' if vt.attivo else 'spento' }}">
-      <td><a href="{{ url_for('admin.vettore', vettore_id=vt.id) }}"><b>{{ vt.nome }}</b></a></td><td class="num" style="font-weight:400">{{ vt.piva }}</td><td class="tenue">{{ vt.indirizzo }}</td>
+      <td><a href="{{ url_for('admin.vettore', vettore_id=vt.id) }}"><b>{{ vt.nome }}</b></a>{% if vt.proprio %}<div class="tenue piccolo">Vettore della concessionaria · si aggiorna con i Dati aziendali</div>{% elif vt.sede_id %}<div class="tenue piccolo">Vettore di un fornitore · creato dal suo profilo di guida</div>{% endif %}</td><td class="num" style="font-weight:400">{{ vt.piva }}</td><td class="tenue">{{ vt.indirizzo }}</td>
       <td style="text-align:right"><form method="post" action="{{ url_for('admin.attiva', tipo='vettore', oggetto_id=vt.id) }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <button class="btn-link">{{ 'Disattiva' if vt.attivo else 'Riattiva' }}</button></form></td>

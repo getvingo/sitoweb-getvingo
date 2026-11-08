@@ -109,7 +109,7 @@
     <form method="post" action="{{ url_for('main.sede_consegna', veicolo_id=v.id) }}" data-una-volta>
       {{ csrf_input() }}
       <label class="campo" style="max-width:420px"><span>Sede di consegna</span>
-        <select name="sede_id" required>{% for s in sedi_consegna %}<option value="{{ s.id }}" {{ 'selected' if s.id == (v.consegna_sede_id or v.sede_id) }}>{{ s.nome }}{{ ' (qui)' if s.id == v.sede_id }}</option>{% endfor %}</select></label>
+        <select name="sede_id" required>{% for s in sedi_consegna %}<option value="{{ s.id }}" {{ 'selected' if s.id == (v.consegna_sede_id or v.sede_id) }}>{{ s.nome }}{{ ' · ' ~ s.comune if s.comune }}{{ ' (qui)' if s.id == v.sede_id }}</option>{% endfor %}</select></label>
       <div class="campo"><span>Appuntamento con il cliente <span class="tenue">(facoltativo · slot di 30 minuti, uno per sede)</span></span>
         {{ scegli_slot('prevista', slot_consegna, v.consegna_prevista_at, per_sede='sede_id', vuoto='Orario da fissare') }}</div>
       <button class="btn primario">{{ i('check', 's') }} Conferma</button>

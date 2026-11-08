@@ -4,7 +4,7 @@
 {% block larghezza %}{% endblock %}
 {% block contenuto %}
 <div class="titolo-pagina"><div>{{ indietro(url_for('admin.azienda'), 'Dati aziendali') }}<div class="sopratitolo">Gestione · Dati aziendali</div><h1>Giorni di chiusura</h1>
-  <p class="descrizione-pagina">Nei giorni chiusi non si fissano preparazioni né appuntamenti di consegna. Sabato, domenica e feste nazionali sono già esclusi: qui si aggiungono patrono, ferie e ponti.</p></div></div>
+  <p class="descrizione-pagina">Il calendario delle preparazioni salta i giorni chiusi: lì non si fissa nessuna preparazione. Sabato, domenica e feste nazionali sono già esclusi: qui si aggiungono patrono, ferie e ponti.</p></div></div>
 
 <form method="post" class="scheda" style="margin-bottom:16px" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">

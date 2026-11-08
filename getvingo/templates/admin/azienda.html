@@ -16,13 +16,15 @@
 <h2>{{ i('doc') }} Dati e firma sui DDT</h2>
 <form method="post" class="scheda" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <p class="tenue piccolo" style="margin-top:0">Compaiono come mittente su ogni DDT e valgono per tutti gli utenti della concessionaria. I DDT già emessi non cambiano.</p>
+  <p class="tenue piccolo" style="margin-top:0">Compaiono come mittente su ogni DDT e valgono per tutti gli utenti della concessionaria; con gli stessi dati c'è anche il vettore della concessionaria, proposto a chi guida. I DDT già emessi non cambiano.</p>
   <label class="campo"><span>Ragione sociale</span><input name="ragione_sociale" value="{{ a.ragione_sociale or '' }}" required></label>
   <div class="griglia-2">
     <label class="campo"><span>Indirizzo della sede</span><input name="indirizzo" value="{{ a.indirizzo or '' }}"></label>
     <label class="campo"><span>Partita IVA</span><input name="piva" value="{{ a.piva or '' }}" inputmode="numeric"></label>
   </div>
   {{ firma_pad("Firma del mittente (apposta in automatico sui DDT)", attuale=a.firma) }}
+  <label class="campo"><span>Sigla degli adesivi NFC</span><input name="sigla" value="{{ sigla }}" maxlength="5" minlength="2" pattern="[A-Za-z]{2,5}" autocapitalize="characters" class="input-vin" required>
+    <small>Da 2 a 5 lettere, unica tra tutte le concessionarie: i codici degli adesivi nuovi saranno {{ sigla }}-0001, {{ sigla }}-0002…{% if adesivi %} Gli adesivi già creati tengono il loro codice.{% endif %}</small></label>
   <button class="btn primario pieno">{{ i('check') }} Salva i dati aziendali</button>
 </form>
 {% endblock %}

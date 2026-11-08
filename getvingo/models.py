@@ -25,6 +25,8 @@ class Organizzazione(db.Model):
     # il cliente consente al gestore Getvingo di entrare per assistenza (lo decide il suo admin in Gestione)
     assistenza_consentita = db.Column(db.Boolean, default=False)
     assistenza_cambiata_at = db.Column(db.DateTime)
+    # sigla dei codici degli adesivi NFC (es. CDEMO → CDEMO-0001): unica su tutto il portale
+    sigla = db.Column(db.String(5), unique=True)
 
 
 def org_attiva():
@@ -70,7 +72,7 @@ class Azienda(PerOrganizzazione, db.Model):
 
 
 class Utente(PerOrganizzazione, db.Model):
-    RUOLI = {"autista": "Autista", "ufficio": "Ufficio", "admin": "Amministratore",
+    RUOLI = {"autista": "Autista", "venditore": "Venditore", "ufficio": "Ufficio", "admin": "Amministratore",
              "fornitore": "Fornitore esterno"}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -98,7 +100,7 @@ class Utente(PerOrganizzazione, db.Model):
 
     @property
     def interno(self):
-        return self.ruolo in ("autista", "ufficio", "admin")
+        return self.ruolo in ("autista", "venditore", "ufficio", "admin")
 
     @property
     def gestione(self):
@@ -115,7 +117,7 @@ class Utente(PerOrganizzazione, db.Model):
 class Sede(PerOrganizzazione, db.Model):
     """Qualsiasi luogo di partenza/arrivo: sedi proprie, carrozzerie, officine, clienti."""
     TIPI = {
-        "propria": "Sede propria",
+        "propria": "Sede o piazzale della concessionaria",
         "carrozzeria": "Carrozzeria",
         "officina": "Officina",
         "cliente": "Cliente",
@@ -125,6 +127,7 @@ class Sede(PerOrganizzazione, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
     indirizzo = db.Column(db.String(300), default="")
+    comune = db.Column(db.String(120), default="")  # es. "Villorba (TV)": dice dove si trova il luogo
     piva = db.Column(db.String(30), default="")
     tipo = db.Column(db.String(20), nullable=False, default="propria")
     attiva = db.Column(db.Boolean, default=True)
@@ -138,6 +141,11 @@ class Sede(PerOrganizzazione, db.Model):
     def esterna(self):
         """Fornitore esterno: le auto ci vanno in lavorazione e poi tornano."""
         return self.tipo not in ("propria", "cliente")
+
+    @property
+    def dove(self):
+        """Riga sotto il nome: il comune (per sapere dove si trova); senza comune, il tipo di luogo."""
+        return self.comune or self.TIPI.get(self.tipo, "")
 
 
 class GiornoChiuso(PerOrganizzazione, db.Model):
@@ -155,6 +163,10 @@ class Vettore(PerOrganizzazione, db.Model):
     piva = db.Column(db.String(30), default="")
     indirizzo = db.Column(db.String(300), default="")
     attivo = db.Column(db.Boolean, default=True)
+    # vettore della concessionaria (mezzi propri): creato con il cliente, segue i dati aziendali
+    proprio = db.Column(db.Boolean, default=False)
+    # vettore di un fornitore (es. la carrozzeria che riporta l'auto con un suo autista)
+    sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
 
 
 class Veicolo(PerOrganizzazione, db.Model):

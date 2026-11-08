@@ -27,11 +27,12 @@ def crea_organizzazione(nome, admin_email, admin_password, admin_nome="Amministr
         raise Vietato("Servono ragione sociale, email e una password di almeno 8 caratteri.")
     if Utente.query.filter_by(email=admin_email).execution_options(tutte_le_organizzazioni=True).first():
         raise Vietato("Email già registrata.")
-    org = Organizzazione(nome=nome)
+    org = Organizzazione(nome=nome, sigla=genera_sigla(nome))
     db.session.add(org)
     db.session.flush()
     g.org_id = org.id
     db.session.add(Azienda(ragione_sociale=nome))
+    db.session.add(Vettore(nome=nome, proprio=True))  # il vettore della concessionaria, già pronto
     admin = Utente(nome=admin_nome, email=admin_email, ruolo="admin")
     admin.imposta_password(admin_password)
     db.session.add(admin)
@@ -242,8 +243,103 @@ def crea_ddt_multiplo(veicoli, dati, utente, firma_conducente=None, lat=None, lo
 
 # ---------------------------------------------------------------- partenza col tocco NFC
 
+# ---------------------------------------------------------------- vettori e adesivi della concessionaria
+
+def vettore_proprio():
+    """Il vettore della concessionaria attiva (mezzi propri), creato se manca; segue i dati aziendali."""
+    v = Vettore.query.filter_by(proprio=True).first()
+    if v is None:
+        azienda = Azienda.query.first()
+        org = db.session.get(Organizzazione, g.org_id) if g.get("org_id") else None
+        nome = (azienda.ragione_sociale if azienda and azienda.ragione_sociale else (org.nome if org else "Concessionaria"))
+        v = Vettore(nome=nome, proprio=True, piva=azienda.piva if azienda else "",
+                    indirizzo=azienda.indirizzo if azienda else "")
+        db.session.add(v)
+        db.session.flush()
+    return v
+
+
+def allinea_vettore_proprio(azienda):
+    """Dopo aver cambiato i dati aziendali, il vettore della concessionaria li riprende."""
+    v = vettore_proprio()
+    v.nome, v.piva, v.indirizzo, v.attivo = azienda.ragione_sociale, azienda.piva or "", azienda.indirizzo or "", True
+
+
+def vettore_predefinito(utente):
+    """Il vettore di chi guida, dall'azienda per cui lavora: per la concessionaria il suo vettore,
+    per un fornitore un vettore con i dati della sua azienda (creato al primo uso)."""
+    if utente.ruolo == "fornitore" and utente.sede is not None:
+        v = Vettore.query.filter_by(sede_id=utente.sede_id).first()
+        if v is None:
+            s = utente.sede
+            v = Vettore(nome=s.nome, piva=s.piva or "", indirizzo=" ".join(x for x in (s.indirizzo, s.comune) if x),
+                        sede_id=s.id)
+            db.session.add(v)
+            db.session.flush()
+        return v
+    return vettore_proprio()
+
+
+def completa_vettore(utente):
+    """Se chi guida non ha ancora un vettore, prende quello della sua azienda."""
+    if utente.vettore is None or not utente.vettore.attivo:
+        utente.vettore = vettore_predefinito(utente)
+    return utente.vettore
+
+
+LEGALI = {"SRL", "SPA", "SNC", "SAS", "SRLS", "SS", "SAPA", "SCARL", "COOP", "DI", "DEI", "DELLA", "DEL", "E", "&"}
+
+
+def genera_sigla(nome):
+    """Sigla dei codici degli adesivi dal nome (es. "Concessionaria Demo S.r.l." → CDEMO): iniziali delle
+    parole significative, completata con l'ultima parola fino a 5 lettere; unica su tutto il portale."""
+    import re
+    import unicodedata
+    testo = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode().upper()
+    parole = [p for p in re.split(r"[^A-Z]+", testo.replace(".", "")) if p and p not in LEGALI] or ["GV"]
+    base = "".join(p[0] for p in parole)[:5]
+    if len(base) < 5:
+        base = (base[:-1] + parole[-1])[:5] if len(parole) > 1 else parole[0][:5]
+    base = base if len(base) >= 2 else (base + "GV")[:2]
+    tutte = {o.sigla for o in Organizzazione.query.all() if o.sigla}
+    sigla, n = base, 1
+    while sigla in tutte:
+        n += 1
+        sigla = base[:5 - len(str(n))] + str(n)
+    return sigla
+
+
+def sigla_valida(sigla, org_id):
+    """La sigla scelta in Dati aziendali: 2-5 lettere, non usata da un'altra concessionaria."""
+    import re
+    sigla = (sigla or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{2,5}", sigla):
+        raise Vietato("La sigla degli adesivi deve avere da 2 a 5 lettere (senza numeri né spazi).")
+    altra = Organizzazione.query.filter(Organizzazione.sigla == sigla, Organizzazione.id != org_id).first()
+    if altra:
+        raise Vietato("Questa sigla è già usata da un'altra concessionaria: scegline un'altra.")
+    return sigla
+
+
+def nuovi_codici_adesivi(quanti):
+    """Codici progressivi della concessionaria attiva: SIGLA-0001, SIGLA-0002… (si riparte dal più alto)."""
+    org = db.session.get(Organizzazione, g.org_id)
+    if not org.sigla:
+        org.sigla = genera_sigla(org.nome)
+    prefisso = org.sigla + "-"
+    numeri = [int(t.codice[len(prefisso):]) for t in Tag.query.filter(Tag.codice.like(prefisso + "%"))
+              .execution_options(tutte_le_organizzazioni=True) if t.codice[len(prefisso):].isdigit()]
+    primo = max(numeri, default=0) + 1
+    codici = [f"{prefisso}{n:04d}" for n in range(primo, primo + quanti)]
+    for c in codici:
+        db.session.add(Tag(codice=c))
+    return codici
+
+
 def profilo_guida_mancante(utente):
-    """Cosa manca al profilo di guida per partire col solo tocco (vuoto = pronto)."""
+    """Cosa manca al profilo di guida per partire col solo tocco (vuoto = pronto).
+    Il vettore non manca mai: si prende quello dell'azienda per cui si lavora."""
+    completa_vettore(utente)
     mancano = []
     if utente.vettore is None or not utente.vettore.attivo:
         mancano.append("vettore")

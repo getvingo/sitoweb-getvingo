@@ -8,7 +8,7 @@
 <form method="post" data-una-volta>
   {{ csrf_input() }}<input type="hidden" name="poi" value="{{ poi }}">
   <div class="scheda">
-    <label class="campo"><span>Vettore</span>
+    <label class="campo"><span>Vettore <span class="tenue">(già compilato con la tua azienda)</span></span>
       <select name="vettore_id" required>
         <option value="">Per chi trasporti…</option>
         {% for vt in vettori %}<option value="{{ vt.id }}" {{ 'selected' if vettore_id == vt.id }}>{{ vt.nome }}</option>{% endfor %}

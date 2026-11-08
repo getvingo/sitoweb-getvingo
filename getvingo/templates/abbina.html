@@ -54,7 +54,7 @@
     <div class="griglia-2">
       <label class="campo"><span>Colore</span><input name="colore" value="{{ form.get('colore', '') }}"></label>
       <label class="campo"><span>Dove si trova</span>
-        <select name="sede_id" required>{% for s in sedi %}<option value="{{ s.id }}">{{ s.nome }}</option>{% endfor %}</select>
+        <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.comune if s.comune }}</option>{% endfor %}</select>
       </label>
     </div>
   </div>

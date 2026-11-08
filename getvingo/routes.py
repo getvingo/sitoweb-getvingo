@@ -826,7 +826,8 @@ def profilo_guida():
     if not poi.startswith("/") or poi.startswith("//"):
         poi = ""
     if request.method == "POST":
-        vettore = db.session.get(Vettore, request.form.get("vettore_id", type=int) or 0)
+        vettore = db.session.get(Vettore, request.form.get("vettore_id", type=int) or 0) \
+            or servizi.vettore_predefinito(g.utente)
         mezzo = request.form.get("mezzo", "")
         firma = servizi.firma_valida(request.form.get("firma")) or g.utente.firma
         if vettore is None or not vettore.attivo:
@@ -840,7 +841,11 @@ def profilo_guida():
             db.session.commit()
             flash("Profilo di guida salvato.", "ok")
             return redirect(poi or url_for("main.home"))
-    vettore_id = g.utente.vettore_id or servizi.ultimo_vettore_id(g.utente) or (vettori[0].id if len(vettori) == 1 else None)
+    # il vettore viene dall'azienda per cui si lavora: la concessionaria o il proprio fornitore
+    predefinito = servizi.vettore_predefinito(g.utente)
+    db.session.commit()
+    vettore_id = g.utente.vettore_id or predefinito.id
+    vettori = Vettore.query.filter_by(attivo=True).order_by(Vettore.proprio.desc(), Vettore.nome).all()
     return render_template("profilo_guida.html", vettori=vettori, mezzi=Movimento.MEZZI, poi=poi,
                            vettore_id=vettore_id, mezzo=g.utente.mezzo or Movimento.MEZZI[0])
 
@@ -1025,7 +1030,7 @@ def veicolo(veicolo_id):
     v = _veicolo_visibile(veicolo_id)
     mov = v.movimento_aperto
     ultimo = v.ultimo_arrivo
-    valori = {"conducente": g.utente.nome if g.utente.ruolo in ("autista", "fornitore") else "",
+    valori = {"conducente": g.utente.nome if g.utente.ruolo in ("autista", "venditore", "fornitore") else "",
               "vettore_id": servizi.ultimo_vettore_id(g.utente)}
     if v.sede and v.sede.esterna and ultimo:
         valori.update(a_sede_id=ultimo.da_sede_id, causale="Rientro da lavorazione",

@@ -59,7 +59,8 @@ def aggiungi_colonne():
         return []
     aggiunte = []
     colonne_org = [c["name"] for c in ispettore.get_columns("organizzazione")]
-    for nome, tipo in (("assistenza_consentita", "BOOLEAN DEFAULT FALSE"), ("assistenza_cambiata_at", "TIMESTAMP")):
+    for nome, tipo in (("assistenza_consentita", "BOOLEAN DEFAULT FALSE"), ("assistenza_cambiata_at", "TIMESTAMP"),
+                       ("sigla", "VARCHAR(5)")):
         if nome not in colonne_org:  # consenso del cliente all'assistenza del gestore Getvingo
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE organizzazione ADD COLUMN {nome} {tipo}")
@@ -119,6 +120,16 @@ def aggiungi_colonne():
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE utente ADD COLUMN {nome} {tipo}")
             aggiunte.append("utente." + nome)
+    if "comune" not in [c["name"] for c in ispettore.get_columns("sede")]:
+        with db.engine.begin() as conn:  # comune del luogo: dove si trova
+            conn.exec_driver_sql("ALTER TABLE sede ADD COLUMN comune VARCHAR(120) DEFAULT ''")
+        aggiunte.append("sede.comune")
+    colonne_vettore = [c["name"] for c in ispettore.get_columns("vettore")]
+    for nome, tipo in (("proprio", "BOOLEAN DEFAULT FALSE"), ("sede_id", "INTEGER REFERENCES sede(id)")):
+        if nome not in colonne_vettore:  # vettore della concessionaria / di un fornitore
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE vettore ADD COLUMN {nome} {tipo}")
+            aggiunte.append("vettore." + nome)
     if "firma_salvata" not in [c["name"] for c in ispettore.get_columns("movimento")]:
         with db.engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE movimento ADD COLUMN firma_salvata BOOLEAN DEFAULT FALSE")
@@ -128,3 +139,26 @@ def aggiungi_colonne():
             conn.exec_driver_sql("ALTER TABLE movimento ADD COLUMN lavorazione_stima_giorni INTEGER")
         aggiunte.append("movimento.lavorazione_stima_giorni")
     return aggiunte
+
+
+def assicura_vettori_propri():
+    """Ogni concessionaria ha il suo vettore (mezzi propri): per quelle nate prima si adotta quello
+    con il nome della concessionaria, altrimenti si crea. Idempotente, a ogni avvio."""
+    from .models import Azienda, Organizzazione, Vettore
+    creati = 0
+    for org in Organizzazione.query.all():
+        tutte = {"tutte_le_organizzazioni": True}
+        if Vettore.query.execution_options(**tutte).filter_by(org_id=org.id, proprio=True).first():
+            continue
+        azienda = Azienda.query.execution_options(**tutte).filter_by(org_id=org.id).first()
+        nome = (azienda.ragione_sociale if azienda and azienda.ragione_sociale else org.nome).strip()
+        simile = [v for v in Vettore.query.execution_options(**tutte).filter_by(org_id=org.id)
+                  if v.nome.lower().startswith(nome.lower())]
+        if simile:
+            simile[0].proprio = True
+        else:
+            db.session.add(Vettore(org_id=org.id, nome=nome, proprio=True,
+                                   piva=azienda.piva if azienda else "", indirizzo=azienda.indirizzo if azienda else ""))
+            creati += 1
+    db.session.commit()
+    return creati

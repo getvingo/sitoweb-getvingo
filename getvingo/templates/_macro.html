@@ -32,7 +32,7 @@
     <option value="">Scegli dove va l'auto…</option>
     {% for gruppo, sedi in gruppi_sedi %}
       <optgroup label="{{ gruppo }}">
-        {% for s in sedi %}<option value="{{ s.id }}" data-tipo="{{ s.tipo }}" {{ 'selected' if valori.a_sede_id == s.id }}>{{ s.nome }}</option>{% endfor %}
+        {% for s in sedi %}<option value="{{ s.id }}" data-tipo="{{ s.tipo }}" {{ 'selected' if valori.a_sede_id == s.id }}>{{ s.nome }}{{ ' · ' ~ s.comune if s.comune }}</option>{% endfor %}
       </optgroup>
     {% endfor %}
   </select>

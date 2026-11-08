@@ -1912,7 +1912,7 @@ class TestPagineDemoPulite(unittest.TestCase):
         with app.app_context():
             demo.carica()
         auth._falliti.clear()
-        for ruolo in ("admin", "ufficio", "autista", "carrozzeria", "officina"):
+        for ruolo in ("admin", "ufficio", "autista", "venditore", "carrozzeria", "officina"):
             c = app.test_client()
             c.post("/login", data={"email": f"{ruolo}@demo.it", "password": "demo"})
             home = c.get("/").get_data(as_text=True)
@@ -2328,3 +2328,114 @@ class TestProfiloEGestione(Base):
             self.assertIn(gruppo, t)
         self.entra("ufficio")
         self.assertEqual(self.c.get("/admin/azienda").status_code, 403)
+
+
+
+class TestConfigurazioneConcessionaria(Base):
+    """Vettore della concessionaria, adesivi progressivi con sigla, comune dei luoghi, venditore."""
+    def test_nuova_concessionaria_ha_vettore_e_sigla(self):
+        with self.app.app_context():
+            org = servizi.crea_organizzazione("Rossi Auto S.r.l.", "a@rossi.it", "password9")
+            self.assertEqual(org.sigla, "RAUTO")
+            v = Vettore.query.filter_by(org_id=org.id, proprio=True).one()
+            self.assertEqual(v.nome, "Rossi Auto S.r.l.")
+            org2 = servizi.crea_organizzazione("Rossi Auto S.p.A.", "b@rossi.it", "password9")
+            self.assertNotEqual(org2.sigla, "RAUTO")  # unica su tutto il portale
+            self.assertEqual(servizi.genera_sigla("Concessionaria Demo S.r.l."), "CDEMO")
+
+    def test_vettore_compilato_dall_azienda(self):
+        self.entra("autista")
+        t = self.c.get("/profilo-guida").get_data(as_text=True)
+        with self.app.app_context():
+            proprio = Vettore.query.filter_by(proprio=True).one()  # creato al bisogno con i dati aziendali
+            self.assertEqual(proprio.nome, "Test S.r.l.")
+            self.assertIn(f'<option value="{proprio.id}" selected>', t)
+        self.entra("carr")
+        t = self.c.get("/profilo-guida").get_data(as_text=True)
+        with self.app.app_context():
+            suo = Vettore.query.filter_by(sede_id=self._id(Sede, nome="Carrozzeria B")).one()
+            self.assertEqual(suo.nome, "Carrozzeria B")
+            self.assertIn(f'<option value="{suo.id}" selected>', t)
+            u = Utente.query.filter_by(email="carr@t.it").one()
+            self.assertNotIn("vettore", servizi.profilo_guida_mancante(u))
+
+    def test_dati_aziendali_aggiornano_il_vettore(self):
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuovo Nome S.r.l.", "piva": "IT1", "indirizzo": "Via X",
+                                            "sigla": "NNOME"})
+        with self.app.app_context():
+            v = Vettore.query.filter_by(proprio=True).one()
+            self.assertEqual((v.nome, v.piva), ("Nuovo Nome S.r.l.", "IT1"))
+            self.assertEqual(db.session.get(Organizzazione, 1).sigla, "NNOME")
+
+    def test_adesivi_progressivi_con_sigla(self):
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst"})
+        self.c.post("/admin/tag", data={"quanti": "3"})
+        self.c.post("/admin/tag", data={"quanti": "2"})
+        with self.app.app_context():
+            codici = sorted(t.codice for t in Tag.query if t.codice.startswith("TST-"))
+            self.assertEqual(codici, ["TST-0001", "TST-0002", "TST-0003", "TST-0004", "TST-0005"])
+        # il tocco funziona con il codice nuovo (anche scritto in minuscolo)
+        self.assertIn("/abbina/TST-0001", self.c.post("/t/tst-0001", data=POS).headers["Location"])
+
+    def test_sigla_non_valida_o_gia_usata(self):
+        with self.app.app_context():
+            servizi.crea_organizzazione("Altra S.r.l.", "x@altra.it", "password9")
+            altra = Organizzazione.query.filter_by(nome="Altra S.r.l.").one().sigla
+        for sbagliata in ("A1", "TROPPOLUNGA", altra):
+            self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": sbagliata})
+            with self.app.app_context():
+                self.assertNotEqual(db.session.get(Organizzazione, 1).sigla, sbagliata.upper())
+
+    def test_luoghi_con_comune_e_posizione(self):
+        n = lambda: self._conta(Sede)
+        prima = n()
+        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria"})  # senza comune: rifiutato
+        self.assertEqual(n(), prima)
+        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria", "comune": "Villorba (TV)",
+                                         "lat": "45.70", "lon": "12.24"})
+        sid = self._id(Sede, nome="Piazzale Nord")
+        with self.app.app_context():
+            s = db.session.get(Sede, sid)
+            self.assertEqual((s.comune, s.lat, s.lon, s.dove), ("Villorba (TV)", 45.70, 12.24, "Villorba (TV)"))
+        t = self.c.get(f"/admin/sedi/{sid}").get_data(as_text=True)
+        self.assertNotIn("Firma predefinita del destinatario", t)  # sede propria: vale la firma aziendale
+        self.assertIn("Dati aziendali", t)
+        carr = self._id(Sede, nome="Carrozzeria B")
+        self.assertIn("Firma predefinita del destinatario", self.c.get(f"/admin/sedi/{carr}").get_data(as_text=True))
+        self.c.post(f"/admin/sedi/{sid}", data={"nome": "Piazzale Nord", "tipo": "propria", "comune": ""})
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Sede, sid).comune, "Villorba (TV)")  # il comune non si toglie
+        # nel caricamento dell'auto: solo i piazzali della concessionaria, con il comune
+        nuova = self.c.get("/piazzale/nuova").get_data(as_text=True)
+        self.assertIn("Piazzale Nord · Villorba (TV)", nuova)
+        self.assertNotIn("Carrozzeria B</option>", nuova)
+        self.assertNotIn("Cliente C</option>", nuova)
+
+    def _conta(self, modello):
+        with self.app.app_context():
+            return modello.query.count()
+
+    def test_venditore(self):
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Giulia Vendite",
+                                                          "email": "giulia@t.it", "ruolo": "venditore",
+                                                          "password": "vendite12"})
+        with self.app.app_context():
+            u = Utente.query.filter_by(email="giulia@t.it").one()
+            self.assertEqual(u.ruolo, "venditore")
+            self.assertTrue(u.interno)
+            self.assertFalse(u.gestione)
+        vid = self.abbina()
+        self.c.post("/logout")
+        self.c.post("/login", data={"email": "giulia@t.it", "password": "vendite12"})
+        for pagina in ("/", "/stock", "/preparazione", "/lavorazioni", "/ddt", f"/veicolo/{vid}"):
+            self.assertEqual(self.c.get(pagina).status_code, 200, pagina)
+        self.assertEqual(self.c.get("/admin/").status_code, 403)
+        # sposta le auto di persona: profilo di guida (il vettore è già quello della concessionaria) e partenza
+        self.c.post("/profilo-guida", data={"mezzo": "Su strada (guidata)", "firma": FIRMA})
+        self.c.post("/t/ABCD2345", data=POS)
+        r = self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Carrozzeria B")})
+        self.assertEqual(r.status_code, 302)
+        with self.app.app_context():
+            m = Movimento.query.order_by(Movimento.id.desc()).first()
+            self.assertEqual(m.conducente, "Giulia Vendite")
+            self.assertTrue(m.vettore.proprio)

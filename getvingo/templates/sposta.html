@@ -3,7 +3,7 @@
 {% block titolo %}Inizia spostamento · Getvingo{% endblock %}
 {% macro destinazione(s) %}
 <button type="submit" name="a_sede_id" value="{{ s.id }}" class="destinazione-btn">
-  <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b>{% if s.indirizzo %}<small>{{ s.indirizzo }}</small>{% endif %}{% if s.lat is none %}<small>Posizione sulla mappa fissata al primo arrivo</small>{% endif %}</span>
+  <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b>{% if s.indirizzo or s.comune %}<small>{{ s.indirizzo }}{{ ' · ' if s.indirizzo and s.comune }}{{ s.comune }}</small>{% endif %}{% if s.lat is none %}<small>Posizione sulla mappa fissata al primo arrivo</small>{% endif %}</span>
 </button>
 {% endmacro %}
 {% block contenuto %}

@@ -17,6 +17,7 @@ Accessi demo (password "demo"):
   admin@demo.it        amministratore (può anche cancellare DDT)
   ufficio@demo.it      ufficio (predispone DDT, gestione)
   autista@demo.it      autista
+  venditore@demo.it    venditore
   carrozzeria@demo.it  fornitore "Carrozzeria Rossi"
   officina@demo.it     fornitore "Officina Bianchi"
 

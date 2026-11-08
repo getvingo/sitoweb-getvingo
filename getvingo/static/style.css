@@ -1741,3 +1741,5 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 .profilo-voce { margin-bottom: 10px; }
 .profilo-voce > .icona { color: var(--segnale); width: 26px; height: 26px; flex: none; }
 .profilo-esci { margin-top: 12px; }
+.esito-posizione { margin: 8px 0 12px; font-size: .9rem; color: var(--ok); }
+.esito-posizione.errore { color: var(--errore); }

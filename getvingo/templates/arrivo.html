@@ -17,7 +17,7 @@
       <span>{{ m.partenza_at|data('%d/%m alle %H:%M') }}</span></div>
     <div class="viaggio-linea" aria-hidden="true">{{ i('camion') }}</div>
     <div class="luogo arrivo"><small>Verso</small><b>{{ m.a_sede.nome }}</b>
-      <span>{{ m.a_sede.indirizzo or m.a_sede.TIPI[m.a_sede.tipo] }}</span></div>
+      <span>{{ m.a_sede.indirizzo or m.a_sede.dove }}{% if m.a_sede.indirizzo and m.a_sede.comune %} · {{ m.a_sede.comune }}{% endif %}</span></div>
   </div>
   <p class="viaggio-durata">{{ i('orologio', 's') }} In viaggio da {{ in_viaggio_da(m) }}</p>
 </section>

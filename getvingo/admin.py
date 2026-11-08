@@ -13,8 +13,6 @@ from .models import AccessoSupporto, Azienda, GiornoChiuso, Sede, Tag, Utente, V
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-# senza caratteri ambigui (0/O, 1/I/L) per chi li legge a voce
-ALFABETO_TAG = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 
 def _testo(campo):
@@ -63,28 +61,39 @@ def azienda():
     giorni di chiusura e loghi delle marche (impostazioni della concessionaria)."""
     a = Azienda.query.first() or Azienda(ragione_sociale="")
     if request.method == "POST":
+        org = g.utente.organizzazione
+        try:
+            sigla = servizi.sigla_valida(_testo("sigla") or org.sigla or servizi.genera_sigla(org.nome), org.id)
+        except servizi.Vietato as e:
+            sigla = None
+            flash(str(e), "errore")
         if not _testo("ragione_sociale"):
             flash("La ragione sociale è obbligatoria.", "errore")
-        else:
+        elif sigla:
             a.ragione_sociale, a.indirizzo, a.piva = _testo("ragione_sociale"), _testo("indirizzo"), _testo("piva")
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 a.firma = firma
+            org.sigla = sigla
             db.session.add(a)
+            servizi.allinea_vettore_proprio(a)
             db.session.commit()
             flash("Dati aziendali salvati: compaiono sui prossimi DDT. Quelli già emessi non cambiano.", "ok")
             return redirect(url_for("admin.azienda"))
     oggi = adesso().date()
     chiusure = GiornoChiuso.query.filter(GiornoChiuso.data >= oggi).order_by(GiornoChiuso.data).all()
     marche = {v.marca.strip().lower() for v in Veicolo.query if v.marca and v.marca.strip()}
-    return render_template("admin/azienda.html", a=a, chiusure=chiusure, n_marche=len(marche))
+    org = g.utente.organizzazione
+    return render_template("admin/azienda.html", a=a, chiusure=chiusure, n_marche=len(marche),
+                           sigla=org.sigla or servizi.genera_sigla(org.nome),
+                           adesivi=Tag.query.count())
 
 
 @bp.route("/chiusure", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def chiusure():
-    """Giorni senza preparazioni né consegne oltre alle feste nazionali (patrono, ferie, ponti):
-    nel calendario a slot non si possono scegliere."""
+    """Giorni chiusi oltre alle feste nazionali (patrono, ferie, ponti): il calendario delle
+    preparazioni li salta."""
     if request.method == "POST":
         try:
             dal = datetime.strptime(request.form.get("dal", ""), "%Y-%m-%d").date()
@@ -122,14 +131,28 @@ def elimina_chiusura(chiuso_id):
     return redirect(url_for("admin.chiusure"))
 
 
+def _coordinate():
+    """Coordinate inviate dal modulo ("Usa la mia posizione"); (None, None) se mancano o non valide."""
+    try:
+        return float(_testo("lat").replace(",", ".")), float(_testo("lon").replace(",", "."))
+    except ValueError:
+        return None, None
+
+
 @bp.route("/sedi", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def sedi():
-    if request.method == "POST" and _testo("nome"):
-        db.session.add(Sede(nome=_testo("nome"), indirizzo=_testo("indirizzo"), piva=_testo("piva"),
+    if request.method == "POST":
+        if not (_testo("nome") and _testo("comune")):
+            flash("Nome e comune sono obbligatori: il comune dice dove si trova il luogo.", "errore")
+            return redirect(url_for("admin.sedi"))
+        lat, lon = _coordinate()
+        db.session.add(Sede(nome=_testo("nome"), indirizzo=_testo("indirizzo"), comune=_testo("comune"),
+                            piva=_testo("piva"), lat=lat, lon=lon,
                             tipo=request.form.get("tipo") if request.form.get("tipo") in Sede.TIPI else "altro"))
         db.session.commit()
-        flash("Luogo aggiunto.", "ok")
+        flash("Luogo aggiunto" + (" con la posizione sulla mappa." if lat is not None else
+                                  ": la posizione si fissa al primo arrivo, oppure aprilo e usa la tua posizione."), "ok")
         return redirect(url_for("admin.sedi"))
     return render_template("admin/sedi.html", sedi=Sede.query.order_by(Sede.nome).all(), tipi=Sede.TIPI)
 
@@ -139,13 +162,16 @@ def sedi():
 def sede(sede_id):
     s = db.get_or_404(Sede, sede_id)
     if request.method == "POST":
+        if not _testo("comune"):
+            flash("Indica il comune: dice dove si trova il luogo.", "errore")
+            return redirect(url_for("admin.sede", sede_id=s.id))
         s.nome = _testo("nome") or s.nome
-        s.indirizzo, s.piva = _testo("indirizzo"), _testo("piva")
+        s.indirizzo, s.piva, s.comune = _testo("indirizzo"), _testo("piva"), _testo("comune")
         if request.form.get("tipo") in Sede.TIPI:
             s.tipo = request.form["tipo"]
         try:
-            s.lat = float(request.form["lat"]) if _testo("lat") else None
-            s.lon = float(request.form["lon"]) if _testo("lon") else None
+            s.lat = float(request.form["lat"].replace(",", ".")) if _testo("lat") else None
+            s.lon = float(request.form["lon"].replace(",", ".")) if _testo("lon") else None
         except ValueError:
             flash("Coordinate non valide.", "errore")
             return redirect(url_for("admin.sede", sede_id=s.id))
@@ -380,12 +406,9 @@ def vettore(vettore_id):
 def tag():
     if request.method == "POST":
         quanti = max(1, min(request.form.get("quanti", 10, type=int), 500))
-        for _ in range(quanti):
-            codice = "".join(secrets.choice(ALFABETO_TAG) for _ in range(8))
-            if not Tag.query.filter_by(codice=codice).execution_options(tutte_le_organizzazioni=True).first():
-                db.session.add(Tag(codice=codice))
+        codici = servizi.nuovi_codici_adesivi(quanti)
         db.session.commit()
-        flash(f"{quanti} codici creati: scrivi ciascun link su un adesivo NFC.", "ok")
+        flash(f"{quanti} codici creati, da {codici[0]} a {codici[-1]}: scrivi ciascun link su un adesivo NFC.", "ok")
         return redirect(url_for("admin.tag"))
     base = (current_app.config["BASE_URL"] or request.url_root).rstrip("/")
     host = request.host.split(":")[0]
@@ -395,7 +418,8 @@ def tag():
         base = "https://" + base[len("http://"):]
     return render_template("admin/tag.html", base=base, link_locale=locale and not current_app.config["BASE_URL"],
                            liberi=Tag.query.filter_by(veicolo_id=None).order_by(Tag.creato_at.desc()).all(),
-                           abbinati=Tag.query.filter(Tag.veicolo_id.isnot(None)).count())
+                           abbinati=Tag.query.filter(Tag.veicolo_id.isnot(None)).count(),
+                           sigla=g.utente.organizzazione.sigla)
 
 
 @bp.route("/import", methods=["GET", "POST"])

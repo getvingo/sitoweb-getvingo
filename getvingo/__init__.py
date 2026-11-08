@@ -88,6 +88,7 @@ def create_app(config=None):
             except OperationalError:
                 pass
 
+
     from . import admin, archivio, auth, filtri, piattaforma, routes
     app.register_blueprint(auth.bp)
     app.register_blueprint(routes.bp)
@@ -123,7 +124,9 @@ def create_app(config=None):
         from .models import Organizzazione
         db.create_all()
         if Organizzazione.query.execution_options(tutte_le_organizzazioni=True).first():
-            click.echo("Portale già inizializzato.")
+            from . import migrazioni
+            creati = migrazioni.assicura_vettori_propri()
+            click.echo(f"Portale già inizializzato.{' Vettori della concessionaria creati: ' + str(creati) if creati else ''}")
             return
         dati = [os.environ.get(k, "") for k in ("GETVINGO_AZIENDA", "GETVINGO_ADMIN_EMAIL",
                                                  "GETVINGO_ADMIN_PASSWORD")]
@@ -170,6 +173,6 @@ def create_app(config=None):
         from . import demo
         demo.carica()
         click.echo("Demo pronta. Accessi (password: demo): admin@demo.it, ufficio@demo.it, "
-                   "autista@demo.it, carrozzeria@demo.it, officina@demo.it")
+                   "autista@demo.it, venditore@demo.it, carrozzeria@demo.it, officina@demo.it")
 
     return app

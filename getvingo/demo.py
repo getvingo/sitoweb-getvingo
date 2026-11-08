@@ -41,23 +41,24 @@ def _indietro(**kw):
 def carica():
     db.drop_all()
     db.create_all()
-    org = Organizzazione(nome="Concessionaria Demo S.r.l.")
+    org = Organizzazione(nome="Concessionaria Demo S.r.l.", sigla="CDEMO")
     db.session.add(org)
     db.session.flush()
     g.org_id = org.id  # tutto ciò che segue appartiene alla concessionaria demo
     db.session.add(Azienda(ragione_sociale="Concessionaria Demo S.r.l.", piva="01234567890",
                            indirizzo="Viale Europa 1, 31100 Treviso (TV)", firma=_png_firma(1)))
-    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 1, 31100 Treviso (TV)", tipo="propria",
+    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 1, 31100", comune="Treviso (TV)", tipo="propria",
                    lat=45.6672, lon=12.2431)
-    villorba = Sede(nome="Piazzale Villorba", indirizzo="Via Postumia 50, 31020 Villorba (TV)",
+    villorba = Sede(nome="Piazzale Villorba", indirizzo="Via Postumia 50, 31020", comune="Villorba (TV)",
                     tipo="propria", lat=45.7051, lon=12.2468)
-    carrozzeria = Sede(nome="Carrozzeria Rossi", indirizzo="Via Roma 12, 31050 Ponzano (TV)",
+    carrozzeria = Sede(nome="Carrozzeria Rossi", indirizzo="Via Roma 12, 31050", comune="Ponzano Veneto (TV)",
                        piva="09876543210", tipo="carrozzeria", lat=45.7089, lon=12.2101, firma=_png_firma(2))
-    officina = Sede(nome="Officina Bianchi", indirizzo="Via Feltrina 88, 31100 Treviso (TV)",
+    officina = Sede(nome="Officina Bianchi", indirizzo="Via Feltrina 88, 31100", comune="Treviso (TV)",
                     piva="05556667778", tipo="officina", lat=45.6905, lon=12.2350)
-    detailing = Sede(nome="Lucido Detailing", indirizzo="Via Noalese 3, 31100 Treviso (TV)",
+    detailing = Sede(nome="Lucido Detailing", indirizzo="Via Noalese 3, 31100", comune="Treviso (TV)",
                      tipo="altro", lat=45.6620, lon=12.2180)
-    proprio = Vettore(nome="Concessionaria Demo S.r.l. (mezzo proprio)")
+    proprio = Vettore(nome="Concessionaria Demo S.r.l.", proprio=True, piva="01234567890",
+                      indirizzo="Viale Europa 1, 31100 Treviso (TV)")
     esterno = Vettore(nome="Trasporti Bianchi S.r.l.", piva="11223344556",
                       indirizzo="Via Industria 5, 31030 Casier (TV)")
     db.session.add_all([treviso, villorba, carrozzeria, officina, detailing, proprio, esterno])
@@ -68,6 +69,7 @@ def carica():
             ("admin", "Admin Demo", "admin@demo.it", "admin", None),
             ("ufficio", "Laura Ufficio", "ufficio@demo.it", "ufficio", None),
             ("autista", "Mario Autista", "autista@demo.it", "autista", None),
+            ("venditore", "Giulia Venditrice", "venditore@demo.it", "venditore", None),
             ("carrozzeria", "Paolo Rossi", "carrozzeria@demo.it", "fornitore", carrozzeria),
             ("carrozzeria2", "Sara Rossi", "carrozzeria2@demo.it", "fornitore", carrozzeria),
             ("officina", "Anna Bianchi", "officina@demo.it", "fornitore", officina)]:
