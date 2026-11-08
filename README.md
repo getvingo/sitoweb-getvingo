@@ -31,6 +31,7 @@ Avvio senza dati demo: `.venv/bin/flask --app getvingo init-db`
 
 | Variabile | Uso |
 |---|---|
+| `DOVIN_DATI` | cartella di foto, archivio DDT e loghi (default `instance/`) |
 | `DOVIN_SECRET_KEY` | chiave di sessione (se assente viene creata in `instance/secret_key`) |
 | `DOVIN_DATABASE_URL` | database Postgres in produzione (default SQLite in `instance/`) |
 | `ANTHROPIC_API_KEY` | assistente IA (facoltativo) |
@@ -40,5 +41,5 @@ Nessun dato, database o segreto è incluso nel repository (cartella `instance/` 
 
 ## Pubblicazione
 
-Guida per VPS Hostinger: [`deploy/GUIDA-HOSTINGER.txt`](deploy/GUIDA-HOSTINGER.txt).
+Produzione: Render (Francoforte), tutto descritto in [`render.yaml`](render.yaml).
 Dettagli di funzionamento: [`LEGGIMI.txt`](LEGGIMI.txt).

@@ -110,7 +110,31 @@
   {% if g.utente.interno %}<a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}"><span class="icona-nav">{{ i('attenzione') }}{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</span>Danni</a>{% endif %}
 </nav>
 {% endif %}
-<script>window.DOVIN_CSRF = "{{ csrf_token() if g.utente else '' }}";</script>
+{% if g.utente and not config.DEMO %}
+{# Blocco posizione: senza permesso GPS il portale non si usa (le posizioni di auto e DDT dipendono da lì) #}
+<div id="blocco-gps" class="blocco-gps" role="alertdialog" aria-modal="true" aria-labelledby="blocco-gps-titolo" hidden>
+  <div class="blocco-gps-scheda">
+    <span class="blocco-gps-icona">{{ i('pin') }}</span>
+    <h2 id="blocco-gps-titolo">Serve la tua posizione</h2>
+    <p data-gps-testo="chiedi">Getvingo registra dove si trovano le auto a ogni spostamento: per continuare consenti l’accesso alla posizione.</p>
+    <div data-gps-testo="negata" hidden>
+      <p>Hai negato l’accesso alla posizione. Per riattivarlo:</p>
+      <ul class="blocco-gps-passi">
+        <li><strong>iPhone:</strong> Impostazioni → Privacy e sicurezza → Localizzazione → Safari (o Chrome) → “Mentre usi l’app”, poi ricarica la pagina.</li>
+        <li><strong>Android:</strong> tocca il lucchetto accanto all’indirizzo → Autorizzazioni → Posizione → Consenti.</li>
+        <li><strong>Computer:</strong> clicca il lucchetto accanto all’indirizzo → Posizione → Consenti.</li>
+      </ul>
+    </div>
+    <p data-gps-testo="spenta" hidden>La localizzazione del telefono è spenta o non risponde: attivala e riprova.</p>
+    <button type="button" class="btn primario pieno" data-gps-consenti>{{ i('pin') }} Consenti posizione</button>
+    <form method="post" action="{{ url_for('auth.logout') }}" class="blocco-gps-esci">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="btn piccolo">{{ i('esci', 's') }} Esci</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+<script>window.DOVIN_CSRF ="{{ csrf_token() if g.utente else '' }}";</script>
 <script src="{{ url_for('static', filename='voce.js') }}"></script>
 <script src="{{ url_for('static', filename='ia.js') }}"></script>
 <script src="{{ url_for('static', filename='firma.js') }}"></script>

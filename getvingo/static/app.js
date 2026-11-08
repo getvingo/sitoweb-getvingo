@@ -10,6 +10,53 @@
     }, function () {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
   }
 
+  // Blocco posizione: finché il permesso GPS non è concesso una schermata copre tutto il portale
+  // (non c'è in demo né senza accesso). Si toglie da sola appena il permesso arriva.
+  var blocco = document.getElementById('blocco-gps');
+  if (blocco) {
+    var sotto = document.querySelectorAll('body > header, body > main, body > nav');
+    var bottoneGps = blocco.querySelector('[data-gps-consenti]');
+    var mostra = function (motivo) {
+      blocco.querySelectorAll('[data-gps-testo]').forEach(function (el) {
+        el.hidden = el.dataset.gpsTesto !== motivo;
+      });
+      bottoneGps.lastChild.textContent = motivo === 'chiedi' ? ' Consenti posizione' : ' Ho dato il permesso, riprova';
+      blocco.hidden = false;
+      document.documentElement.classList.add('gps-bloccato');
+      sotto.forEach(function (el) { el.inert = true; el.setAttribute('aria-hidden', 'true'); });
+    };
+    var togli = function () {
+      blocco.hidden = true;
+      document.documentElement.classList.remove('gps-bloccato');
+      sotto.forEach(function (el) { el.inert = false; el.removeAttribute('aria-hidden'); });
+    };
+    var chiedi = function () {
+      if (!navigator.geolocation) return mostra('spenta');
+      bottoneGps.classList.add('in-corso');
+      navigator.geolocation.getCurrentPosition(function () {
+        bottoneGps.classList.remove('in-corso');
+        togli();
+      }, function (err) {
+        bottoneGps.classList.remove('in-corso');
+        mostra(err.code === 1 ? 'negata' : 'spenta');
+      }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+    };
+    bottoneGps.addEventListener('click', chiedi);
+    var secondo = function (stato) {
+      if (stato === 'granted') togli();
+      else if (stato === 'denied') mostra('negata');
+      else mostra('chiedi');  // mai chiesto: il telefono lo chiede al tocco di "Consenti posizione"
+    };
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function (p) {
+        secondo(p.state);
+        p.onchange = function () { secondo(p.state); };  // permesso tolto o dato a pagina aperta
+      }, chiedi);
+    } else {
+      chiedi();  // browser senza Permissions API: si prova direttamente
+    }
+  }
+
   // Conferma tattile dopo un'azione riuscita
   if (document.querySelector('[data-vibra=ok]') && navigator.vibrate) navigator.vibrate(60);
 

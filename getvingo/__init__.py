@@ -22,7 +22,7 @@ def _chiave_segreta(app):
 
 
 def create_app(config=None):
-    # DOVIN_DATI: cartella di foto, archivio DDT e loghi fuori dal codice (su Google Cloud √® lo
+    # DOVIN_DATI: cartella di foto, archivio DDT e loghi fuori dal codice (su Google Cloud è lo
     # spazio Cloud Storage montato come cartella); senza, la cartella instance/ accanto al codice
     app = Flask(__name__, instance_relative_config=True, instance_path=os.environ.get("DOVIN_DATI") or None)
     # Dietro un tunnel/proxy HTTPS (Cloudflare, Nginx): usa schema e host pubblici per i link
@@ -33,7 +33,7 @@ def create_app(config=None):
     if os.path.exists(vecchio) and not os.path.exists(nuovo):
         try:
             os.rename(vecchio, nuovo)
-        except OSError:  # gi√† rinominato da un altro processo in avvio
+        except OSError:  # già rinominato da un altro processo in avvio
             pass
     database = os.environ.get("DOVIN_DATABASE_URL", "sqlite:///" + os.path.join(app.instance_path, "dovin.db"))
     # Postgres sempre con il driver psycopg 3 (indicato esplicitamente: non dipende dalla
@@ -44,9 +44,9 @@ def create_app(config=None):
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database,
         # URL pubblico scritto negli adesivi NFC (es. https://portale.dovin.it)
-        # su Render, finch√© non c'√® il dominio definitivo, vale l'indirizzo assegnato da Render
+        # su Render, finché non c'è il dominio definitivo, vale l'indirizzo assegnato da Render
         BASE_URL=os.environ.get("DOVIN_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL", ""),
-        # demo: l'admin pu√≤ eliminare anche auto con DDT (in produzione i DDT non si cancellano mai)
+        # demo: l'admin può eliminare anche auto con DDT (in produzione i DDT non si cancellano mai)
         DEMO=os.environ.get("DOVIN_DEMO") == "1",
         CSRF_ATTIVO=True,
         MAX_CONTENT_LENGTH=40 * 1024 * 1024,  # fino a qualche foto di danni per invio
@@ -100,7 +100,7 @@ def create_app(config=None):
             org = servizi.crea_organizzazione(azienda, admin_email, admin_password)
         except servizi.Vietato as e:
             raise click.ClickException(str(e))
-        click.echo(f"Cliente ‚Äú{org.nome}‚Äù creato (n. {org.id}). Accesso: {admin_email}")
+        click.echo(f"Cliente “{org.nome}” creato (n. {org.id}). Accesso: {admin_email}")
 
     # le variabili GETVINGO_* permettono il primo avvio senza domande (job su Google Cloud)
     @app.cli.command("init-db")
@@ -115,12 +115,12 @@ def create_app(config=None):
 
     @app.cli.command("primo-avvio")
     def primo_avvio():
-        """Prima di ogni avvio online: crea le tabelle mancanti e, solo se il portale √® vuoto,
+        """Prima di ogni avvio online: crea le tabelle mancanti e, solo se il portale è vuoto,
         il primo cliente da GETVINGO_AZIENDA / GETVINGO_ADMIN_EMAIL / GETVINGO_ADMIN_PASSWORD."""
         from .models import Organizzazione
         db.create_all()
         if Organizzazione.query.execution_options(tutte_le_organizzazioni=True).first():
-            click.echo("Portale gi√† inizializzato.")
+            click.echo("Portale già inizializzato.")
             return
         dati = [os.environ.get(k, "") for k in ("GETVINGO_AZIENDA", "GETVINGO_ADMIN_EMAIL",
                                                  "GETVINGO_ADMIN_PASSWORD")]
@@ -154,7 +154,7 @@ def create_app(config=None):
 
     @app.cli.command("aggiorna-loghi")
     def aggiorna_loghi_cmd():
-        """Riscarica i loghi delle marche presenti (versione pi√π recente disponibile)."""
+        """Riscarica i loghi delle marche presenti (versione più recente disponibile)."""
         from . import marchi
         from .models import Veicolo
         marche = sorted({v.marca for v in Veicolo.query.execution_options(tutte_le_organizzazioni=True) if v.marca})
