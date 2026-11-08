@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, firma_pad, indietro %}
+{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
 {% block contenuto %}
 <div class="titolo-pagina"><div>{{ indietro(url_for('admin.aziende')) }}<h1>{{ nome }}</h1></div></div>
 
@@ -45,11 +45,9 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="azione" value="dati">
   <p class="tenue piccolo" style="margin-top:0">Compaiono sui DDT {{ 'come mittente' if tipo == 'concessionaria' else 'quando questo fornitore è mittente o destinatario' }}. I DDT già emessi non cambiano.</p>
   <label class="campo"><span>Ragione sociale</span><input name="ragione_sociale" value="{{ dati.ragione_sociale if tipo == 'concessionaria' else dati.nome }}" required></label>
-  <div class="griglia-2">
-    <label class="campo"><span>Indirizzo</span><input name="indirizzo" value="{{ dati.indirizzo or '' }}"></label>
-    <label class="campo"><span>Partita IVA</span><input name="piva" value="{{ dati.piva or '' }}"></label>
-  </div>
-  {{ firma_pad("Firma unica dell'azienda (usata da tutti i suoi utenti)", attuale=dati.firma) }}
+  {{ campi_fiscali(dati) }}
+  {{ campi_indirizzo(dati, 'Sede') }}
+  {{ firma_pad("Firma unica dell'azienda (usata da tutti i suoi utenti)", attuale=dati.firma, timbro=True) }}
   <button class="btn primario pieno">Salva dati e firma</button>
 </form>
 {% endif %}

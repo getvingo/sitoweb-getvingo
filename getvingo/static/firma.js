@@ -27,11 +27,36 @@
       ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(p.x, p.y); ctx.stroke();
       ultimo = p; vuota = false;
     });
+    // la firma si salva a 600 px di larghezza: leggera anche con un timbro sotto
+    function salva() {
+      var largo = 600, c = document.createElement('canvas');
+      c.width = largo; c.height = Math.round(canvas.height * largo / canvas.width);
+      c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+      input.value = c.toDataURL('image/png'); box.classList.add('firmata');
+    }
     function fine() {
       if (!disegnando) return;
       disegnando = false;
-      if (!vuota) { input.value = canvas.toDataURL('image/png'); box.classList.add('firmata'); }
+      if (!vuota) salva();
     }
+    // logo o timbro dell'azienda sotto la firma: si adatta al riquadro, poi si firma sopra
+    var campoTimbro = box.parentElement.querySelector('[data-timbro]');
+    if (campoTimbro) campoTimbro.addEventListener('change', function () {
+      var file = campoTimbro.files[0];
+      if (!file) return;
+      var img = new Image();
+      img.onload = function () {
+        dimensiona();
+        var r = canvas.getBoundingClientRect(), margine = 8;
+        var scala = Math.min((r.width - 2 * margine) / img.width, (r.height - 2 * margine) / img.height);
+        var w = img.width * scala, h = img.height * scala;
+        ctx.globalAlpha = 0.9; ctx.drawImage(img, (r.width - w) / 2, (r.height - h) / 2, w, h); ctx.globalAlpha = 1;
+        vuota = false; salva();
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+      campoTimbro.value = '';
+    });
     canvas.addEventListener('pointerup', fine);
     canvas.addEventListener('pointercancel', fine);
     if (cancella) cancella.addEventListener('click', function () { dimensiona(); });

@@ -122,6 +122,8 @@ def init_app(app):
         return int((adesso() - momento).total_seconds()) if momento else 0
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
+    from .servizi import stima_viaggio
+    app.jinja_env.globals["stima_viaggio"] = stima_viaggio
     from .models import Movimento
     app.jinja_env.globals["MEZZI_TRASPORTO"] = Movimento.MEZZI
 

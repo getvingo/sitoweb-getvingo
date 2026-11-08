@@ -36,7 +36,13 @@
 {% if piazzali %}
 <div id="mappa-piazzale"></div>
 <p class="tenue piccolo" id="mappa-aiuto" style="margin:-8px 0 14px">Tocca una sede per vedere come sono disposte le auto.</p>
+{% else %}
+<div class="mappa-vuota">{{ i('pin') }}
+  <p><b>La mappa compare appena i piazzali hanno la loro posizione.</b>
+  {% if g.utente.ruolo == 'admin' %}Apri <a href="{{ url_for('admin.sedi') }}">Gestione → Sedi e piazzali</a> e per ognuno verifica l'indirizzo sulla mappa.{% else %}Chiedi all'amministratore di completare gli indirizzi in Gestione.{% endif %}
+  Le auto compaiono al primo tocco dell'adesivo.</p></div>
 {% endif %}
+{% if piazzali and senza_posizione %}<p class="tenue piccolo" style="margin:-6px 0 14px">{{ senza_posizione }} {{ 'piazzale non è' if senza_posizione == 1 else 'piazzali non sono' }} sulla mappa: manca la posizione{% if g.utente.ruolo == 'admin' %} (<a href="{{ url_for('admin.sedi') }}">completa</a>){% endif %}.</p>{% endif %}
 </aside>
 <div class="stock-elenco">
 {{ legenda(gruppi|map(attribute='voci')|sum(start=[])) }}
@@ -83,6 +89,7 @@
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   (function () {
+    if (!document.getElementById('mappa-piazzale')) return;  // nessun piazzale con la posizione
     var auto = {{ auto|tojson }}, piazzali = {{ piazzali|tojson }};
     var ZOOM_AUTO = 16;  // da qui in su si vedono le singole auto
     var mappa = L.map('mappa-piazzale', { zoomControl: true });

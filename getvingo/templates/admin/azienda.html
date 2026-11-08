@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, firma_pad, indietro %}
+{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
 {% block titolo %}Dati aziendali · Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('admin.indice')) }}
@@ -18,11 +18,10 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <p class="tenue piccolo" style="margin-top:0">Compaiono come mittente su ogni DDT e valgono per tutti gli utenti della concessionaria; con gli stessi dati c'è anche il vettore della concessionaria, proposto a chi guida. I DDT già emessi non cambiano.</p>
   <label class="campo"><span>Ragione sociale</span><input name="ragione_sociale" value="{{ a.ragione_sociale or '' }}" required></label>
-  <div class="griglia-2">
-    <label class="campo"><span>Indirizzo della sede</span><input name="indirizzo" value="{{ a.indirizzo or '' }}"></label>
-    <label class="campo"><span>Partita IVA</span><input name="piva" value="{{ a.piva or '' }}" inputmode="numeric"></label>
-  </div>
-  {{ firma_pad("Firma del mittente (apposta in automatico sui DDT)", attuale=a.firma) }}
+  {{ campi_fiscali(a) }}
+  {{ campi_indirizzo(a, 'Sede legale') }}
+  <p class="tenue piccolo" style="margin-top:-6px">La sede legale diventa anche una destinazione tra le Sedi e piazzali, sempre aggiornata.</p>
+  {{ firma_pad("Firma del mittente (apposta in automatico sui DDT)", attuale=a.firma, timbro=True) }}
   <label class="campo"><span>Sigla degli adesivi NFC</span><input name="sigla" value="{{ sigla }}" maxlength="5" minlength="2" pattern="[A-Za-z]{2,5}" autocapitalize="characters" class="input-vin" required>
     <small>Da 2 a 5 lettere, unica tra tutte le concessionarie: i codici degli adesivi nuovi saranno {{ sigla }}-0001, {{ sigla }}-0002…{% if adesivi %} Gli adesivi già creati tengono il loro codice.{% endif %}</small></label>
   <button class="btn primario pieno">{{ i('check') }} Salva i dati aziendali</button>

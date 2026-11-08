@@ -41,8 +41,8 @@ def crea_organizzazione(nome, admin_email, admin_password, admin_nome="Amministr
 
 
 def firma_valida(dato):
-    """Accetta solo PNG in data URL, max ~200 KB. Restituisce la firma o None."""
-    if not dato or not dato.startswith(PREFISSO_FIRMA) or len(dato) > 280_000:
+    """Accetta solo PNG in data URL, max ~500 KB (firma timbrata). Restituisce la firma o None."""
+    if not dato or not dato.startswith(PREFISSO_FIRMA) or len(dato) > 700_000:  # anche con il timbro
         return None
     try:
         grezzo = base64.b64decode(dato[len(PREFISSO_FIRMA):], validate=True)
@@ -74,9 +74,9 @@ def mittente(mov):
     se l'auto parte da una sede propria, altrimenti il fornitore da cui parte."""
     sede = mov.da_sede
     if sede is not None and sede.esterna:
-        return sede.nome, sede.indirizzo, sede.piva, sede.firma
+        return sede.nome, sede.indirizzo_completo, sede.piva, sede.firma
     a = Azienda.query.first()
-    return (a.ragione_sociale, a.indirizzo, a.piva, a.firma) if a else ("", "", "", None)
+    return (a.ragione_sociale, a.indirizzo_completo, a.piva, a.firma) if a else ("", "", "", None)
 
 
 def rientro_libero(veicolo):
@@ -133,8 +133,8 @@ def _fissa_controparti(ddt):
     dest = m.a_sede or db.session.get(Sede, m.a_sede_id)
     vt = m.vettore or db.session.get(Vettore, m.vettore_id)
     fissi = dict(ddt.dati_fissi or {})
-    fissi["destinatario"] = [dest.nome, dest.indirizzo or "", dest.piva or ""]
-    fissi["vettore"] = [vt.nome, vt.indirizzo or "", vt.piva or ""]
+    fissi["destinatario"] = [dest.nome, dest.indirizzo_completo or "", dest.piva or ""]
+    fissi["vettore"] = [vt.nome, vt.indirizzo_completo or "", vt.piva or ""]
     ddt.dati_fissi = fissi
 
 
@@ -143,8 +143,8 @@ def dati_ddt(ddt):
     fissi = ddt.dati_fissi or {}
     m = ddt.movimento
     return (fissi.get("mittente") or list(mittente(m)[:3]),
-            fissi.get("destinatario") or [m.a_sede.nome, m.a_sede.indirizzo, m.a_sede.piva],
-            fissi.get("vettore") or [m.vettore.nome, m.vettore.indirizzo, m.vettore.piva])
+            fissi.get("destinatario") or [m.a_sede.nome, m.a_sede.indirizzo_completo, m.a_sede.piva],
+            fissi.get("vettore") or [m.vettore.nome, m.vettore.indirizzo_completo, m.vettore.piva])
 
 
 def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=None,
@@ -262,7 +262,24 @@ def vettore_proprio():
 def allinea_vettore_proprio(azienda):
     """Dopo aver cambiato i dati aziendali, il vettore della concessionaria li riprende."""
     v = vettore_proprio()
-    v.nome, v.piva, v.indirizzo, v.attivo = azienda.ragione_sociale, azienda.piva or "", azienda.indirizzo or "", True
+    v.nome, v.attivo = azienda.ragione_sociale, True
+    for campo in ("piva", "codice_fiscale", "indirizzo", "cap", "comune", "provincia", "stato", "lat", "lon"):
+        setattr(v, campo, getattr(azienda, campo))
+
+
+def allinea_sede_legale(azienda):
+    """La sede legale della concessionaria è anche una destinazione (sede propria), creata e aggiornata
+    dai Dati aziendali: stesso indirizzo e stessa posizione sulla mappa."""
+    if not azienda.comune:
+        return None
+    s = Sede.query.filter_by(sede_legale=True).first()
+    if s is None:
+        s = Sede(tipo="propria", sede_legale=True, nome="Sede legale")
+        db.session.add(s)
+    for campo in ("indirizzo", "cap", "comune", "provincia", "stato", "lat", "lon"):
+        setattr(s, campo, getattr(azienda, campo))
+    s.attiva = True
+    return s
 
 
 def vettore_predefinito(utente):
@@ -272,7 +289,8 @@ def vettore_predefinito(utente):
         v = Vettore.query.filter_by(sede_id=utente.sede_id).first()
         if v is None:
             s = utente.sede
-            v = Vettore(nome=s.nome, piva=s.piva or "", indirizzo=" ".join(x for x in (s.indirizzo, s.comune) if x),
+            v = Vettore(nome=s.nome, piva=s.piva or "", codice_fiscale=s.codice_fiscale or "", indirizzo=s.indirizzo,
+                        cap=s.cap, comune=s.comune, provincia=s.provincia, stato=s.stato, lat=s.lat, lon=s.lon,
                         sede_id=s.id)
             db.session.add(v)
             db.session.flush()
@@ -355,8 +373,14 @@ def causale_per(da_sede, a_sede):
     if a_sede.tipo == "cliente":
         return "Consegna a cliente"
     if a_sede.esterna:
-        return "Conto lavorazione"
-    return "Rientro da lavorazione" if da_sede is not None and da_sede.esterna else "Trasferimento tra sedi"
+        return "Invio lavorazione"
+    if a_sede.tipo == "esposizione":
+        return "Conto esposizione"
+    if da_sede is not None and da_sede.esterna:
+        return "Reso lavorazione"
+    if da_sede is not None and da_sede.tipo == "esposizione":
+        return "Reso esposizione"
+    return "Spostamento"
 
 
 def destinazioni_rapide(veicolo, utente):
@@ -373,21 +397,25 @@ def destinazioni_rapide(veicolo, utente):
     return preferite, [(Sede.TIPI[t], list(gr)) for t, gr in groupby(altre, key=lambda s: s.tipo)]
 
 
-TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina")
+TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "esposizione")
 
 
 def destinazione_scritta(nome, tipo="altro"):
     """Destinazione non in elenco, scritta da chi parte: se esiste già con quel nome si usa quella,
     altrimenti nasce un nuovo luogo. La sua posizione si fissa al primo arrivo (vedi _per_conto)."""
+    from . import anagrafica
     nome = " ".join((nome or "").split())[:200]
     if len(nome) < 3:
-        raise Vietato("Scrivi il nome (e se puoi l'indirizzo) della destinazione.")
+        raise Vietato("Scrivi il nome della destinazione.")
     esistente = Sede.query.filter(func.lower(Sede.nome) == nome.lower()).first()
     if esistente is not None:
         if not esistente.attiva:
             raise Vietato(f"{esistente.nome} è disattivata in Gestione.")
         return esistente
     sede = Sede(nome=nome, tipo=tipo if tipo in TIPI_DESTINAZIONE_NUOVA else "altro")
+    # come in Gestione: indirizzo trovato sulla mappa e dati fiscali (per un cliente basta il codice fiscale)
+    anagrafica.leggi_indirizzo(sede)
+    anagrafica.leggi_fiscali(sede, obbligatori=True, solo_cf=sede.tipo == "cliente")
     db.session.add(sede)
     db.session.flush()
     return sede
@@ -723,7 +751,7 @@ def completa_lavorazione(mov, utente, note="", prepara_rientro=True):
         Sede.query.filter_by(tipo="propria", attiva=True).order_by(Sede.id).first()
     if ritorno is None:
         return None
-    dati = dict(a_sede_id=ritorno.id, causale="Rientro da lavorazione", vettore_id=mov.vettore_id,
+    dati = dict(a_sede_id=ritorno.id, causale="Reso lavorazione", vettore_id=mov.vettore_id,
                 conducente="", lavorazione=Movimento.NESSUNA, lavorazione_note="")
     rientro = crea_movimento(mov.veicolo, dati, utente, predisponi_ore=ORE_RITIRO_RIENTRO)
     db.session.flush()
@@ -1221,3 +1249,37 @@ def giorni_con_slot(da=None, giorni_lavorativi=15):
             out.append((giorno, slot))
         giorno += timedelta(days=1)
     return out
+
+
+# ---------------------------------------------------------------- stima del viaggio
+
+VELOCITA_KMH = {"Su strada (guidata)": 48, "Bisarca": 42, "Carro attrezzi": 45, "Furgone / carrello": 45, "Altro": 45}
+FATTORE_STRADA = 1.3  # la strada è più lunga della linea d'aria (media per percorsi locali e provinciali)
+
+
+def traffico(quando):
+    """Fattore di traffico tipico dell'orario (senza servizi a pagamento non c'è il traffico in tempo reale)."""
+    ora = quando.hour + quando.minute / 60
+    if quando.weekday() >= 5:
+        return 1.0, "fine settimana"
+    if 7.5 <= ora < 9.5 or 17 <= ora < 19.5:
+        return 1.35, "ora di punta"
+    if 12.5 <= ora < 14.5:
+        return 1.12, "pausa pranzo"
+    if ora >= 21 or ora < 6:
+        return 0.9, "notte"
+    return 1.0, "traffico normale"
+
+
+def stima_viaggio(mov):
+    """Distanza e tempo stimati da partenza a destinazione: {km, minuti, arrivo, traffico} o None
+    se manca la posizione di uno dei due luoghi."""
+    da, a = mov.da_sede, mov.a_sede
+    if da is None or a is None or da.lat is None or a.lat is None:
+        return None
+    km = distanza_m(da.lat, da.lon, a.lat, a.lon) / 1000 * FATTORE_STRADA
+    partenza = mov.partenza_at or adesso()
+    fattore, nota = traffico(partenza)
+    minuti = max(5, round(km / VELOCITA_KMH.get(mov.mezzo, 45) * 60 * fattore + 5))  # + manovre e parcheggio
+    return {"km": round(km, 1) if km < 10 else round(km), "minuti": minuti, "traffico": nota,
+            "arrivo": partenza + timedelta(minutes=minuti)}

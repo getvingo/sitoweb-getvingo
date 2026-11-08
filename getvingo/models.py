@@ -61,12 +61,40 @@ class AccessoSupporto(PerOrganizzazione, db.Model):
     gestore = db.Column(db.String(200), nullable=False)  # email del gestore che è entrato
 
 
-class Azienda(PerOrganizzazione, db.Model):
+class ConIndirizzo:
+    """Indirizzo completo come sui DDT: "Via Roma 12, 31050 Ponzano Veneto (TV), Italia".
+    Per i dati inseriti prima della scomposizione (solo "indirizzo"), si mostra quello che c'è."""
+
+    @property
+    def dove(self):
+        """Comune con provincia, es. "Villorba (TV)"."""
+        comune = (getattr(self, "comune", "") or "").strip()
+        prov = (getattr(self, "provincia", "") or "").strip()
+        return f"{comune} ({prov})" if comune and prov else comune
+
+    @property
+    def indirizzo_completo(self):
+        via = (self.indirizzo or "").strip()
+        if not getattr(self, "comune", None):
+            return via
+        luogo = " ".join(x for x in ((getattr(self, "cap", "") or "").strip(), self.dove) if x)
+        stato = (getattr(self, "stato", "") or "").strip()
+        return ", ".join(x for x in (via, luogo, stato) if x)
+
+
+class Azienda(PerOrganizzazione, ConIndirizzo, db.Model):
     """Dati del mittente stampati sul DDT (una sola riga)."""
     id = db.Column(db.Integer, primary_key=True)
     ragione_sociale = db.Column(db.String(200), nullable=False)
-    indirizzo = db.Column(db.String(300), default="")
+    indirizzo = db.Column(db.String(300), default="")  # sede legale: via e civico
     piva = db.Column(db.String(30), default="")
+    codice_fiscale = db.Column(db.String(16), default="")
+    cap = db.Column(db.String(10), default="")
+    comune = db.Column(db.String(120), default="")
+    provincia = db.Column(db.String(4), default="")
+    stato = db.Column(db.String(60), default="Italia")
+    lat = db.Column(db.Float)
+    lon = db.Column(db.Float)
     # Firma predefinita del mittente (PNG in data URL), apposta in automatico sui DDT
     firma = db.Column(db.Text)
 
@@ -114,21 +142,29 @@ class Utente(PerOrganizzazione, db.Model):
         return check_password_hash(self.password_hash, password)
 
 
-class Sede(PerOrganizzazione, db.Model):
+class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     """Qualsiasi luogo di partenza/arrivo: sedi proprie, carrozzerie, officine, clienti."""
     TIPI = {
         "propria": "Sede o piazzale della concessionaria",
         "carrozzeria": "Carrozzeria",
         "officina": "Officina",
+        "esposizione": "Esposizione (fiera, showroom esterno)",
         "cliente": "Cliente",
         "altro": "Altro fornitore",
     }
+    FORNITORI = ("carrozzeria", "officina", "altro")  # luoghi dove le auto vanno in lavorazione
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
     indirizzo = db.Column(db.String(300), default="")
-    comune = db.Column(db.String(120), default="")  # es. "Villorba (TV)": dice dove si trova il luogo
+    comune = db.Column(db.String(120), default="")  # es. "Villorba": con la provincia dice dove si trova
+    cap = db.Column(db.String(10), default="")
+    provincia = db.Column(db.String(4), default="")
+    stato = db.Column(db.String(60), default="Italia")
     piva = db.Column(db.String(30), default="")
+    codice_fiscale = db.Column(db.String(16), default="")
+    # la sede legale della concessionaria, creata e aggiornata dai Dati aziendali
+    sede_legale = db.Column(db.Boolean, default=False)
     tipo = db.Column(db.String(20), nullable=False, default="propria")
     attiva = db.Column(db.Boolean, default=True)
     # Coordinate usate per aggiornare la posizione dell'auto all'arrivo
@@ -140,12 +176,17 @@ class Sede(PerOrganizzazione, db.Model):
     @property
     def esterna(self):
         """Fornitore esterno: le auto ci vanno in lavorazione e poi tornano."""
-        return self.tipo not in ("propria", "cliente")
+        return self.tipo in self.FORNITORI
+
+    @property
+    def societa(self):
+        """Luogo di un'altra azienda (fornitore, esposizione): servono P. IVA e codice fiscale."""
+        return self.tipo in self.FORNITORI + ("esposizione",)
 
     @property
     def dove(self):
-        """Riga sotto il nome: il comune (per sapere dove si trova); senza comune, il tipo di luogo."""
-        return self.comune or self.TIPI.get(self.tipo, "")
+        """Riga sotto il nome: comune e provincia (per sapere dove si trova); senza, il tipo di luogo."""
+        return ConIndirizzo.dove.fget(self) or self.TIPI.get(self.tipo, "")
 
 
 class GiornoChiuso(PerOrganizzazione, db.Model):
@@ -157,11 +198,18 @@ class GiornoChiuso(PerOrganizzazione, db.Model):
     motivo = db.Column(db.String(120), default="")
 
 
-class Vettore(PerOrganizzazione, db.Model):
+class Vettore(PerOrganizzazione, ConIndirizzo, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)
     piva = db.Column(db.String(30), default="")
     indirizzo = db.Column(db.String(300), default="")
+    codice_fiscale = db.Column(db.String(16), default="")
+    cap = db.Column(db.String(10), default="")
+    comune = db.Column(db.String(120), default="")
+    provincia = db.Column(db.String(4), default="")
+    stato = db.Column(db.String(60), default="Italia")
+    lat = db.Column(db.Float)
+    lon = db.Column(db.Float)
     attivo = db.Column(db.Boolean, default=True)
     # vettore della concessionaria (mezzi propri): creato con il cliente, segue i dati aziendali
     proprio = db.Column(db.Boolean, default=False)
@@ -304,14 +352,17 @@ class Tag(PerOrganizzazione, db.Model):
 
 class Movimento(PerOrganizzazione, db.Model):
     CAUSALI = [
-        "Trasferimento tra sedi",
-        "Conto lavorazione",
-        "Conto riparazione",
-        "Rientro da lavorazione",
+        "Spostamento",           # tra sedi e piazzali della concessionaria
+        "Invio lavorazione",     # verso carrozzeria, officina, altro fornitore
+        "Reso lavorazione",      # dal fornitore indietro alla concessionaria
+        "Conto esposizione",     # verso una fiera o uno showroom esterno
+        "Reso esposizione",      # dall'esposizione indietro alla concessionaria
         "Consegna a cliente",
         "Conto visione",
         "Reso",
     ]
+    # causali dei DDT emessi prima dell'08/11/2026: restano valide sui documenti già fatti
+    CAUSALI_STORICHE = ["Trasferimento tra sedi", "Conto lavorazione", "Conto riparazione", "Rientro da lavorazione"]
     LAVORAZIONI = [
         "Nessuna (solo trasferimento)",
         "Carrozzeria",

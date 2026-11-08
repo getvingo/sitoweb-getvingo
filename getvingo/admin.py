@@ -4,7 +4,7 @@ import secrets
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 
-from . import accessi, posta, servizi
+from . import accessi, anagrafica, posta, servizi
 from . import vin as vin_mod
 from .auth import ruolo_richiesto
 from datetime import datetime, timedelta
@@ -67,18 +67,30 @@ def azienda():
         except servizi.Vietato as e:
             sigla = None
             flash(str(e), "errore")
-        if not _testo("ragione_sociale"):
-            flash("La ragione sociale è obbligatoria.", "errore")
+        errore = None
+        if sigla:
+            try:
+                if not _testo("ragione_sociale"):
+                    raise servizi.Vietato("La ragione sociale è obbligatoria.")
+                a.ragione_sociale = _testo("ragione_sociale")
+                anagrafica.leggi_fiscali(a)
+                anagrafica.leggi_indirizzo(a)
+            except servizi.Vietato as e:
+                errore = str(e)
+        if errore:
+            db.session.rollback()
+            flash(errore, "errore")
         elif sigla:
-            a.ragione_sociale, a.indirizzo, a.piva = _testo("ragione_sociale"), _testo("indirizzo"), _testo("piva")
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 a.firma = firma
             org.sigla = sigla
             db.session.add(a)
             servizi.allinea_vettore_proprio(a)
+            servizi.allinea_sede_legale(a)
             db.session.commit()
-            flash("Dati aziendali salvati: compaiono sui prossimi DDT. Quelli già emessi non cambiano.", "ok")
+            flash("Dati aziendali salvati: compaiono sui prossimi DDT (quelli già emessi non cambiano). "
+                  "La sede legale è anche tra le Sedi e piazzali.", "ok")
             return redirect(url_for("admin.azienda"))
     oggi = adesso().date()
     chiusure = GiornoChiuso.query.filter(GiornoChiuso.data >= oggi).order_by(GiornoChiuso.data).all()
@@ -131,68 +143,112 @@ def elimina_chiusura(chiuso_id):
     return redirect(url_for("admin.chiusure"))
 
 
-def _coordinate():
-    """Coordinate inviate dal modulo ("Usa la mia posizione"); (None, None) se mancano o non valide."""
-    try:
-        return float(_testo("lat").replace(",", ".")), float(_testo("lon").replace(",", "."))
-    except ValueError:
-        return None, None
+GRUPPI_LUOGHI = {
+    "proprie": ("Sedi e piazzali", "I luoghi della concessionaria: sede legale, sedi e piazzali dove stanno le auto.",
+                ("propria",)),
+    "esterne": ("Destinazioni esterne", "Fornitori per le lavorazioni, esposizioni e clienti: dove le auto vanno e da dove tornano.",
+                ("carrozzeria", "officina", "altro", "esposizione", "cliente")),
+}
+SEZIONI_ESTERNE = [("Fornitori per le lavorazioni", ("carrozzeria", "officina", "altro")),
+                   ("Esposizioni", ("esposizione",)), ("Clienti", ("cliente",))]
+
+
+def _luogo_dal_modulo(s):
+    """Nome, tipo, indirizzo verificato sulla mappa e dati fiscali (obbligatori per le società,
+    solo codice fiscale per i clienti, nessuno per le sedi della concessionaria)."""
+    if not _testo("nome"):
+        raise servizi.Vietato("Il nome è obbligatorio.")
+    tipo = request.form.get("tipo") if request.form.get("tipo") in Sede.TIPI else (s.tipo or "altro")
+    if s.sede_legale:
+        tipo = "propria"  # la sede legale resta della concessionaria
+    s.nome, s.tipo = _testo("nome"), tipo
+    anagrafica.leggi_indirizzo(s)
+    if tipo == "propria":
+        s.piva = s.codice_fiscale = ""
+    else:
+        anagrafica.leggi_fiscali(s, obbligatori=True, solo_cf=tipo == "cliente")
 
 
 @bp.route("/sedi", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def sedi():
+    gruppo = request.values.get("gruppo") if request.values.get("gruppo") in GRUPPI_LUOGHI else "proprie"
+    titolo, descrizione, tipi_gruppo = GRUPPI_LUOGHI[gruppo]
     if request.method == "POST":
-        if not (_testo("nome") and _testo("comune")):
-            flash("Nome e comune sono obbligatori: il comune dice dove si trova il luogo.", "errore")
-            return redirect(url_for("admin.sedi"))
-        lat, lon = _coordinate()
-        db.session.add(Sede(nome=_testo("nome"), indirizzo=_testo("indirizzo"), comune=_testo("comune"),
-                            piva=_testo("piva"), lat=lat, lon=lon,
-                            tipo=request.form.get("tipo") if request.form.get("tipo") in Sede.TIPI else "altro"))
+        nuova = Sede(tipo=tipi_gruppo[0])
+        try:
+            _luogo_dal_modulo(nuova)
+        except servizi.Vietato as e:
+            flash(str(e), "errore")
+            return render_template("admin/sedi.html", gruppo=gruppo, titolo=titolo, descrizione=descrizione,
+                                   tipi={k: Sede.TIPI[k] for k in tipi_gruppo}, sezioni=_sezioni(gruppo),
+                                   nuova=nuova, aperto=True)
+        db.session.add(nuova)
         db.session.commit()
-        flash("Luogo aggiunto" + (" con la posizione sulla mappa." if lat is not None else
-                                  ": la posizione si fissa al primo arrivo, oppure aprilo e usa la tua posizione."), "ok")
-        return redirect(url_for("admin.sedi"))
-    return render_template("admin/sedi.html", sedi=Sede.query.order_by(Sede.nome).all(), tipi=Sede.TIPI)
+        flash(f"{nuova.nome} aggiunto, con la sua posizione sulla mappa.", "ok")
+        return redirect(url_for("admin.sedi", gruppo=gruppo))
+    return render_template("admin/sedi.html", gruppo=gruppo, titolo=titolo, descrizione=descrizione,
+                           tipi={k: Sede.TIPI[k] for k in tipi_gruppo}, sezioni=_sezioni(gruppo), nuova=None,
+                           aperto=False)
+
+
+@bp.route("/destinazioni")
+@ruolo_richiesto("admin")
+def sedi_esterne():
+    return redirect(url_for("admin.sedi", gruppo="esterne"))
+
+
+def _sezioni(gruppo):
+    tutte = Sede.query.order_by(Sede.nome).all()
+    if gruppo == "proprie":
+        return [("", [x for x in tutte if x.tipo == "propria"])]
+    return [(t, [x for x in tutte if x.tipo in tipi]) for t, tipi in SEZIONI_ESTERNE]
 
 
 @bp.route("/sedi/<int:sede_id>", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def sede(sede_id):
     s = db.get_or_404(Sede, sede_id)
+    gruppo = "proprie" if s.tipo == "propria" else "esterne"
     if request.method == "POST":
-        if not _testo("comune"):
-            flash("Indica il comune: dice dove si trova il luogo.", "errore")
-            return redirect(url_for("admin.sede", sede_id=s.id))
-        s.nome = _testo("nome") or s.nome
-        s.indirizzo, s.piva, s.comune = _testo("indirizzo"), _testo("piva"), _testo("comune")
-        if request.form.get("tipo") in Sede.TIPI:
-            s.tipo = request.form["tipo"]
         try:
-            s.lat = float(request.form["lat"].replace(",", ".")) if _testo("lat") else None
-            s.lon = float(request.form["lon"].replace(",", ".")) if _testo("lon") else None
-        except ValueError:
-            flash("Coordinate non valide.", "errore")
+            _luogo_dal_modulo(s)
+        except servizi.Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
             return redirect(url_for("admin.sede", sede_id=s.id))
         firma = servizi.firma_valida(request.form.get("firma"))
-        if firma:
+        if firma and s.tipo != "propria":
             s.firma = firma
         db.session.commit()
-        flash("Luogo aggiornato.", "ok")
-        return redirect(url_for("admin.sedi"))
-    return render_template("admin/sede.html", s=s, tipi=Sede.TIPI)
+        flash("Luogo aggiornato. I DDT già emessi restano con i dati di quando sono stati emessi.", "ok")
+        return redirect(url_for("admin.sedi", gruppo="proprie" if s.tipo == "propria" else "esterne"))
+    tipi = {k: Sede.TIPI[k] for k in GRUPPI_LUOGHI[gruppo][2]}
+    return render_template("admin/sede.html", s=s, tipi=tipi, gruppo=gruppo)
 
 
 @bp.route("/vettori", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def vettori():
-    if request.method == "POST" and _testo("nome"):
-        db.session.add(Vettore(nome=_testo("nome"), piva=_testo("piva"), indirizzo=_testo("indirizzo")))
-        db.session.commit()
-        flash("Vettore aggiunto.", "ok")
-        return redirect(url_for("admin.vettori"))
-    return render_template("admin/vettori.html", vettori=Vettore.query.order_by(Vettore.nome).all())
+    nuovo = None
+    if request.method == "POST":
+        nuovo = Vettore(nome=_testo("nome"))
+        try:
+            if not nuovo.nome:
+                raise servizi.Vietato("Il nome del vettore è obbligatorio.")
+            anagrafica.leggi_fiscali(nuovo)
+            anagrafica.leggi_indirizzo(nuovo)
+        except servizi.Vietato as e:
+            flash(str(e), "errore")
+        else:
+            db.session.add(nuovo)
+            db.session.commit()
+            flash("Vettore aggiunto.", "ok")
+            return redirect(url_for("admin.vettori"))
+    servizi.vettore_proprio()
+    db.session.commit()
+    return render_template("admin/vettori.html", vettori=Vettore.query.order_by(Vettore.proprio.desc(), Vettore.nome).all(),
+                           nuovo=nuovo)
 
 
 @bp.route("/attiva/<tipo>/<int:oggetto_id>", methods=["POST"])
@@ -204,6 +260,8 @@ def attiva(tipo, oggetto_id):
     oggetto = db.get_or_404(modello, oggetto_id)
     setattr(oggetto, campo, not getattr(oggetto, campo))
     db.session.commit()
+    if tipo == "sede":
+        return redirect(url_for(pagina, gruppo="proprie" if oggetto.tipo == "propria" else "esterne"))
     return redirect(url_for(pagina))
 
 
@@ -330,8 +388,14 @@ def gruppo_fornitore(sede_id):
             if esito is not None:
                 return esito
         else:
-            sede.nome = _testo("ragione_sociale") or sede.nome
-            sede.indirizzo, sede.piva = _testo("indirizzo"), _testo("piva")
+            try:
+                sede.nome = _testo("ragione_sociale") or sede.nome
+                anagrafica.leggi_fiscali(sede)
+                anagrafica.leggi_indirizzo(sede)
+            except servizi.Vietato as e:
+                db.session.rollback()
+                flash(str(e), "errore")
+                return redirect(url_for("admin.gruppo_fornitore", sede_id=sede.id))
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 sede.firma = firma
@@ -389,15 +453,23 @@ def utente(utente_id):
 @ruolo_richiesto("admin")
 def vettore(vettore_id):
     vt = db.get_or_404(Vettore, vettore_id)
+    if vt.proprio:  # segue i Dati aziendali: si cambia da lì
+        return redirect(url_for("admin.azienda"))
     if request.method == "POST":
-        if not _testo("nome"):
-            flash("Il nome è obbligatorio.", "errore")
-        else:
-            vt.nome, vt.piva, vt.indirizzo = _testo("nome"), _testo("piva"), _testo("indirizzo")
-            vt.attivo = request.form.get("attivo") == "1"
-            db.session.commit()
-            flash("Vettore aggiornato. I DDT già emessi restano con i dati di quando sono stati emessi.", "ok")
-            return redirect(url_for("admin.vettori"))
+        try:
+            if not _testo("nome"):
+                raise servizi.Vietato("Il nome è obbligatorio.")
+            vt.nome = _testo("nome")
+            anagrafica.leggi_fiscali(vt)
+            anagrafica.leggi_indirizzo(vt)
+        except servizi.Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
+            return redirect(url_for("admin.vettore", vettore_id=vt.id))
+        vt.attivo = request.form.get("attivo") == "1"
+        db.session.commit()
+        flash("Vettore aggiornato. I DDT già emessi restano con i dati di quando sono stati emessi.", "ok")
+        return redirect(url_for("admin.vettori"))
     return render_template("admin/vettore.html", vt=vt)
 
 

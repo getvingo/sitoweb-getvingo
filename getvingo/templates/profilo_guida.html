@@ -19,7 +19,7 @@
         {% for m in mezzi %}<option {{ 'selected' if mezzo == m }}>{{ m }}</option>{% endfor %}
       </select>
     </label>
-    {{ firma_pad("La tua firma (conducente)", obbligatoria=not g.utente.firma, attuale=g.utente.firma) }}
+    {{ firma_pad("La tua firma (conducente)", obbligatoria=not g.utente.firma, attuale=g.utente.firma, timbro=True) }}
     <small class="tenue">Viene apposta su ogni DDT che emetti col tocco; sul PDF resta scritto che è la firma salvata.</small>
   </div>
   <div class="barra-azione"><button class="btn primario pieno">{{ i('check') }} Salva</button></div>

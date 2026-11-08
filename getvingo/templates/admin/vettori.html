@@ -1,31 +1,29 @@
 {% extends "base.html" %}
-{% from "_macro.html" import indietro %}
-{% block larghezza %}{% endblock %}
+{% from "_macro.html" import i, indietro, campi_indirizzo, campi_fiscali %}
+{% block titolo %}Vettori · Getvingo{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<h1>Vettori</h1></div></div>
-<p class="tenue">Il vettore è stampato sul DDT. Inserisci anche la concessionaria stessa se trasporta con mezzi propri.</p>
-<details class="ripiega"><summary>+ Aggiungi un vettore</summary>
-<form method="post" class="scheda" style="margin-bottom:16px">
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Vettori</h1>
+  <p class="descrizione-pagina">Chi esegue il trasporto, stampato sul DDT. Il vettore della concessionaria c'è già e segue i Dati aziendali; quello di un fornitore nasce dal suo profilo di guida.</p></div></div>
+<details class="ripiega" {{ 'open' if nuovo }}><summary>+ Aggiungi un vettore (ditta di trasporti)</summary>
+<form method="post" class="scheda" style="margin-bottom:16px" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <div class="griglia-2">
-    <label class="campo"><span>Nome / ragione sociale</span><input name="nome" required></label>
-    <label class="campo"><span>Partita IVA</span><input name="piva"></label>
-  </div>
-  <label class="campo"><span>Indirizzo</span><input name="indirizzo"></label>
-  <button class="btn primario">Aggiungi</button>
+  <label class="campo"><span>Ragione sociale</span><input name="nome" value="{{ nuovo.nome if nuovo and nuovo.nome else '' }}" required></label>
+  {{ campi_fiscali(nuovo) }}
+  {{ campi_indirizzo(nuovo, 'Sede') }}
+  <button class="btn primario">{{ i('check', 's') }} Aggiungi</button>
 </form>
 </details>
-<div class="scorre"><table class="tabella">
-  <thead><tr><th>Nome</th><th>P.IVA</th><th>Indirizzo</th><th></th></tr></thead>
-  <tbody>
-  {% for vt in vettori %}
-    <tr class="{{ '' if vt.attivo else 'spento' }}">
-      <td><a href="{{ url_for('admin.vettore', vettore_id=vt.id) }}"><b>{{ vt.nome }}</b></a>{% if vt.proprio %}<div class="tenue piccolo">Vettore della concessionaria · si aggiorna con i Dati aziendali</div>{% elif vt.sede_id %}<div class="tenue piccolo">Vettore di un fornitore · creato dal suo profilo di guida</div>{% endif %}</td><td class="num" style="font-weight:400">{{ vt.piva }}</td><td class="tenue">{{ vt.indirizzo }}</td>
-      <td style="text-align:right"><form method="post" action="{{ url_for('admin.attiva', tipo='vettore', oggetto_id=vt.id) }}">
-        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="btn-link">{{ 'Disattiva' if vt.attivo else 'Riattiva' }}</button></form></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table></div>
+<div class="lista">
+{% for vt in vettori %}
+  <a class="voce {{ '' if vt.attivo else 'spento' }}" href="{{ url_for('admin.azienda') if vt.proprio else url_for('admin.vettore', vettore_id=vt.id) }}">
+    <span class="tondo-piccolo">{{ i('camion', 's') }}</span>
+    <div class="corpo"><h3>{{ vt.nome }}{% if vt.proprio %} <span class="badge chiuso">Concessionaria</span>{% endif %}{% if not vt.attivo %} <span class="tenue piccolo">· disattivato</span>{% endif %}</h3>
+      <div class="tratta">{{ vt.indirizzo_completo or 'Indirizzo mancante' }}</div>
+      <div class="tenue piccolo">{% if vt.piva %}P. IVA {{ vt.piva }}{% endif %}{% if vt.codice_fiscale %} · C.F. {{ vt.codice_fiscale }}{% endif %}
+        {% if not vt.piva or not vt.codice_fiscale or not vt.comune %}<span class="stato-accesso attesa">Dati da completare</span>{% endif %}
+        {% if vt.proprio %} · si cambia dai Dati aziendali{% elif vt.sede_id %} · vettore di un fornitore{% endif %}</div></div>
+    {{ i('chevron') }}
+  </a>
+{% endfor %}
+</div>
 {% endblock %}

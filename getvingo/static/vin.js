@@ -63,8 +63,9 @@
       if (!d) return;
       ['marca', 'modello', 'versione', 'colore'].forEach(function (k) {
         var el = document.querySelector('[name=' + k + ']');
-        if (el && !el.value && d[k]) el.value = d[k];
+        if (el && !el.value && d[k]) { el.value = d[k]; el.dataset.corretto = '1'; }  // nome ufficiale: non si riformatta
       });
+      if (d.da_vin && d.marca) stato.textContent = 'Marca ricavata dal VIN: ' + d.marca + '. Controlla e completa il modello.';
       var targa = document.querySelector('[name=targa]');
       if (targa && !targa.value && d.targa) targa.value = d.targa;
       var tipo = d.tipologia && document.querySelector('[name=tipologia][value=' + d.tipologia + ']');
@@ -163,7 +164,13 @@
       URL.revokeObjectURL(url);
     }
   });
-  campo.addEventListener('input', aggiornaConta);
+  campo.addEventListener('input', function () {
+    var pulito = normalizza(campo.value).replace(/[^A-Z0-9]/g, '').slice(0, 17);
+    if (pulito !== campo.value) { var fine = campo.selectionEnd === campo.value.length; campo.value = pulito;
+      if (fine) campo.setSelectionRange(pulito.length, pulito.length); }
+    aggiornaConta();
+    if (pulito.length === 17) precompila(pulito);
+  });
   campo.addEventListener('change', function () {
     var v = normalizza(campo.value);
     if (v.length === 17) precompila(v);

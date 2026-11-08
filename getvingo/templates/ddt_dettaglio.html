@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, badge_ddt, csrf_input, gps, firma_pad, immagine_firma, giorni, annulla, indietro, azioni_ddt %}
 {% from "_arrivo.html" import lavorazione_da_indicare, form_arrivo %}
-{% from "_auto.html" import in_viaggio_da, tocchi %}
+{% from "_auto.html" import in_viaggio_da, tocchi, stima %}
 {% block titolo %}DDT {{ d.sigla }} · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
@@ -45,6 +45,7 @@
     <li class="{{ 'fatto' if m.partenza_at }}"><span>Partito</span><small>{{ m.partenza_at|data('%d/%m %H:%M') if m.partenza_at else ('entro ' ~ m.ritiro_entro_at|data('%d/%m %H:%M') if m.ritiro_entro_at else '—') }}</small></li>
     <li class="{{ 'fatto' if m.arrivo_at }}"><span>Arrivato</span><small>{{ m.arrivo_at|data('%d/%m %H:%M') if m.arrivo_at else 'in attesa' }}</small></li>
   </ol>
+  {% if not m.arrivo_at %}{{ stima(m) }}{% endif %}
 </section>
 
 {# Veicoli #}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input, gps, indietro %}
+{% from "_macro.html" import campi_indirizzo, campi_fiscali, i, csrf_input, gps, indietro %}
 {% block titolo %}Inizia spostamento · Getvingo{% endblock %}
 {% macro destinazione(s) %}
 <button type="submit" name="a_sede_id" value="{{ s.id }}" class="destinazione-btn">
-  <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b>{% if s.indirizzo or s.comune %}<small>{{ s.indirizzo }}{{ ' · ' if s.indirizzo and s.comune }}{{ s.comune }}</small>{% endif %}{% if s.lat is none %}<small>Posizione sulla mappa fissata al primo arrivo</small>{% endif %}</span>
+  <span class="tondo-piccolo">{{ i('pin', 's') }}</span><span><b>{{ s.nome }}</b>{% if s.indirizzo or s.comune %}<small>{{ s.indirizzo_completo }}</small>{% endif %}{% if s.lat is none %}<small>Posizione sulla mappa fissata al primo arrivo</small>{% endif %}</span>
 </button>
 {% endmacro %}
 {% block contenuto %}
@@ -34,18 +34,21 @@
 {# Destinazione che non c'è in elenco: si scrive e si parte lo stesso #}
 {% if v.fase != 'pronta' %}
 <form method="post" data-una-volta class="scheda destinazione-nuova">
-  {{ csrf_input() }}{{ gps() }}
+  {{ csrf_input() }}
   <h3>{{ i('matita', 's') }} Non è in elenco?</h3>
-  <label class="campo"><span>Nome e indirizzo della destinazione</span>
-    <input name="nuova_destinazione" required minlength="3" maxlength="200" placeholder="Es. Mario Bianchi, Via Roma 5, Treviso" autocomplete="off"></label>
-  <div class="scelta-tipo scelta-tipo-4">
-    <label><input type="radio" name="tipo" value="altro" checked> Altro luogo</label>
-    <label><input type="radio" name="tipo" value="cliente"> Cliente</label>
+  <label class="campo"><span>Nome / ragione sociale</span>
+    <input name="nuova_destinazione" required minlength="3" maxlength="200" placeholder="Es. Mario Bianchi, Carrozzeria Verdi S.r.l." autocomplete="off"></label>
+  <div class="scelta-tipo scelta-tipo-luogo">
+    <label><input type="radio" name="tipo" value="cliente" checked> Cliente</label>
     <label><input type="radio" name="tipo" value="carrozzeria"> Carrozzeria</label>
     <label><input type="radio" name="tipo" value="officina"> Officina</label>
+    <label><input type="radio" name="tipo" value="esposizione"> Esposizione</label>
+    <label><input type="radio" name="tipo" value="altro"> Altro fornitore</label>
   </div>
+  {{ campi_indirizzo(None, 'Indirizzo della destinazione') }}
+  {{ campi_fiscali(None, per_tipo=True) }}
   <button type="submit" class="btn primario pieno">{{ i('camion') }} Emetti DDT e parti</button>
-  <small class="tenue">Il punto sulla mappa si fissa al primo “Arrivato a destinazione”; l'amministratore completa i dati in Gestione.</small>
+  <small class="tenue">Resta tra le Destinazioni esterne, con il suo indirizzo sulla mappa.</small>
 </form>
 {% endif %}
 {% endblock %}

@@ -1743,3 +1743,27 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 .profilo-esci { margin-top: 12px; }
 .esito-posizione { margin: 8px 0 12px; font-size: .9rem; color: var(--ok); }
 .esito-posizione.errore { color: var(--errore); }
+
+/* Indirizzo completo verificato sulla mappa */
+fieldset.indirizzo { border: 1px solid var(--bordo); border-radius: var(--r-s); padding: 12px 14px 10px; margin: 0 0 14px; min-width: 0; }
+fieldset.indirizzo legend { padding: 0 6px; font-size: .85rem; font-weight: 750; color: var(--testo-2); }
+.griglia-indirizzo { display: grid; grid-template-columns: 2fr 1fr; gap: 0 12px; }
+@media (min-width: 700px) { .griglia-indirizzo { grid-template-columns: 2fr 1fr 1fr 1.4fr; } }
+.indirizzo-azioni { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px; }
+.indirizzo-esito { font-size: .88rem; }
+.indirizzo-esito.ok { color: var(--ok); }
+.indirizzo-esito.errore { color: var(--errore); font-weight: 650; }
+.indirizzo-mappa { height: 220px; border-radius: var(--r-s); border: 1px solid var(--bordo); margin-bottom: 6px; z-index: 0; }
+input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3px var(--errore-tenue); }
+
+.schede-luoghi { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 14px; }
+.scelta-tipo-luogo { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.voce.spento { opacity: .55; }
+
+.stima-viaggio { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 0; font-size: .9rem; color: var(--testo-2); }
+.stima-viaggio .icona { flex: none; margin-top: 2px; }
+
+.mappa-vuota { display: flex; gap: 12px; align-items: flex-start; padding: 16px; margin-bottom: 14px; border: 1px dashed var(--bordo-forte);
+  border-radius: var(--r); background: var(--carta); color: var(--testo-2); }
+.mappa-vuota .icona { flex: none; width: 28px; height: 28px; color: var(--segnale); }
+.mappa-vuota p { margin: 0; }

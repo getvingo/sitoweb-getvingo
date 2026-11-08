@@ -1,42 +1,47 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, indietro %}
-{% block larghezza %}{% endblock %}
-{% block script %}<script src="{{ url_for('static', filename='luogo.js') }}"></script>{% endblock %}
+{% from "_macro.html" import i, indietro, campi_indirizzo, campi_fiscali %}
+{% block titolo %}{{ titolo }} · Getvingo{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Sedi e destinazioni</h1></div></div>
-<p class="descrizione-pagina">Piazzali e sedi della concessionaria, fornitori e clienti. Per ognuno serve il comune, così si sa sempre dove si trova.</p>
-<details class="ripiega" {{ 'open' if not sedi }}><summary>+ Aggiungi un luogo</summary>
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>{{ titolo }}</h1>
+  <p class="descrizione-pagina">{{ descrizione }} L'indirizzo si verifica sulla mappa: dice sempre dov'è il luogo e serve a chiudere i DDT all'arrivo.</p></div></div>
+
+<nav class="interruttore schede-luoghi" aria-label="Tipo di luoghi">
+  <a href="{{ url_for('admin.sedi', gruppo='proprie') }}" class="{{ 'attivo' if gruppo == 'proprie' }}">{{ i('piazzale', 's') }} Sedi e piazzali</a>
+  <a href="{{ url_for('admin.sedi', gruppo='esterne') }}" class="{{ 'attivo' if gruppo == 'esterne' }}">{{ i('chiave', 's') }} Destinazioni esterne</a>
+</nav>
+
+<details class="ripiega" {{ 'open' if aperto }}><summary>+ Aggiungi {{ 'una sede o un piazzale' if gruppo == 'proprie' else 'una destinazione esterna' }}</summary>
 <form method="post" class="scheda" style="margin-bottom:16px" data-una-volta>
-  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <input type="hidden" name="lat"><input type="hidden" name="lon">
-  <div class="griglia-2">
-    <label class="campo"><span>Nome</span><input name="nome" required placeholder="Es. Piazzale Villorba"></label>
-    <label class="campo"><span>Tipo</span><select name="tipo">{% for k, n in tipi.items() %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></label>
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="gruppo" value="{{ gruppo }}">
+  <label class="campo"><span>{{ 'Nome' if gruppo == 'proprie' else 'Nome / ragione sociale' }}</span><input name="nome" value="{{ nuova.nome if nuova and nuova.nome else '' }}" required placeholder="{{ 'Es. Piazzale Villorba' if gruppo == 'proprie' else 'Es. Carrozzeria Rossi S.n.c.' }}"></label>
+  {% if tipi|length > 1 %}
+  <div class="scelta-tipo scelta-tipo-luogo" role="radiogroup" aria-label="Tipo">
+    {% for k, n in tipi.items() %}<label><input type="radio" name="tipo" value="{{ k }}" {{ 'checked' if (nuova.tipo if nuova else 'carrozzeria') == k }}> {{ n.split(' (')[0] }}</label>{% endfor %}
   </div>
-  <button type="button" class="btn" data-usa-posizione>{{ i('pin', 's') }} Sono qui: usa la mia posizione</button>
-  <p class="esito-posizione" data-esito-posizione hidden></p>
-  <div class="griglia-2">
-    <label class="campo"><span>Comune</span><input name="comune" required placeholder="Es. Villorba (TV)"></label>
-    <label class="campo"><span>Indirizzo <span class="tenue">(via e civico)</span></span><input name="indirizzo"></label>
-  </div>
-  <label class="campo"><span>Partita IVA <span class="tenue">(solo per fornitori e clienti azienda)</span></span><input name="piva"></label>
-  <button class="btn primario">Aggiungi</button>
+  {% else %}<input type="hidden" name="tipo" value="{{ tipi|first }}">{% endif %}
+  {{ campi_indirizzo(nuova) }}
+  {% if gruppo == 'esterne' %}{{ campi_fiscali(nuova, per_tipo=True) }}{% endif %}
+  <button class="btn primario">{{ i('check', 's') }} Aggiungi</button>
 </form>
 </details>
-<div class="scorre"><table class="tabella">
-  <thead><tr><th>Nome</th><th>Tipo</th><th>Dove</th><th></th></tr></thead>
-  <tbody>
-  {% for s in sedi %}
-    <tr class="{{ '' if s.attiva else 'spento' }}">
-      <td><a href="{{ url_for('admin.sede', sede_id=s.id) }}"><b>{{ s.nome }}</b></a>
-        <div class="tenue piccolo">{% if not s.comune %}<span class="stato-accesso attesa">Comune mancante</span> · {% endif %}{{ 'Posizione ✓' if s.lat is not none else 'Posizione mancante' }}{% if s.tipo != 'propria' %} · {{ 'Firma ✓' if s.firma else 'Firma mancante' }}{% endif %}
-          {% if s.esterna %} · <a href="{{ url_for('admin.gruppo_fornitore', sede_id=s.id) }}">utenti e firma</a>{% endif %}</div></td>
-      <td>{{ tipi[s.tipo] }}</td><td><b>{{ s.comune or '—' }}</b>{% if s.indirizzo %}<div class="tenue piccolo">{{ s.indirizzo }}</div>{% endif %}</td>
-      <td style="text-align:right"><form method="post" action="{{ url_for('admin.attiva', tipo='sede', oggetto_id=s.id) }}">
-        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="btn-link">{{ 'Disattiva' if s.attiva else 'Riattiva' }}</button></form></td>
-    </tr>
+
+{% for titolo_sezione, luoghi in sezioni %}
+  {% if titolo_sezione %}<h2>{{ titolo_sezione }}</h2>{% endif %}
+  <div class="lista">
+  {% for s in luoghi %}
+    <a class="voce {{ '' if s.attiva else 'spento' }}" href="{{ url_for('admin.sede', sede_id=s.id) }}">
+      <span class="tondo-piccolo">{{ i('piazzale' if s.tipo == 'propria' else ('chiave' if s.esterna else ('brilla' if s.tipo == 'esposizione' else 'utente')), 's') }}</span>
+      <div class="corpo"><h3>{{ s.nome }}{% if s.sede_legale %} <span class="badge chiuso">Sede legale</span>{% endif %}{% if not s.attiva %} <span class="tenue piccolo">· disattivato</span>{% endif %}</h3>
+        <div class="tratta">{{ s.indirizzo_completo or 'Indirizzo mancante' }}</div>
+        <div class="tenue piccolo">{% if s.tipo != 'propria' %}{{ s.TIPI[s.tipo].split(' (')[0] }} · {% endif %}
+          {% if not s.comune or not s.cap %}<span class="stato-accesso attesa">Indirizzo da completare</span>{% elif s.lat is none %}<span class="stato-accesso attesa">Posizione mancante</span>{% else %}Posizione ✓{% endif %}
+          {% if s.societa and (not s.piva or not s.codice_fiscale) %} · <span class="stato-accesso attesa">P. IVA / C.F. mancanti</span>{% endif %}
+          {% if s.esterna %} · {{ 'firma ✓' if s.firma else 'firma mancante' }}{% endif %}</div></div>
+      {{ i('chevron') }}
+    </a>
+  {% else %}
+    <div class="vuoto">Nessun luogo{{ ' in questa sezione' if titolo_sezione }}.</div>
   {% endfor %}
-  </tbody>
-</table></div>
+  </div>
+{% endfor %}
 {% endblock %}

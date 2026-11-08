@@ -1,39 +1,38 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, firma_pad, indietro %}
+{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
+{% block titolo %}{{ s.nome }} · Getvingo{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.sedi')) }}<div class="sopratitolo">Sedi e destinazioni</div><h1>{{ s.nome }}</h1></div></div>
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.sedi', gruppo=gruppo)) }}<div class="sopratitolo">{{ 'Sedi e piazzali' if gruppo == 'proprie' else 'Destinazioni esterne' }}</div><h1>{{ s.nome }}</h1></div></div>
 <form method="post" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <div class="scheda">
-    <div class="griglia-2">
-      <label class="campo"><span>Nome</span><input name="nome" value="{{ s.nome }}" required></label>
-      <label class="campo"><span>Tipo</span><select name="tipo">{% for k, n in tipi.items() %}<option value="{{ k }}" {{ 'selected' if s.tipo == k }}>{{ n }}</option>{% endfor %}</select></label>
+    <label class="campo"><span>{{ 'Nome' if gruppo == 'proprie' else 'Nome / ragione sociale' }}</span><input name="nome" value="{{ s.nome }}" required></label>
+    {% if s.sede_legale %}
+      <p class="tenue piccolo">È la sede legale della concessionaria: indirizzo e posizione seguono i <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>.</p>
+      <input type="hidden" name="tipo" value="propria">
+    {% elif tipi|length > 1 %}
+    <div class="scelta-tipo scelta-tipo-luogo" role="radiogroup" aria-label="Tipo">
+      {% for k, n in tipi.items() %}<label><input type="radio" name="tipo" value="{{ k }}" {{ 'checked' if s.tipo == k }}> {{ n.split(' (')[0] }}</label>{% endfor %}
     </div>
-    <div class="griglia-2">
-      <label class="campo"><span>Comune</span><input name="comune" value="{{ s.comune or '' }}" required placeholder="Es. Villorba (TV)"></label>
-      <label class="campo"><span>Indirizzo <span class="tenue">(via e civico)</span></span><input name="indirizzo" value="{{ s.indirizzo }}"></label>
-    </div>
-    {% if s.tipo != 'propria' %}<label class="campo"><span>Partita IVA</span><input name="piva" value="{{ s.piva }}"></label>{% endif %}
-  </div>
-  <div class="scheda">
-    <h3>{{ i('pin', 's') }} Posizione sulla mappa</h3>
-    <p class="tenue piccolo">Serve per chiudere i DDT all'arrivo (entro 200 m) e per vedere il luogo sulla mappa. Se sei sul posto, premi il pulsante: il telefono prende le coordinate e propone comune e indirizzo.</p>
-    <button type="button" class="btn" data-usa-posizione>{{ i('pin', 's') }} Sono qui: usa la mia posizione</button>
-    <p class="esito-posizione" data-esito-posizione hidden></p>
-    <div class="griglia-2">
-      <label class="campo"><span>Latitudine</span><input name="lat" value="{{ s.lat if s.lat is not none else '' }}" inputmode="decimal"></label>
-      <label class="campo"><span>Longitudine</span><input name="lon" value="{{ s.lon if s.lon is not none else '' }}" inputmode="decimal"></label>
-    </div>
+    {% else %}<input type="hidden" name="tipo" value="{{ s.tipo }}">{% endif %}
+    {{ campi_indirizzo(s) }}
+    {% if gruppo == 'esterne' %}{{ campi_fiscali(s, per_tipo=True) }}{% endif %}
   </div>
   {% if s.tipo == 'propria' %}
   <p class="tenue piccolo">Firma: per le sedi e i piazzali della concessionaria vale quella in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>, non serve altro.</p>
   {% else %}
   <div class="scheda">
-    {{ firma_pad("Firma predefinita del destinatario", attuale=s.firma) }}
+    {{ firma_pad("Firma predefinita del destinatario", attuale=s.firma, timbro=True) }}
     <small class="tenue">Di solito la imposta il fornitore dal suo account. Se manca, la ricezione resta senza firma.</small>
   </div>
   {% endif %}
-  <div class="barra-azione"><button class="btn primario pieno">Salva</button></div>
+  <div class="barra-azione"><button class="btn primario pieno">{{ i('check') }} Salva</button></div>
 </form>
+{% if not s.sede_legale %}
+<form method="post" action="{{ url_for('admin.attiva', tipo='sede', oggetto_id=s.id) }}" class="zona-pericolo">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <p class="tenue piccolo">{{ 'Disattivato non compare più nelle scelte; resta nei DDT già emessi.' if s.attiva else 'Questo luogo è disattivato.' }}</p>
+  <button class="btn piccolo">{{ 'Disattiva questo luogo' if s.attiva else 'Riattiva questo luogo' }}</button>
+</form>
+{% endif %}
 {% endblock %}
-{% block script %}<script src="{{ url_for('static', filename='luogo.js') }}"></script>{% endblock %}

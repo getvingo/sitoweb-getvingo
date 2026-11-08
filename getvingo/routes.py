@@ -77,7 +77,7 @@ def _dati_movimento(conducente_obbligatorio=True, manca_conducente="Indica chi s
     }
     if not dati["a_sede_id"] or not db.session.get(Sede, dati["a_sede_id"]):
         return None, "Scegli la destinazione."
-    if dati["causale"] not in Movimento.CAUSALI:
+    if dati["causale"] not in Movimento.CAUSALI + Movimento.CAUSALI_STORICHE:
         return None, "Scegli la causale."
     if not dati["vettore_id"] or not db.session.get(Vettore, dati["vettore_id"]):
         return None, "Scegli il vettore."
@@ -553,8 +553,10 @@ def piazzale():
              "titolo": v.descrizione, "sotto": v.targa or "VIN …" + v.vin[-8:],
              "url": url_for("main.veicolo", veicolo_id=v.id), "id": v.id} for v in risultati if v.lat is not None]
     piazzali = []
-    luoghi = sorted({v.sede for v in risultati if v.sede is not None and v.stato == "in_sede"},
-                    key=lambda x: (x.tipo != "propria", x.nome))
+    # tutti i piazzali con la posizione, anche vuoti, più i luoghi dove ci sono auto ferme
+    luoghi = {v.sede for v in risultati if v.sede is not None and v.stato == "in_sede"}
+    luoghi |= set(Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.isnot(None)))
+    luoghi = sorted(luoghi, key=lambda x: (x.tipo != "propria", x.nome))
     for sede in luoghi:
         voci = [v for v in risultati if v.sede is sede and v.stato == "in_sede"]
         coord = [(v.lat, v.lon) for v in voci if v.lat is not None]
@@ -566,8 +568,10 @@ def piazzale():
             continue
         piazzali.append({"id": sede.id, "nome": sede.nome, "n": len(voci), "lat": centro[0], "lon": centro[1],
                          "esterna": sede.esterna})
+    senza_posizione = Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.is_(None)).count()
     return render_template("piazzale.html", gruppi=gruppi, totale=len(risultati), f=f,
                            opzioni=_filtri_veicoli(stock, f), auto=auto, piazzali=piazzali,
+                           senza_posizione=senza_posizione,
                            filtri_attivi=[k for k in CHIAVI_FILTRO if f[k]])
 
 
@@ -789,11 +793,13 @@ def sposta(veicolo_id):
     if servizi.profilo_guida_mancante(g.utente):
         return redirect(url_for("main.profilo_guida", poi=url_for("main.sposta", veicolo_id=v.id)))
     if request.method == "POST":
-        lat, lon = _coord()
+        nuova = request.form.get("nuova_destinazione") is not None
+        # con una destinazione nuova lat/lon del modulo sono quelli del suo indirizzo, non del telefono
+        lat, lon = _posizione_tocco() if nuova else _coord()
         if lat is None:  # il telefono non ha ancora risposto: vale la posizione appena rilevata al tocco
             lat, lon = v.lat, v.lon
         try:
-            if request.form.get("nuova_destinazione") is not None:
+            if nuova:
                 sede = servizi.destinazione_scritta(request.form["nuova_destinazione"], request.form.get("tipo"))
             else:
                 sede = db.session.get(Sede, request.form.get("a_sede_id", type=int) or 0)
@@ -902,9 +908,11 @@ def abbina(codice):
             veicolo = Veicolo(vin=vin)
             db.session.add(veicolo)
         for campo in ("marca", "modello", "versione", "colore"):
-            valore = request.form.get(campo, "").strip()
+            valore = " ".join(request.form.get(campo, "").split())
             if valore:
                 setattr(veicolo, campo, valore)
+        if not veicolo.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
+            veicolo.marca = vin_mod.marca_da_vin(vin)
         if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
             veicolo.tipologia = request.form["tipologia"]
         if request.form.get("condizione") not in Veicolo.CONDIZIONI:
@@ -980,7 +988,9 @@ def nuova_auto():
                 v.tipologia = request.form["tipologia"]
             for k in ("marca", "modello", "versione", "colore"):
                 if request.form.get(k, "").strip():
-                    setattr(v, k, request.form[k].strip())
+                    setattr(v, k, " ".join(request.form[k].split()))
+            if not v.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
+                v.marca = vin_mod.marca_da_vin(vin)
             tag.veicolo, tag.abbinato_at = v, adesso()
             servizi.registra_evento(v, "inserimento", g.utente, *_coord())
             db.session.commit()
@@ -1018,8 +1028,13 @@ def modifica_dati_auto(veicolo_id):
 @bp.route("/api/veicolo")
 @solo_interni
 def api_veicolo():
-    """Dati già noti di un VIN (es. importato dal gestionale), per precompilare l'abbinamento."""
-    v = Veicolo.query.filter_by(vin=vin_mod.normalizza(request.args.get("vin"))).first_or_404()
+    """Dati già noti di un VIN (es. importato dal gestionale), per precompilare l'abbinamento;
+    se l'auto non c'è ancora, almeno la marca ricavata dal VIN."""
+    vin = vin_mod.normalizza(request.args.get("vin"))
+    v = Veicolo.query.filter_by(vin=vin).first()
+    if v is None:
+        marca = vin_mod.marca_da_vin(vin)
+        return ({"vin": vin, "marca": marca, "da_vin": True} if marca else ({}, 404))
     return {"vin": v.vin, "marca": v.marca, "modello": v.modello, "versione": v.versione, "colore": v.colore, "tipologia": v.tipologia,
             "targa": v.targa}
 
@@ -1033,7 +1048,7 @@ def veicolo(veicolo_id):
     valori = {"conducente": g.utente.nome if g.utente.ruolo in ("autista", "venditore", "fornitore") else "",
               "vettore_id": servizi.ultimo_vettore_id(g.utente)}
     if v.sede and v.sede.esterna and ultimo:
-        valori.update(a_sede_id=ultimo.da_sede_id, causale="Rientro da lavorazione",
+        valori.update(a_sede_id=ultimo.da_sede_id, causale="Reso lavorazione",
                       lavorazione=Movimento.NESSUNA)
     simili = Veicolo.query.filter(Veicolo.marca == v.marca, Veicolo.modello == v.modello,
                                   Veicolo.id != v.id, Veicolo.stato != "consegnato").count()

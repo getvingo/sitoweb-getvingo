@@ -7,7 +7,7 @@
 <p class="tenue">È la firma dell'azienda, non la tua personale: viene apposta in automatico ogni volta che confermate la ricezione di un'auto e vale per tutti gli utenti di {{ sede.nome }}. La tua firma da conducente sta nel Profilo di guida.</p>
 <form method="post" data-una-volta>
   {{ csrf_input() }}
-  <div class="scheda">{{ firma_pad("Firma del destinatario", obbligatoria=True, attuale=sede.firma) }}</div>
+  <div class="scheda">{{ firma_pad("Firma del destinatario", obbligatoria=True, attuale=sede.firma, timbro=True) }}</div>
   <div class="barra-azione"><button class="btn primario pieno">Salva firma</button></div>
 </form>
 {% endblock %}

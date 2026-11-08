@@ -124,6 +124,28 @@ def aggiungi_colonne():
         with db.engine.begin() as conn:  # comune del luogo: dove si trova
             conn.exec_driver_sql("ALTER TABLE sede ADD COLUMN comune VARCHAR(120) DEFAULT ''")
         aggiunte.append("sede.comune")
+    # indirizzo completo (CAP, comune, provincia, stato), codice fiscale e posizione (08/11/2026)
+    INDIRIZZO = [("codice_fiscale", "VARCHAR(16) DEFAULT ''"), ("cap", "VARCHAR(10) DEFAULT ''"),
+                 ("comune", "VARCHAR(120) DEFAULT ''"), ("provincia", "VARCHAR(4) DEFAULT ''"),
+                 ("stato", "VARCHAR(60) DEFAULT 'Italia'"), ("lat", "FLOAT"), ("lon", "FLOAT")]
+    for tabella, extra in (("azienda", []), ("vettore", []), ("sede", [("sede_legale", "BOOLEAN DEFAULT FALSE")])):
+        presenti = [c["name"] for c in ispettore.get_columns(tabella)]
+        for nome, tipo in INDIRIZZO + extra:
+            if nome not in presenti:
+                with db.engine.begin() as conn:
+                    conn.exec_driver_sql(f"ALTER TABLE {tabella} ADD COLUMN {nome} {tipo}")
+                aggiunte.append(f"{tabella}.{nome}")
+    if "sede.provincia" in aggiunte:
+        # il comune era scritto "Villorba (TV)": si separa la provincia
+        import re
+        with db.engine.begin() as conn:
+            for sid, comune in conn.exec_driver_sql("SELECT id, comune FROM sede WHERE comune LIKE '%(%)'").fetchall():
+                m = re.fullmatch(r"\s*(.+?)\s*\((\w{2})\)\s*", comune or "")
+                if m:
+                    conn.exec_driver_sql("UPDATE sede SET comune = %s, provincia = %s WHERE id = %s"
+                                         if db.engine.dialect.name == "postgresql" else
+                                         "UPDATE sede SET comune = ?, provincia = ? WHERE id = ?",
+                                         (m.group(1), m.group(2).upper(), sid))
     colonne_vettore = [c["name"] for c in ispettore.get_columns("vettore")]
     for nome, tipo in (("proprio", "BOOLEAN DEFAULT FALSE"), ("sede_id", "INTEGER REFERENCES sede(id)")):
         if nome not in colonne_vettore:  # vettore della concessionaria / di un fornitore

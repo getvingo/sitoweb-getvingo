@@ -1,16 +1,15 @@
 {% extends "base.html" %}
-{% from "_macro.html" import indietro %}
+{% from "_macro.html" import i, indietro, campi_indirizzo, campi_fiscali %}
+{% block titolo %}{{ vt.nome }} · Vettori{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.vettori')) }}<h1>{{ vt.nome }}</h1></div></div>
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.vettori')) }}<div class="sopratitolo">Vettori</div><h1>{{ vt.nome }}</h1></div></div>
 <form method="post" class="scheda" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <label class="campo"><span>Nome / ragione sociale</span><input name="nome" value="{{ vt.nome }}" required></label>
-  <div class="griglia-2">
-    <label class="campo"><span>Partita IVA</span><input name="piva" value="{{ vt.piva or '' }}"></label>
-    <label class="campo"><span>Indirizzo</span><input name="indirizzo" value="{{ vt.indirizzo or '' }}"></label>
-  </div>
+  <label class="campo"><span>Ragione sociale</span><input name="nome" value="{{ vt.nome }}" required></label>
+  {{ campi_fiscali(vt) }}
+  {{ campi_indirizzo(vt, 'Sede') }}
   <label class="spunta"><input type="checkbox" name="attivo" value="1" {{ 'checked' if vt.attivo }}><span><b>Attivo</b>: se disattivato non compare più nella scelta del vettore.</span></label>
   <p class="tenue piccolo">I DDT già emessi restano con i dati di quando sono stati emessi.</p>
-  <button class="btn primario pieno">Salva</button>
+  <button class="btn primario pieno">{{ i('check') }} Salva</button>
 </form>
 {% endblock %}

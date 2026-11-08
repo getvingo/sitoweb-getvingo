@@ -45,22 +45,23 @@ def carica():
     db.session.add(org)
     db.session.flush()
     g.org_id = org.id  # tutto ciò che segue appartiene alla concessionaria demo
-    db.session.add(Azienda(ragione_sociale="Concessionaria Demo S.r.l.", piva="01234567890",
-                           indirizzo="Viale Europa 1, 31100 Treviso (TV)", firma=_png_firma(1)))
-    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 1, 31100", comune="Treviso (TV)", tipo="propria",
+    db.session.add(Azienda(ragione_sociale="Concessionaria Demo S.r.l.", piva="01234567897", codice_fiscale="01234567897",
+                           indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", stato="Italia",
+                           lat=45.6672, lon=12.2431, firma=_png_firma(1)))
+    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", tipo="propria", sede_legale=True,
                    lat=45.6672, lon=12.2431)
-    villorba = Sede(nome="Piazzale Villorba", indirizzo="Via Postumia 50, 31020", comune="Villorba (TV)",
+    villorba = Sede(nome="Piazzale Villorba", indirizzo="Via Postumia 50", cap="31020", comune="Villorba", provincia="TV",
                     tipo="propria", lat=45.7051, lon=12.2468)
-    carrozzeria = Sede(nome="Carrozzeria Rossi", indirizzo="Via Roma 12, 31050", comune="Ponzano Veneto (TV)",
+    carrozzeria = Sede(nome="Carrozzeria Rossi", indirizzo="Via Roma 12", cap="31050", comune="Ponzano Veneto", provincia="TV", codice_fiscale="09876543210",
                        piva="09876543210", tipo="carrozzeria", lat=45.7089, lon=12.2101, firma=_png_firma(2))
-    officina = Sede(nome="Officina Bianchi", indirizzo="Via Feltrina 88, 31100", comune="Treviso (TV)",
+    officina = Sede(nome="Officina Bianchi", indirizzo="Via Feltrina 88", cap="31100", comune="Treviso", provincia="TV", codice_fiscale="05556667778",
                     piva="05556667778", tipo="officina", lat=45.6905, lon=12.2350)
-    detailing = Sede(nome="Lucido Detailing", indirizzo="Via Noalese 3, 31100", comune="Treviso (TV)",
+    detailing = Sede(nome="Lucido Detailing", indirizzo="Via Noalese 3", cap="31100", comune="Treviso", provincia="TV",
                      tipo="altro", lat=45.6620, lon=12.2180)
-    proprio = Vettore(nome="Concessionaria Demo S.r.l.", proprio=True, piva="01234567890",
-                      indirizzo="Viale Europa 1, 31100 Treviso (TV)")
-    esterno = Vettore(nome="Trasporti Bianchi S.r.l.", piva="11223344556",
-                      indirizzo="Via Industria 5, 31030 Casier (TV)")
+    proprio = Vettore(nome="Concessionaria Demo S.r.l.", proprio=True, piva="01234567897", codice_fiscale="01234567897",
+                      indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", lat=45.6672, lon=12.2431)
+    esterno = Vettore(nome="Trasporti Bianchi S.r.l.", piva="11223344556", codice_fiscale="11223344556",
+                      indirizzo="Via Industria 5", cap="31030", comune="Casier", provincia="TV")
     db.session.add_all([treviso, villorba, carrozzeria, officina, detailing, proprio, esterno])
     db.session.flush()
 
@@ -116,7 +117,7 @@ def carica():
         m.arrivo_at = quando
 
     def in_lavorazione(v, fornitore, chi, lavorazione, note, giorni, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Autista"):
-        m = viaggio(v, fornitore, "Conto riparazione" if fornitore.tipo == "carrozzeria" else "Conto lavorazione",
+        m = viaggio(v, fornitore, "Invio lavorazione",
                     lavorazione, note, _indietro(days=giorni, hours=2), mezzo, vettore, conducente)
         arriva(m, chi, _indietro(days=giorni))
         return m
@@ -227,7 +228,7 @@ def carica():
     prep = rientro_in_sede(puma, carrozzeria, utenti["carrozzeria"], giorni_fa=6, giorni_lav=5, ore_attesa=18)
     passi(prep, 3)  # prossimo passo: Pronta -> bloccato dal danno qui sotto (il lavaggio si fa)
     prep.pronta_entro_at = slot_da((adesso() + timedelta(days=1)).replace(hour=12, minute=0, second=0))
-    rientro_puma = [m for m in puma.movimenti if m.causale == "Rientro da lavorazione"][0]
+    rientro_puma = [m for m in puma.movimenti if m.causale == "Reso lavorazione"][0]
     servizi.segnala_danno(puma, utenti["autista"], "Cerchi / gomme", "Cerchio anteriore destro rigato al rientro",
                           [foto_demo(8), foto_demo(9)], movimento=rientro_puma)
     for v, entro, fatti, ore_fa in ((tucson, oggi_tardi, 1, 6),                                          # entro oggi
@@ -245,12 +246,12 @@ def carica():
     servizi.imposta_consegna(classe_a, utenti["ufficio"], treviso, oggi_tardi)  # da consegnare oggi (o al primo slot utile)
     pronta_diretta(troc, 3)                         # già in viaggio con l'ultimo DDT: resta tra le pronte fino alla consegna
     servizi.imposta_consegna(troc, utenti["ufficio"], villorba, (adesso() + timedelta(days=1)).replace(hour=15, minute=0))
-    viaggio(troc, villorba, "Trasferimento tra sedi", Movimento.NESSUNA, "", _indietro(minutes=35))
+    viaggio(troc, villorba, "Spostamento", Movimento.NESSUNA, "", _indietro(minutes=35))
 
     # ------------------------------------------------------------- DAI FORNITORI
     m = in_lavorazione(a3, carrozzeria, utenti["carrozzeria"], "Carrozzeria", "Paraurti anteriore", 16,
                        MEZZO[2], esterno, "Giulia Verdi (Trasporti Bianchi)")                  # urgente
-    servizi.modifica_ddt(m.ddt, {"a_sede_id": carrozzeria.id, "causale": "Conto riparazione", "vettore_id": esterno.id,
+    servizi.modifica_ddt(m.ddt, {"a_sede_id": carrozzeria.id, "causale": "Invio lavorazione", "vettore_id": esterno.id,
                                  "conducente": "Giulia Verdi (Trasporti Bianchi)", "lavorazione": "Carrozzeria",
                                  "lavorazione_note": "Paraurti anteriore + sensore parcheggio", "mezzo": MEZZO[2]},
                          utenti["ufficio"])
@@ -265,29 +266,29 @@ def carica():
     m = in_lavorazione(clio_rientro, officina, utenti["officina"], "Meccanica / tagliando", "Tagliando pre-consegna", 3)
     servizi.completa_lavorazione(m, utenti["officina"], "Tagliando fatto, filtri sostituiti")  # rientro pronto
     m.lavorazione_completata_at = _indietro(days=1)
-    servizi.crea_movimento(fiat600, dict(a_sede_id=detailing.id, causale="Conto lavorazione", vettore_id=proprio.id,
+    servizi.crea_movimento(fiat600, dict(a_sede_id=detailing.id, causale="Invio lavorazione", vettore_id=proprio.id,
                                          conducente="", lavorazione="Lavaggio / detailing",
                                          lavorazione_note="Trattamento ceramico", mezzo=MEZZO[0]),
                            utenti["ufficio"], predisponi_ore=4)                                  # entro oggi
-    scaduto = servizi.crea_movimento(corsa, dict(a_sede_id=carrozzeria.id, causale="Conto riparazione",
+    scaduto = servizi.crea_movimento(corsa, dict(a_sede_id=carrozzeria.id, causale="Invio lavorazione",
                                                  vettore_id=esterno.id, conducente="", lavorazione="Carrozzeria",
                                                  lavorazione_note="Specchietto destro", mezzo=MEZZO[2]),
                                      utenti["ufficio"], predisponi_ore=24)
     scaduto.movimento.ritiro_entro_at = _indietro(hours=5)                                      # ritiro scaduto
 
     # ------------------------------------------------------------- IN VIAGGIO
-    viaggio(golf, carrozzeria, "Conto riparazione", "Carrozzeria", "Graffio portiera post. sx", _indietro(minutes=50))
-    viaggio(transit2, officina, "Conto riparazione", "Meccanica / tagliando", "Non parte: batteria e motorino",
+    viaggio(golf, carrozzeria, "Invio lavorazione", "Carrozzeria", "Graffio portiera post. sx", _indietro(minutes=50))
+    viaggio(transit2, officina, "Invio lavorazione", "Meccanica / tagliando", "Non parte: batteria e motorino",
             _indietro(hours=1, minutes=20), MEZZO[2], esterno, "Giulia Verdi (Trasporti Bianchi)")
     multiplo = servizi.crea_ddt_multiplo([aygo, clio, duster], dict(
-        a_sede_id=villorba.id, causale="Trasferimento tra sedi", vettore_id=esterno.id,
+        a_sede_id=villorba.id, causale="Spostamento", vettore_id=esterno.id,
         conducente="Trasporti Bianchi (bisarca)", lavorazione="Nessuna (solo trasferimento)", lavorazione_note="",
         mezzo=MEZZO[1]), utenti["autista"], firma_conducente=firma_autista)
     for mv in multiplo.movimenti:
         mv.partenza_at = _indietro(minutes=25)
 
     # ------------------------------------------------------------- DDT cancellato, danni, adesivi liberi
-    d = viaggio(peugeot, villorba, "Trasferimento tra sedi", "Nessuna (solo trasferimento)", "", _indietro(hours=3))
+    d = viaggio(peugeot, villorba, "Spostamento", "Nessuna (solo trasferimento)", "", _indietro(hours=3))
     servizi.annulla_ddt(d.ddt, utenti["admin"], "Creato sull'auto sbagliata")
     servizi.segnala_danno(golf_bianca, utenti["autista"], "Lato sinistro",
                           "Graffio di circa 10 cm sulla portiera posteriore", [foto_demo(7)])

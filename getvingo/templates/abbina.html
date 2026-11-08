@@ -30,7 +30,7 @@
     <p id="stato-lettura" class="tenue piccolo" role="status"></p>
 
     <label class="campo"><span>VIN · controlla carattere per carattere</span>
-      <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="20" required
+      <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
       <small id="conta-vin" class="contatore"></small>
     </label>
@@ -47,14 +47,14 @@
     <label class="campo"><span>Targa <span class="tenue">(facoltativa, se già presente)</span></span>
       <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
     <div class="griglia-2">
-      <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}"></label>
-      <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}"></label>
+      <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required data-formato="nome" autocapitalize="words"></label>
+      <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required data-formato="nome" autocapitalize="words"></label>
     </div>
     <label class="campo"><span>Versione <span class="tenue">(facoltativa)</span></span><input name="versione" value="{{ form.get('versione', '') }}" placeholder="Es. 1.5 eTSI Life"></label>
     <div class="griglia-2">
       <label class="campo"><span>Colore</span><input name="colore" value="{{ form.get('colore', '') }}"></label>
       <label class="campo"><span>Dove si trova</span>
-        <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.comune if s.comune }}</option>{% endfor %}</select>
+        <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select>
       </label>
     </div>
   </div>

@@ -218,3 +218,9 @@
 <p class="rientro-stato bloccato">{{ i('chiave', 's') }} <span><b>DDT di rientro non ancora disponibile</b> · si crea solo quando {{ m.sede_arrivo_effettiva.nome }} conferma la fine della lavorazione</span></p>
 {% endif %}
 {% endmacro %}
+
+{# Stima del viaggio: distanza e tempo dalla partenza alla destinazione, con il traffico tipico dell'orario #}
+{% macro stima(m) %}{% set st = stima_viaggio(m) %}{% if st %}
+<p class="stima-viaggio">{{ i('cronometro', 's') }} <span>Circa <b>{{ st.km }} km</b> · <b>{{ st.minuti // 60 ~ ' h ' if st.minuti >= 60 }}{{ st.minuti % 60 }} min</b>
+  ({{ st.traffico }}){% if m.stato == 'aperto' and m.partenza_at %} · arrivo previsto verso le <b>{{ st.arrivo|data('%H:%M') }}</b>{% endif %}</span></p>
+{% endif %}{% endmacro %}

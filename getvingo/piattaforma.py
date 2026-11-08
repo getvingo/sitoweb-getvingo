@@ -8,7 +8,7 @@ from functools import wraps
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from sqlalchemy import func
 
-from . import accessi, posta, servizi
+from . import accessi, anagrafica, posta, servizi
 from .auth import gestore, login_richiesto
 from .models import AccessoSupporto, Azienda, Ddt, Organizzazione, Utente, Veicolo, adesso, db
 
@@ -53,10 +53,16 @@ def indice():
 @solo_gestore
 def nuova():
     if request.method == "POST":
-        f = {k: request.form.get(k, "").strip() for k in ("ragione_sociale", "piva", "indirizzo", "nome", "email")}
-        if not all(f[k] for k in ("ragione_sociale", "nome", "email")):
-            flash("Servono ragione sociale, nome ed email dell'amministratore.", "errore")
-            return render_template("piattaforma/nuova.html", f=f)
+        f = {k: request.form.get(k, "").strip() for k in ("ragione_sociale", "nome", "email")}
+        dati = Azienda(ragione_sociale=f["ragione_sociale"])  # solo per leggere e controllare il modulo
+        try:
+            if not all(f.values()):
+                raise servizi.Vietato("Servono ragione sociale, nome ed email dell'amministratore.")
+            anagrafica.leggi_fiscali(dati)
+            anagrafica.leggi_indirizzo(dati)
+        except servizi.Vietato as e:
+            flash(str(e), "errore")
+            return render_template("piattaforma/nuova.html", f=f, dati=dati)
         mia = g.org_id
         try:
             org = servizi.crea_organizzazione(f["ragione_sociale"], f["email"], accessi.password_provvisoria(),
@@ -65,10 +71,13 @@ def nuova():
             db.session.rollback()
             g.org_id = mia
             flash(str(e), "errore")
-            return render_template("piattaforma/nuova.html", f=f)
+            return render_template("piattaforma/nuova.html", f=f, dati=dati)
         # crea_organizzazione attiva la nuova: i dati aggiunti qui sotto vanno a lei
         azienda = Azienda.query.first()
-        azienda.piva, azienda.indirizzo = f["piva"], f["indirizzo"]
+        for campo in ("piva", "codice_fiscale", "indirizzo", "cap", "comune", "provincia", "stato", "lat", "lon"):
+            setattr(azienda, campo, getattr(dati, campo))
+        servizi.allinea_vettore_proprio(azienda)
+        servizi.allinea_sede_legale(azienda)
         admin = Utente.query.filter_by(email=f["email"].lower()).first()
         admin.invito_in_attesa = True
         db.session.commit()
@@ -76,7 +85,7 @@ def nuova():
         g.org_id = mia  # si torna alla propria organizzazione
         return render_template("admin/invito.html", u=admin, scopo="invito", link=link, inviata=inviata,
                                errore=errore, torna=url_for("piattaforma.indice"), durata_ore=168)
-    return render_template("piattaforma/nuova.html", f={})
+    return render_template("piattaforma/nuova.html", f={}, dati=None)
 
 
 def _organizzazione(org_id):

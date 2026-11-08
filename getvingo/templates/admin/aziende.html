@@ -20,5 +20,5 @@
   </a>
   {% endfor %}
 </div>
-<p class="tenue piccolo" style="margin-top:14px">Per aggiungere un nuovo fornitore crealo in <a href="{{ url_for('admin.sedi') }}">Sedi e destinazioni</a> con tipo Carrozzeria, Officina o Altro fornitore: comparirà qui.</p>
+<p class="tenue piccolo" style="margin-top:14px">Per aggiungere un nuovo fornitore crealo in <a href="{{ url_for('admin.sedi', gruppo='esterne') }}">Destinazioni esterne</a> (Carrozzeria, Officina o Altro fornitore): comparirà qui.</p>
 {% endblock %}

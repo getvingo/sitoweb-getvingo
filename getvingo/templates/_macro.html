@@ -32,7 +32,7 @@
     <option value="">Scegli dove va l'auto…</option>
     {% for gruppo, sedi in gruppi_sedi %}
       <optgroup label="{{ gruppo }}">
-        {% for s in sedi %}<option value="{{ s.id }}" data-tipo="{{ s.tipo }}" {{ 'selected' if valori.a_sede_id == s.id }}>{{ s.nome }}{{ ' · ' ~ s.comune if s.comune }}</option>{% endfor %}
+        {% for s in sedi %}<option value="{{ s.id }}" data-tipo="{{ s.tipo }}" {{ 'selected' if valori.a_sede_id == s.id }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}
       </optgroup>
     {% endfor %}
   </select>
@@ -73,16 +73,19 @@
 {% endmacro %}
 
 {# Riquadro firma: obbligatoria=True blocca l'invio finché non si firma #}
-{% macro firma_pad(etichetta, nome='firma', obbligatoria=False, attuale=None) %}
+{% macro firma_pad(etichetta, nome='firma', obbligatoria=False, attuale=None, timbro=False) %}
 <div class="campo">
   <span>{{ etichetta }}</span>
-  {% if attuale %}<div class="firma-attuale"><img src="{{ attuale }}" alt="Firma attuale"><small>Firma attuale · disegnane una nuova per sostituirla</small></div>{% endif %}
+  {% if attuale %}<div class="firma-attuale"><img src="{{ attuale }}" alt="Firma attuale"><small>Firma attuale{{ ' (con timbro)' if timbro }} · usata in automatico · {{ 'carica il timbro o ' if timbro }}disegnane una nuova per sostituirla</small></div>{% endif %}
   <div class="firma-pad" {{ 'data-obbligatoria' if obbligatoria }}>
     <canvas aria-label="Riquadro firma"></canvas>
-    <span class="firma-guida">Firma qui col dito</span>
+    <span class="firma-guida">{{ 'Carica il timbro, poi firma sopra col dito' if timbro else 'Firma qui col dito' }}</span>
     <button type="button" class="btn-link firma-cancella" data-cancella>Cancella</button>
     <input type="hidden" name="{{ nome }}">
   </div>
+  {% if timbro %}<label class="btn piccolo firma-timbro">{{ i('carica', 's') }} Carica logo o timbro dell'azienda
+    <input type="file" accept="image/png,image/jpeg,image/webp" data-timbro hidden></label>
+  <small class="tenue">Il logo o timbro va sotto, la sigla col dito sopra: insieme diventano la firma timbrata, apposta in automatico sui DDT.</small>{% endif %}
   {% if obbligatoria %}<small class="firma-errore">Serve la firma per continuare.</small>{% endif %}
 </div>
 {% endmacro %}
@@ -253,5 +256,41 @@
   {% endfor %}
   <p class="slot-scelto">{{ i('orologio', 's') }} <span data-slot-testo>{{ attuale|slot if attuale else vuoto }}</span>
     <button type="button" class="btn-link" data-slot-togli {{ 'hidden' if not attuale }}>Togli</button></p>
+</div>
+{% endmacro %}
+
+{# Indirizzo completo come sui DDT (via e civico, CAP, comune, provincia, stato) verificato sulla mappa:
+   la via si cerca da sola, oppure si tocca il punto sulla mappa / "Sono qui". Se la via non esiste il campo
+   diventa rosso e il modulo non parte. o = oggetto con i valori attuali (o None) #}
+{% macro campi_indirizzo(o=None, etichetta='Indirizzo', obbligatorio=True) %}
+<fieldset class="indirizzo" data-indirizzo {{ 'data-obbligatorio' if obbligatorio }}>
+  <legend>{{ etichetta }}</legend>
+  <label class="campo"><span>Via e numero civico</span>
+    <input name="indirizzo" value="{{ (o.indirizzo or '') if o else '' }}" {{ 'required' if obbligatorio }} autocomplete="street-address" placeholder="Es. Via Roma 12" data-campo="indirizzo"></label>
+  <div class="griglia-indirizzo">
+    <label class="campo"><span>Comune</span><input name="comune" value="{{ (o.comune or '') if o else '' }}" {{ 'required' if obbligatorio }} data-campo="comune"></label>
+    <label class="campo"><span>CAP</span><input name="cap" value="{{ (o.cap or '') if o else '' }}" inputmode="numeric" maxlength="10" data-campo="cap"></label>
+    <label class="campo"><span>Provincia</span><input name="provincia" value="{{ (o.provincia or '') if o else '' }}" maxlength="4" autocapitalize="characters" placeholder="TV" data-campo="provincia"></label>
+    <label class="campo"><span>Stato</span><input name="stato" value="{{ (o.stato if o else '') or 'Italia' }}" data-campo="stato"></label>
+  </div>
+  <input type="hidden" name="lat" value="{{ o.lat if o and o.lat is not none else '' }}">
+  <input type="hidden" name="lon" value="{{ o.lon if o and o.lon is not none else '' }}">
+  <div class="indirizzo-azioni">
+    <button type="button" class="btn piccolo" data-sono-qui>{{ i('pin', 's') }} Sono qui</button>
+    <span class="indirizzo-esito" data-esito role="status"></span>
+  </div>
+  <div class="indirizzo-mappa" data-mappa aria-label="Mappa: tocca il punto per compilare l'indirizzo"></div>
+  <small class="tenue">Tocca la mappa sul punto esatto per compilare l'indirizzo · ricerca indirizzi © OpenStreetMap</small>
+</fieldset>
+{% endmacro %}
+
+{# Partita IVA e codice fiscale: obbligatori per ogni società. Con un campo "tipo" nel modulo si adattano:
+   sede della concessionaria → nascosti; cliente → basta il codice fiscale (anche di un privato) #}
+{% macro campi_fiscali(o=None, per_tipo=False) %}
+<div class="griglia-2 campi-fiscali" {{ 'data-fiscali-per-tipo' if per_tipo }}>
+  <label class="campo"><span>Partita IVA <span class="tenue" data-piva-facoltativa hidden>(facoltativa per un privato)</span></span>
+    <input name="piva" value="{{ o.piva if o and o.piva else '' }}" inputmode="numeric" maxlength="16" placeholder="11 cifre"></label>
+  <label class="campo"><span>Codice fiscale</span>
+    <input name="codice_fiscale" value="{{ o.codice_fiscale if o and o.codice_fiscale else '' }}" maxlength="16" autocapitalize="characters" class="input-vin" placeholder="16 caratteri o 11 cifre"></label>
 </div>
 {% endmacro %}

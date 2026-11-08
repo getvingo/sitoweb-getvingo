@@ -3,6 +3,35 @@
   // non la chiedono: il server usa quella rilevata all'ultimo tocco (routes._coord).
   var demo = document.body.hasAttribute('data-demo');
 
+  // Dati fiscali che seguono il tipo di luogo: sede della concessionaria = niente; cliente = P. IVA facoltativa
+  document.querySelectorAll('[data-fiscali-per-tipo]').forEach(function (box) {
+    var form = box.closest('form');
+    var aggiorna = function () {
+      var t = form.querySelector('[name=tipo]:checked, select[name=tipo]');
+      var tipo = t ? t.value : '';
+      box.hidden = tipo === 'propria';
+      box.querySelector('[data-piva-facoltativa]').hidden = tipo !== 'cliente';
+    };
+    form.querySelectorAll('[name=tipo]').forEach(function (el) { el.addEventListener('change', aggiorna); });
+    aggiorna();
+  });
+
+  // Marca e modello: "volkswagen golf" → "Volkswagen", "Golf". Si propone una volta; se poi lo si corregge
+  // (es. BMW, e-tron) resta come scritto
+  document.querySelectorAll('input[data-formato=nome]').forEach(function (el) {
+    var formatta = function (t) {
+      return t.trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s\-\/])(\S)/g, function (m, p, c) { return p + c.toUpperCase(); });
+    };
+    el.addEventListener('blur', function () {
+      if (el.dataset.corretto || !el.value.trim()) return;
+      var f = formatta(el.value);
+      if (f !== el.value) { el.value = f; el.dataset.formattato = f; }
+    });
+    el.addEventListener('input', function () {
+      if (el.dataset.formattato && el.value !== el.dataset.formattato) el.dataset.corretto = '1';
+    });
+  });
+
   // Conferma tattile dopo un'azione riuscita
   if (document.querySelector('[data-vibra=ok]') && navigator.vibrate) navigator.vibrate(60);
 
@@ -11,8 +40,8 @@
   var causale = document.getElementById('causale');
   var riepilogo = document.querySelector('[data-riepilogo]');
   var toccata = false;
-  var SUGGERITE = { propria: 'Trasferimento tra sedi', carrozzeria: 'Conto riparazione',
-                    officina: 'Conto riparazione', cliente: 'Consegna a cliente' };
+  var SUGGERITE = { propria: 'Spostamento', carrozzeria: 'Invio lavorazione', officina: 'Invio lavorazione',
+                    altro: 'Invio lavorazione', esposizione: 'Conto esposizione', cliente: 'Consegna a cliente' };
   if (causale) causale.addEventListener('change', function () { toccata = true; });
   function aggiorna(suggerisci) {
     if (!dest) return;

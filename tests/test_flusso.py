@@ -14,6 +14,10 @@ from getvingo.vin import normalizza, valido
 
 VIN = "WVWZZZ1KZAW000123"
 POS = {"lat": "45.66", "lon": "12.24"}  # posizione del telefono al tocco dell'adesivo
+# indirizzo completo trovato sulla mappa e dati fiscali validi (obbligatori per ogni società)
+INDIRIZZO = {"indirizzo": "Via Roma 12", "cap": "31050", "comune": "Ponzano Veneto", "provincia": "TV",
+             "stato": "Italia", "lat": "45.7089", "lon": "12.2101"}
+FISCALI = {"piva": "01234567897", "codice_fiscale": "01234567897"}
 FIRMA = _png_firma(1)
 
 
@@ -298,7 +302,7 @@ class TestSpostamentoColTocco(Base):
         with self.app.app_context():
             m = self.mov(d)
             self.assertEqual((m.stato, m.causale, m.conducente, m.vettore.nome, m.mezzo),
-                             ("aperto", "Conto lavorazione", "Autista", "Vettore X", "Bisarca"))
+                             ("aperto", "Invio lavorazione", "Autista", "Vettore X", "Bisarca"))
             self.assertEqual((m.firma_conducente, m.firma_salvata, m.lavorazione), (FIRMA, True, ""))
             self.assertEqual((m.partenza_lat, m.partenza_lon), (45.66, 12.24))  # posizione del tocco
         self.assertTrue(self.c.get(f"/ddt/{d}.pdf").data.startswith(b"%PDF"))
@@ -326,29 +330,34 @@ class TestSpostamentoColTocco(Base):
         d = self.ddt()
         with self.app.app_context():
             self.assertEqual((self.mov(d).causale, self.mov(d).lavorazione),
-                             ("Trasferimento tra sedi", Movimento.NESSUNA))
+                             ("Spostamento", Movimento.NESSUNA))
         self.arrivo(d)
         with self.app.app_context():
             self.assertEqual(self.mov(d).stato, "chiuso")
 
-    def test_destinazione_scritta_a_mano_fissata_al_primo_arrivo(self):
+    def test_destinazione_scritta_a_mano_con_indirizzo_sulla_mappa(self):
         vid = self.abbina()
         self.profilo()
-        self.c.post(f"/veicolo/{vid}/sposta", data={"nuova_destinazione": "  Garage   Verdi, Via Po 3 ", "tipo": "officina"})
+        # senza indirizzo trovato sulla mappa e senza dati fiscali non si parte
+        self.c.post(f"/veicolo/{vid}/sposta", data={"nuova_destinazione": "Garage Verdi", "tipo": "officina"})
+        with self.app.app_context():
+            self.assertIsNone(Sede.query.filter_by(nome="Garage Verdi").first())
+        self.c.post(f"/veicolo/{vid}/sposta", data={"nuova_destinazione": "  Garage   Verdi ", "tipo": "officina",
+                                                    **INDIRIZZO, **FISCALI})
         d = self.ddt()
         with self.app.app_context():
             m = self.mov(d)
             self.assertEqual((m.a_sede.nome, m.a_sede.tipo, m.a_sede.lat, m.causale),
-                             ("Garage Verdi, Via Po 3", "officina", None, "Conto lavorazione"))
+                             ("Garage Verdi", "officina", 45.7089, "Invio lavorazione"))
+            self.assertEqual(m.a_sede.indirizzo_completo, "Via Roma 12, 31050 Ponzano Veneto (TV), Italia")
+            self.assertEqual(m.ddt.dati_fissi["destinatario"][1], "Via Roma 12, 31050 Ponzano Veneto (TV), Italia")
         self.c.post(f"/ddt/{d}/lavorazione", data={"lavorazione": "Revisione", "lavorazione_note": "annuale"})
-        self.c.post(f"/ddt/{d}/arrivo")  # senza posizione no
-        self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.9", "lon": "12.9"})  # il primo arrivo fissa il punto
+        self.c.post(f"/ddt/{d}/arrivo", data={"lat": "45.7089", "lon": "12.2101"})
         with self.app.app_context():
-            m = self.mov(d)
-            self.assertEqual((m.stato, m.a_sede.lat, m.a_sede.lon, m.arrivo_per_conto), ("chiuso", 45.9, 12.9, False))
+            self.assertEqual(self.mov(d).stato, "chiuso")
         # stesso nome scritto di nuovo: si riusa il luogo, niente doppioni
         with self.app.app_context():
-            self.assertEqual(servizi.destinazione_scritta("garage verdi, via po 3").id, self.mov(d).a_sede_id)
+            self.assertEqual(servizi.destinazione_scritta("garage verdi").id, self.mov(d).a_sede_id)
         self.c.post(f"/veicolo/{vid}/sposta", data={"nuova_destinazione": "ab"})  # troppo corto
         with self.app.app_context():
             self.assertEqual(Ddt.query.count(), 1)
@@ -395,7 +404,7 @@ class TestSpostamentoColTocco(Base):
         self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Sede A")})
         with self.app.app_context():
             m = self.mov(self.ddt())
-            self.assertEqual((m.da_sede.nome, m.causale, m.stato), ("Carrozzeria B", "Rientro da lavorazione", "aperto"))
+            self.assertEqual((m.da_sede.nome, m.causale, m.stato), ("Carrozzeria B", "Reso lavorazione", "aperto"))
             self.assertEqual(servizi.mittente(m)[0], "Carrozzeria B")  # il mittente resta il fornitore
 
     def test_anteprima_e_tocchi_del_viaggio(self):
@@ -2053,16 +2062,17 @@ class TestAccessi(Base):
 
     def test_nuova_concessionaria_separata_e_sospesa(self):
         self.abbina()  # un'auto nella concessionaria del gestore
-        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Rossi Auto S.r.l.", "piva": "IT999",
-                                                    "indirizzo": "Via Roma 1", "nome": "Mara Rossi",
-                                                    "email": "mara@rossi.it"})
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Rossi Auto S.r.l.", "nome": "Mara Rossi",
+                                                    "email": "mara@rossi.it", **INDIRIZZO, **FISCALI})
         self.assertIn("Invito per Mara Rossi", r.get_data(as_text=True))
         with self.app.app_context():
             org = Organizzazione.query.filter_by(nome="Rossi Auto S.r.l.").one()
             admin = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(email="mara@rossi.it").one()
             self.assertEqual((admin.org_id, admin.ruolo, admin.invito_in_attesa), (org.id, "admin", True))
             az = Azienda.query.execution_options(tutte_le_organizzazioni=True).filter_by(org_id=org.id).one()
-            self.assertEqual((az.piva, az.indirizzo), ("IT999", "Via Roma 1"))
+            self.assertEqual((az.piva, az.indirizzo, az.comune), ("01234567897", "Via Roma 12", "Ponzano Veneto"))
+            legale = Sede.query.execution_options(tutte_le_organizzazioni=True).filter_by(org_id=org.id, sede_legale=True).one()
+            self.assertEqual((legale.tipo, legale.indirizzo_completo), ("propria", "Via Roma 12, 31050 Ponzano Veneto (TV), Italia"))
             org_id = org.id
         # il gestore resta nella sua concessionaria
         self.assertIn("Golf", self.c.get("/stock").get_data(as_text=True))
@@ -2094,7 +2104,8 @@ class TestAccessi(Base):
             self.assertTrue(db.session.get(Organizzazione, 1).attiva)
 
     def test_email_duplicata_nuova_concessionaria(self):
-        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Doppia", "nome": "X", "email": "autista@t.it"})
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Doppia", "nome": "X", "email": "autista@t.it",
+                                                    **INDIRIZZO, **FISCALI})
         self.assertIn("Email già registrata", r.get_data(as_text=True))
         with self.app.app_context():
             self.assertIsNone(Organizzazione.query.filter_by(nome="Doppia").first())
@@ -2236,7 +2247,8 @@ class TestUtenzaMaster(Base):
             self.assertTrue(db.session.get(Organizzazione, self.org2).assistenza_consentita)
 
     def test_consenso_spento_di_base(self):
-        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Nuova S.r.l.", "nome": "N", "email": "n@nuova.it"})
+        r = self.c.post("/piattaforma/nuova", data={"ragione_sociale": "Nuova S.r.l.", "nome": "N", "email": "n@nuova.it",
+                                                    **INDIRIZZO, **FISCALI})
         with self.app.app_context():
             self.assertFalse(Organizzazione.query.filter_by(nome="Nuova S.r.l.").one().assistenza_consentita)
 
@@ -2305,11 +2317,10 @@ class TestProfiloEGestione(Base):
         t = r.get_data(as_text=True)
         self.assertIn("Giorni di chiusura", t)
         self.assertIn("Loghi delle marche", t)
-        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuova Ragione S.p.A.", "indirizzo": "Via Nuova 2",
-                                            "piva": "IT123"})
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuova Ragione S.p.A.", **INDIRIZZO, **FISCALI})
         with self.app.app_context():
             a = Azienda.query.one()
-            self.assertEqual((a.ragione_sociale, a.indirizzo, a.piva), ("Nuova Ragione S.p.A.", "Via Nuova 2", "IT123"))
+            self.assertEqual((a.ragione_sociale, a.indirizzo, a.piva), ("Nuova Ragione S.p.A.", "Via Roma 12", "01234567897"))
             self.assertEqual(a.firma, FIRMA)  # senza una firma nuova resta quella di prima
         self.c.post("/admin/azienda", data={"ragione_sociale": ""})
         with self.app.app_context():
@@ -2360,15 +2371,14 @@ class TestConfigurazioneConcessionaria(Base):
             self.assertNotIn("vettore", servizi.profilo_guida_mancante(u))
 
     def test_dati_aziendali_aggiornano_il_vettore(self):
-        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuovo Nome S.r.l.", "piva": "IT1", "indirizzo": "Via X",
-                                            "sigla": "NNOME"})
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Nuovo Nome S.r.l.", "sigla": "NNOME", **INDIRIZZO, **FISCALI})
         with self.app.app_context():
             v = Vettore.query.filter_by(proprio=True).one()
-            self.assertEqual((v.nome, v.piva), ("Nuovo Nome S.r.l.", "IT1"))
+            self.assertEqual((v.nome, v.piva, v.comune), ("Nuovo Nome S.r.l.", "01234567897", "Ponzano Veneto"))
             self.assertEqual(db.session.get(Organizzazione, 1).sigla, "NNOME")
 
     def test_adesivi_progressivi_con_sigla(self):
-        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst"})
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst", **INDIRIZZO, **FISCALI})
         self.c.post("/admin/tag", data={"quanti": "3"})
         self.c.post("/admin/tag", data={"quanti": "2"})
         with self.app.app_context():
@@ -2382,29 +2392,30 @@ class TestConfigurazioneConcessionaria(Base):
             servizi.crea_organizzazione("Altra S.r.l.", "x@altra.it", "password9")
             altra = Organizzazione.query.filter_by(nome="Altra S.r.l.").one().sigla
         for sbagliata in ("A1", "TROPPOLUNGA", altra):
-            self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": sbagliata})
+            self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": sbagliata, **INDIRIZZO, **FISCALI})
             with self.app.app_context():
                 self.assertNotEqual(db.session.get(Organizzazione, 1).sigla, sbagliata.upper())
 
     def test_luoghi_con_comune_e_posizione(self):
         n = lambda: self._conta(Sede)
         prima = n()
-        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria"})  # senza comune: rifiutato
+        senza_mappa = {k: v for k, v in INDIRIZZO.items() if k not in ("lat", "lon")}
+        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria", "comune": "Villorba"})
+        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria", **senza_mappa})  # via non trovata
         self.assertEqual(n(), prima)
-        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria", "comune": "Villorba (TV)",
-                                         "lat": "45.70", "lon": "12.24"})
+        self.c.post("/admin/sedi", data={"nome": "Piazzale Nord", "tipo": "propria", **INDIRIZZO, "comune": "Villorba",
+                                         "cap": "31020", "lat": "45.70", "lon": "12.24"})
         sid = self._id(Sede, nome="Piazzale Nord")
         with self.app.app_context():
             s = db.session.get(Sede, sid)
-            self.assertEqual((s.comune, s.lat, s.lon, s.dove), ("Villorba (TV)", 45.70, 12.24, "Villorba (TV)"))
+            self.assertEqual((s.comune, s.provincia, s.lat, s.dove), ("Villorba", "TV", 45.70, "Villorba (TV)"))
+            self.assertEqual(s.indirizzo_completo, "Via Roma 12, 31020 Villorba (TV), Italia")
         t = self.c.get(f"/admin/sedi/{sid}").get_data(as_text=True)
         self.assertNotIn("Firma predefinita del destinatario", t)  # sede propria: vale la firma aziendale
         self.assertIn("Dati aziendali", t)
-        carr = self._id(Sede, nome="Carrozzeria B")
-        self.assertIn("Firma predefinita del destinatario", self.c.get(f"/admin/sedi/{carr}").get_data(as_text=True))
-        self.c.post(f"/admin/sedi/{sid}", data={"nome": "Piazzale Nord", "tipo": "propria", "comune": ""})
+        self.c.post(f"/admin/sedi/{sid}", data={"nome": "Piazzale Nord", "tipo": "propria", **INDIRIZZO, "comune": ""})
         with self.app.app_context():
-            self.assertEqual(db.session.get(Sede, sid).comune, "Villorba (TV)")  # il comune non si toglie
+            self.assertEqual(db.session.get(Sede, sid).comune, "Villorba")  # senza comune non si salva
         # nel caricamento dell'auto: solo i piazzali della concessionaria, con il comune
         nuova = self.c.get("/piazzale/nuova").get_data(as_text=True)
         self.assertIn("Piazzale Nord · Villorba (TV)", nuova)
@@ -2439,3 +2450,130 @@ class TestConfigurazioneConcessionaria(Base):
             m = Movimento.query.order_by(Movimento.id.desc()).first()
             self.assertEqual(m.conducente, "Giulia Vendite")
             self.assertTrue(m.vettore.proprio)
+
+
+class TestAnagraficaEDDT(Base):
+    """Indirizzi completi verificati, P. IVA e codice fiscale, sede legale, causali nuove, stima del viaggio, VIN."""
+    def test_controlli_fiscali(self):
+        from getvingo.anagrafica import cf_valido, piva_valida
+        self.assertTrue(piva_valida("01234567897"))
+        self.assertFalse(piva_valida("01234567890"))  # cifra di controllo sbagliata
+        self.assertTrue(cf_valido("RSSMRA80A01H501U"))
+        self.assertFalse(cf_valido("RSSMRA80A01H501X"))
+        self.assertTrue(cf_valido("01234567897"))
+
+    def _conta(self, **filtro):
+        with self.app.app_context():
+            return Sede.query.filter_by(**filtro).count()
+
+    def test_destinazioni_esterne_con_dati_fiscali(self):
+        base = {"nome": "Carrozzeria Nuova S.n.c.", "tipo": "carrozzeria", "gruppo": "esterne", **INDIRIZZO}
+        self.c.post("/admin/sedi", data=base)  # senza P. IVA e C.F.: rifiutata
+        self.c.post("/admin/sedi", data={**base, "piva": "01234567890", "codice_fiscale": "01234567890"})  # P. IVA errata
+        self.assertEqual(self._conta(nome="Carrozzeria Nuova S.n.c."), 0)
+        self.c.post("/admin/sedi", data={**base, **FISCALI})
+        self.assertEqual(self._conta(nome="Carrozzeria Nuova S.n.c."), 1)
+        # cliente privato: basta il codice fiscale
+        self.c.post("/admin/sedi", data={"nome": "Mario Rossi", "tipo": "cliente", "gruppo": "esterne", **INDIRIZZO,
+                                         "codice_fiscale": "RSSMRA80A01H501U"})
+        self.assertEqual(self._conta(nome="Mario Rossi"), 1)
+        # le due liste sono separate
+        proprie = self.c.get("/admin/sedi?gruppo=proprie").get_data(as_text=True)
+        esterne = self.c.get("/admin/sedi?gruppo=esterne").get_data(as_text=True)
+        self.assertIn("Sede A", proprie)
+        self.assertNotIn("<h3>Carrozzeria Nuova", proprie)
+        for testo in ("Fornitori per le lavorazioni", "Esposizioni", "Clienti", "Carrozzeria Nuova", "Mario Rossi"):
+            self.assertIn(testo, esterne)
+        self.assertNotIn(">Sede A<", esterne)
+
+    def test_sede_legale_creata_dai_dati_aziendali(self):
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "TEST", **INDIRIZZO, **FISCALI})
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "TEST", **INDIRIZZO, **FISCALI,
+                                            "indirizzo": "Via Roma 14"})
+        with self.app.app_context():
+            legale = Sede.query.filter_by(sede_legale=True).one()  # una sola, aggiornata
+            self.assertEqual((legale.tipo, legale.indirizzo, legale.lat), ("propria", "Via Roma 14", 45.7089))
+            self.assertEqual(Azienda.query.one().indirizzo_completo, "Via Roma 14, 31050 Ponzano Veneto (TV), Italia")
+        # i dati sbagliati non si salvano
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "TEST", **INDIRIZZO,
+                                            "piva": "123", "codice_fiscale": "01234567897"})
+        with self.app.app_context():
+            self.assertEqual(Azienda.query.one().piva, "01234567897")
+
+    def test_vettore_con_dati_obbligatori(self):
+        self.c.post("/admin/vettori", data={"nome": "Trasporti Veloci S.r.l."})
+        with self.app.app_context():
+            self.assertIsNone(Vettore.query.filter_by(nome="Trasporti Veloci S.r.l.").first())
+        self.c.post("/admin/vettori", data={"nome": "Trasporti Veloci S.r.l.", **INDIRIZZO, **FISCALI})
+        with self.app.app_context():
+            v = Vettore.query.filter_by(nome="Trasporti Veloci S.r.l.").one()
+            self.assertEqual(v.indirizzo_completo, "Via Roma 12, 31050 Ponzano Veneto (TV), Italia")
+
+    def test_causali_nuove(self):
+        with self.app.app_context():
+            a, carr, cli = (Sede.query.filter_by(nome=n).one() for n in ("Sede A", "Carrozzeria B", "Cliente C"))
+            expo = Sede(nome="Fiera Verona", tipo="esposizione")
+            self.assertEqual(servizi.causale_per(a, carr), "Invio lavorazione")
+            self.assertEqual(servizi.causale_per(carr, a), "Reso lavorazione")
+            self.assertEqual(servizi.causale_per(a, expo), "Conto esposizione")
+            self.assertEqual(servizi.causale_per(expo, a), "Reso esposizione")
+            self.assertEqual(servizi.causale_per(a, a), "Spostamento")
+            self.assertEqual(servizi.causale_per(a, cli), "Consegna a cliente")
+            self.assertFalse(expo.esterna)  # l'esposizione non è una lavorazione: niente lavorazione da indicare
+
+    def test_ddt_vecchio_tiene_la_sua_causale(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B", causale="Conto riparazione")  # causale di prima: resta valida
+        d = self.ddt()
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Ddt, d).movimento.causale, "Conto riparazione")
+
+    def test_stima_del_viaggio(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B", causale="Invio lavorazione")
+        d = self.ddt()
+        with self.app.app_context():
+            m = db.session.get(Ddt, d).movimento
+            st = servizi.stima_viaggio(m)
+            self.assertGreater(st["km"], 5)       # Sede A (45.0, 12.0) → Carrozzeria B (45.1, 12.1)
+            self.assertGreater(st["minuti"], 10)
+        self.assertIn("arrivo previsto", self.c.get(f"/ddt/{d}").get_data(as_text=True))
+
+    def test_marca_dal_vin(self):
+        r = self.c.get("/api/veicolo?vin=WAUZZZGY5RA037752")
+        self.assertEqual((r.status_code, r.json["marca"]), (200, "Audi"))
+        self.assertEqual(self.c.get("/api/veicolo?vin=XXX00000000000000").status_code, 404)
+        # se la marca non è scritta, al salvataggio la prende dal VIN
+        self.c.post("/abbina/ABCD2345", data={"vin": "ZFA31200000123456", "modello": "Panda", "condizione": "nuovo",
+                                              "sede_id": self._id(Sede, nome="Sede A")})
+        with self.app.app_context():
+            self.assertEqual(Veicolo.query.filter_by(vin="ZFA31200000123456").one().marca, "Fiat")
+        self.assertIn('maxlength="17"', self.c.get("/piazzale/nuova").get_data(as_text=True))
+
+    def test_mappa_stock_anche_senza_auto(self):
+        with self.app.app_context():
+            for s in Sede.query.filter_by(tipo="propria"):
+                s.lat = s.lon = None
+            db.session.commit()
+        t = self.c.get("/stock").get_data(as_text=True)
+        self.assertNotIn('id="mappa-piazzale"', t)
+        self.assertIn("La mappa compare appena i piazzali hanno la loro posizione", t)
+        with self.app.app_context():
+            Sede.query.filter_by(nome="Sede A").one().lat, Sede.query.filter_by(nome="Sede A").one().lon = 45.0, 12.0
+            s = Sede.query.filter_by(nome="Sede A").one(); s.lat, s.lon = 45.0, 12.0
+            db.session.commit()
+        self.assertIn('id="mappa-piazzale"', self.c.get("/stock").get_data(as_text=True))  # piazzale vuoto ma sulla mappa
+
+    def test_ddt_emessi_non_cambiano_con_i_dati_nuovi(self):
+        """I DDT emessi tengono la copia dei dati di quel momento: modifiche ad azienda, luoghi e vettori
+        (e gli aggiornamenti del portale) non li toccano."""
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B", causale="Invio lavorazione")
+        d = self.ddt()
+        with self.app.app_context():
+            prima = dict(db.session.get(Ddt, d).dati_fissi)
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Nome Cambiato S.r.l.", "sigla": "NCAMB", **INDIRIZZO, **FISCALI})
+        with self.app.app_context():
+            ddt = db.session.get(Ddt, d)
+            self.assertEqual(ddt.dati_fissi, prima)
+            self.assertEqual(ddt.dati_fissi["mittente"][0], "Test S.r.l.")

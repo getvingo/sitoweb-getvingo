@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, indietro %}
+{% from "_macro.html" import i, indietro, campi_indirizzo, campi_fiscali %}
 {% block titolo %}Nuova concessionaria · Pannello Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('piattaforma.indice')) }}
@@ -9,11 +9,9 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <span class="etichetta">Concessionaria</span>
   <label class="campo"><span>Ragione sociale</span><input name="ragione_sociale" value="{{ f.ragione_sociale or '' }}" required placeholder="Es. Rossi Auto S.r.l."></label>
-  <div class="griglia-2">
-    <label class="campo"><span>Partita IVA <span class="tenue">(facoltativa)</span></span><input name="piva" value="{{ f.piva or '' }}" inputmode="numeric"></label>
-    <label class="campo"><span>Indirizzo della sede <span class="tenue">(facoltativo)</span></span><input name="indirizzo" value="{{ f.indirizzo or '' }}"></label>
-  </div>
-  <p class="tenue piccolo">Ragione sociale, P. IVA e indirizzo compaiono come mittente sui DDT: l'amministratore potrà correggerli in Gestione.</p>
+  {{ campi_fiscali(dati) }}
+  {{ campi_indirizzo(dati, 'Sede legale') }}
+  <p class="tenue piccolo">Ragione sociale, P. IVA e sede legale compaiono come mittente sui DDT; la sede legale diventa anche la prima destinazione. L'amministratore potrà correggerli in Gestione → Dati aziendali.</p>
   <span class="etichetta">Primo amministratore</span>
   <div class="griglia-2">
     <label class="campo"><span>Nome e cognome</span><input name="nome" value="{{ f.nome or '' }}" required></label>
