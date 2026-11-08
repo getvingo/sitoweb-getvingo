@@ -40,6 +40,6 @@
 
 {% if puo_arrivo %}
 {% if not m.lavorazione %}{{ lavorazione_da_indicare(d, lavorazioni, 'arrivo') }}{% endif %}
-{{ form_arrivo(d, m, raggio) }}
+{{ form_arrivo(d, m, raggio, dopo_tocco=dopo_tocco) }}
 {% endif %}
 {% endblock %}

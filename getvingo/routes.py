@@ -37,12 +37,25 @@ def solo_interni(view):
     return wrapper
 
 
-def _coord():
-    """Legge lat/lon inviati dal telefono (campi nascosti compilati via GPS)."""
+# la posizione rilevata al tocco NFC vale per i passaggi che lo seguono (abbinamento, partenza, arrivo…)
+VALIDITA_TOCCO_S = 15 * 60
+
+
+def _posizione_tocco():
+    """Posizione dell'ultimo tocco NFC di questo utente, se recente; altrimenti (None, None)."""
+    t = session.get("posizione_tocco") or {}
+    if t and time.time() - t.get("at", 0) <= VALIDITA_TOCCO_S:
+        return t["lat"], t["lon"]
+    return None, None
+
+
+def _coord(usa_tocco=True):
+    """Lat/lon inviati dal telefono; se il modulo non li ha (il GPS si chiede solo al tocco NFC)
+    vale la posizione dell'ultimo tocco recente."""
     try:
         return float(request.form["lat"]), float(request.form["lon"])
     except (KeyError, ValueError):
-        return None, None
+        return _posizione_tocco() if usa_tocco else (None, None)
 
 
 def _movimenti(stato):
@@ -663,11 +676,12 @@ def tap(codice):
     tag = Tag.query.filter_by(codice=codice.upper()).first()
     if tag is None:
         abort(404, "Adesivo non registrato nel sistema.")
-    lat, lon = _coord()
+    lat, lon = _coord(usa_tocco=False)  # il tocco rileva sempre una posizione nuova
     if request.method == "POST" and lat is None and current_app.config["DEMO"]:
         lat, lon = _posizione_simulata(tag.veicolo)
     if request.method == "GET" or lat is None:
         return render_template("tocco.html", tag=tag, errore=request.method == "POST")
+    session["posizione_tocco"] = {"lat": lat, "lon": lon, "at": time.time()}
     v = tag.veicolo
     if v is not None:  # "fatto" premuto subito dopo questo tocco vale come conferma (vedi tocco_passo)
         session["ultimo_tocco"] = {"veicolo": v.id, "at": time.time()}
@@ -857,7 +871,8 @@ def arrivo_da_tap(ddt_id):
     if m.stato != "aperto" or d.annullato_at:
         return _torna_al_ddt(d) if servizi.puo_vedere(d, g.utente) else redirect(url_for("main.home"))
     return render_template("arrivo.html", d=d, m=m, raggio=servizi.RAGGIO_ARRIVO_M, lavorazioni=Movimento.LAVORAZIONI,
-                           puo_arrivo=servizi.puo_confermare_arrivo(m, g.utente))
+                           puo_arrivo=servizi.puo_confermare_arrivo(m, g.utente),
+                           dopo_tocco=_posizione_tocco()[0] is not None)
 
 
 @bp.route("/abbina/<codice>", methods=["GET", "POST"])

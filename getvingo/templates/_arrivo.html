@@ -20,8 +20,8 @@
 {% endmacro %}
 
 {# "Arrivato a destinazione": il telefono manda la posizione, il server chiude se è entro il raggio #}
-{% macro form_arrivo(d, m, raggio, id='') %}
-<form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-senza-gps-ok' if g.utente.ruolo == 'admin' }} style="margin-top:16px">
+{% macro form_arrivo(d, m, raggio, id='', dopo_tocco=False) %}
+<form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }} {{ 'data-senza-gps-ok' if g.utente.ruolo == 'admin' }} style="margin-top:16px">
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
   <details class="ripiega">
     <summary>{{ i('matita', 's') }} Vuoi lasciare una nota di ricezione?</summary>

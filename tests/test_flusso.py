@@ -111,6 +111,35 @@ class TestVinEAbbinamento(Base):
     def test_tap_tag_libero_porta_ad_abbinamento(self):
         self.assertIn("/abbina/ABCD2345", self.c.post("/t/abcd2345", data=POS).headers["Location"])
 
+    def test_posizione_chiesta_solo_al_tocco(self):
+        """Il GPS si chiede al tocco; l'abbinamento che segue usa quella posizione senza richiederla."""
+        from getvingo.models import Evento
+        self.c.post("/t/ABCD2345", data={"lat": "45.5", "lon": "12.5"})
+        r = self.c.post("/abbina/ABCD2345", data={
+            "vin": VIN, "marca": "VW", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "sede_id": self._id(Sede, nome="Sede A")})
+        self.assertEqual(r.status_code, 302)
+        with self.app.app_context():
+            e = Evento.query.filter_by(tipo="abbinamento").one()
+            self.assertEqual((e.lat, e.lon), (45.5, 12.5))
+        # un nuovo tocco senza posizione non usa quella vecchia: si ferma a chiedere il GPS
+        r = self.c.post("/t/ABCD2345", data={})
+        self.assertEqual(r.status_code, 200)
+        # le pagine del portale non chiedono più la posizione
+        self.assertNotIn("blocco-gps", self.c.get("/").get_data(as_text=True))
+
+    def test_posizione_del_tocco_scade(self):
+        from getvingo import routes
+        self.c.post("/t/ABCD2345", data=POS)
+        with self.c.session_transaction() as s:
+            s["posizione_tocco"]["at"] -= routes.VALIDITA_TOCCO_S + 1
+        self.c.post("/abbina/ABCD2345", data={
+            "vin": VIN, "marca": "VW", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "sede_id": self._id(Sede, nome="Sede A")})
+        from getvingo.models import Evento
+        with self.app.app_context():
+            self.assertIsNone(Evento.query.filter_by(tipo="abbinamento").one().lat)
+
     def test_vin_non_valido_rifiutato(self):
         self.assertEqual(self.c.post("/abbina/ABCD2345", data={"vin": "CORTO", "sede_id": 1}).status_code, 200)
         with self.app.app_context():
