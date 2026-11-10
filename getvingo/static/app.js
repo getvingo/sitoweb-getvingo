@@ -162,6 +162,30 @@
     });
   });
 
+  // Scarica PDF dall'app installata sul telefono (schermo intero, senza barra del browser): aprire il file
+  // porterebbe in un visore senza via d'uscita. Lì si scarica in memoria e si apre la scheda di sistema
+  // (Salva su File / Condividi); nel browser normale resta il download classico.
+  var installata = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  document.querySelectorAll('[data-scarica-pdf]').forEach(function (a) {
+    if (!installata || !(navigator.canShare && window.File)) return;
+    var file = null;
+    fetch(a.href, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.blob() : null; }).then(function (blob) {
+      var f = blob && new File([blob], a.dataset.nome, { type: 'application/pdf' });
+      if (f && navigator.canShare({ files: [f] })) file = f;
+    }).catch(function () {});
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (file) { navigator.share({ files: [file] }).catch(function () {}); return; }
+      var prima = a.innerHTML; a.textContent = 'Preparo il PDF…';
+      setTimeout(function () { a.innerHTML = prima; }, 1500);
+    });
+  });
+  // Esc chiude le pagine-riquadro (anteprima del DDT) come i pannelli
+  var chiudiEsc = document.querySelector('[data-chiudi-esc]');
+  if (chiudiEsc) document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName)) chiudiEsc.click();
+  });
+
   // "In viaggio da …": parte dai secondi calcolati dal server e avanza da solo
   var contatori = document.querySelectorAll('[data-in-viaggio]');
   if (contatori.length) {

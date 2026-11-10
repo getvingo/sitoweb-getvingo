@@ -89,6 +89,10 @@ def create_app(config=None):
                 migrazioni.aggiungi_colonne()
             except OperationalError:
                 pass
+            try:
+                migrazioni.aggiorna_ruoli()
+            except OperationalError:
+                pass
 
 
     from . import admin, archivio, auth, filtri, piattaforma, routes
@@ -175,6 +179,6 @@ def create_app(config=None):
         from . import demo
         demo.carica()
         click.echo("Demo pronta. Accessi (password: demo): admin@demo.it, ufficio@demo.it, "
-                   "autista@demo.it, venditore@demo.it, carrozzeria@demo.it, officina@demo.it")
+                   "autista@demo.it, venditore@demo.it, preparatore@demo.it, responsabile@demo.it, carrozzeria@demo.it, officina@demo.it")
 
     return app

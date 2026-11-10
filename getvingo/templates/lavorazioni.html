@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block classe_pagina %}pagina-lavorazioni{% endblock %}
-{% from "_macro.html" import i, filtro_tipologia, annulla, targa, marchio, badge_condizione %}
+{% from "_macro.html" import i, filtro_tipologia, annulla, targa, marchio, badge_condizione, filtri_stato, interruttore_modo, calendario_mese %}
 {% from "_auto.html" import avanzamento_lavoro, sollecito_lavoro, cambia_stima, rientro_lavoro %}
 {% block titolo %}Lavorazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
@@ -8,24 +8,33 @@
 <div class="titolo-pagina"><div><h1>Lavorazioni</h1>
   <p class="descrizione-pagina">Auto presso carrozzerie e officine: a che punto sono rispetto al tempo stimato, quali sono in ritardo e quali si possono ritirare.</p></div></div>
 
-{# I 3 stati sono filtri: toccandone uno si vede solo quel gruppo, toccandolo di nuovo si torna a tutte.
-   Il totale non serve: è già nel filtro dei tipi ("Tutte") #}
-{% set st = stato or none %}{% set tp = tipo or none %}{% set tl = tipologia or none %}
-<nav class="riepilogo-pagina tre" aria-label="Filtra per stato">
-  {% for k, etichetta in [('corso', 'in tempo'), ('ritardo', 'in ritardo'), ('finita', 'da ritirare')] %}
-  <a class="tile-numero {{ k }} {{ 'attivo' if stato == k }}" href="{{ url_for('main.lavorazioni', stato=none if stato == k else k, lavorazione=tp, tipologia=tl) }}"
-     {{ 'aria-current=true' if stato == k }}><b>{{ riepilogo[k] }}</b><span>{{ etichetta }}</span></a>
-  {% endfor %}
-</nav>
+{# Filtri di stato: toccandone uno si vede solo quel gruppo, toccandolo di nuovo si torna a tutte #}
+{% set st = stato or none %}{% set tp = tipo or none %}{% set tl = tipologia or none %}{% set md = modo if modo == 'calendario' else none %}
+{{ filtri_stato([
+  ('corso', riepilogo.corso, 'Nei tempi', 'orologio', url_for('main.lavorazioni', stato=none if stato == 'corso' else 'corso', lavorazione=tp, tipologia=tl, modo=md), True),
+  ('ritardo', riepilogo.ritardo, 'In ritardo', 'attenzione', url_for('main.lavorazioni', stato=none if stato == 'ritardo' else 'ritardo', lavorazione=tp, tipologia=tl, modo=md), True),
+  ('finita', riepilogo.finita, 'Da ritirare', 'ritiro', url_for('main.lavorazioni', stato=none if stato == 'finita' else 'finita', lavorazione=tp, tipologia=tl, modo=md), True),
+], stato) }}
 
-{{ filtro_tipologia(tipologia, 'main.lavorazioni', lavorazione=tp, stato=st) }}
+{{ filtro_tipologia(tipologia, 'main.lavorazioni', lavorazione=tp, stato=st, modo=md) }}
 {% if tipi %}
 <nav class="interruttore filtro-gruppo in-riga" aria-label="Tipo di lavorazione">
-  <a href="{{ url_for('main.lavorazioni', tipologia=tl, stato=st) }}" class="{{ 'attivo' if not tipo }}"><span class="nome">Tutte</span> <span class="n">{{ totale }}</span></a>
-  {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=l, tipologia=tl, stato=st) }}" class="{{ 'attivo' if tipo == l }}" title="{{ l }}"><span class="nome">{{ l }}</span> <span class="n">{{ n }}</span></a>{% endfor %}
+  <a href="{{ url_for('main.lavorazioni', tipologia=tl, stato=st, modo=md) }}" class="{{ 'attivo' if not tipo }}"><span class="nome">Tutte</span> <span class="n">{{ totale }}</span></a>
+  {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=l, tipologia=tl, stato=st, modo=md) }}" class="{{ 'attivo' if tipo == l }}" title="{{ l }}"><span class="nome">{{ l }}</span> <span class="n">{{ n }}</span></a>{% endfor %}
 </nav>
 {% endif %}
 
+{# Elenco per fornitore oppure Calendario: il giorno in cui ogni lavorazione deve essere finita #}
+{{ interruttore_modo(modo, url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl),
+                     url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario'),
+                     totale_visibili ~ (' auto dai fornitori' if totale_visibili != 1 else ' auto dal fornitore'),
+                     url_for('main.lavorazioni', modo=md) if (stato or tipo or tipologia) else none) }}
+{% if modo == 'calendario' %}
+<p class="legenda-calendario"><span class="ev fine_prevista">Da finire</span> <span class="ev ritardo">In ritardo</span> <span class="ev lavoro_finita">Finita</span></p>
+{{ calendario_mese(calendario, url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario', mese=calendario.prec),
+                   url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario', mese=calendario.succ), tipi_evento) }}
+<p class="tenue piccolo" style="margin-top:8px">Per spostare una fine prevista: nell'elenco, “Cambia la fine prevista” sulla carta dell'auto.</p>
+{% else %}
 {% for sede, voci in fornitori %}
 <section class="gruppo fornitore">
   <div class="fornitore-testa">
@@ -59,4 +68,5 @@
 {% else %}
 <div class="vuoto">{{ i('chiave') }}{% if stato %}Nessuna auto {{ {'corso': 'in tempo', 'ritardo': 'in ritardo', 'finita': 'da ritirare'}[stato] }}.<br><a class="piccolo" href="{{ url_for('main.lavorazioni', tipologia=tl) }}">Vedi tutte</a>{% else %}Nessuna auto presso fornitori.{% endif %}</div>
 {% endfor %}
+{% endif %}
 {% endblock %}

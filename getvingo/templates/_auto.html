@@ -196,11 +196,14 @@
 
 {# Cambia la stima dei giorni (concessionaria o fornitore) #}
 {% macro cambia_stima(m, torna) %}
+{# la fine prevista si fissa con una data (come il calendario della preparazione); il server la converte in giorni #}
 <details class="cambia-stima">
-  <summary>{{ i('matita', 's') }} Cambia la stima ({{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }})</summary>
+  <summary>{{ i('orologio', 's') }} Cambia la fine prevista <span class="tenue">({{ m.lavorazione_prevista_at|data('%d/%m') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }})</span></summary>
   <form method="post" action="{{ url_for('main.stima_lavorazione', mov_id=m.id) }}" class="azioni" style="align-items:flex-end" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="torna" value="{{ torna }}">
-    <label class="campo" style="margin:0;max-width:200px"><span>Giorni di lavorazione</span><input type="number" name="giorni" min="1" max="120" value="{{ m.stima_giorni }}" required></label>
+    <label class="campo" style="margin:0;max-width:220px"><span>Deve essere finita il</span>
+      <input type="date" name="fine" required value="{{ m.lavorazione_prevista_at|data('%Y-%m-%d') }}"
+             min="{{ (m.arrivo_at + timedelta(days=1))|data('%Y-%m-%d') if m.arrivo_at }}"></label>
     <button class="btn piccolo">Salva</button>
   </form>
 </details>

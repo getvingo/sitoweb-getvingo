@@ -49,8 +49,8 @@ class Base(unittest.TestCase):
                 Vettore(nome="Vettore X"),
             ])
             db.session.flush()
-            for nome, ruolo, sede in [("admin", "admin", None), ("ufficio", "ufficio", None),
-                                      ("autista", "autista", None), ("carr", "fornitore", carr)]:
+            for nome, ruolo, sede in [("admin", "admin", None), ("ufficio", "backoffice", None),
+                                      ("autista", "consegne", None), ("carr", "fornitore", carr)]:
                 u = Utente(nome=nome.capitalize(), email=f"{nome}@t.it", ruolo=ruolo, sede=sede)
                 u.imposta_password("pw")
                 db.session.add(u)
@@ -446,11 +446,6 @@ class TestSpostamentoColTocco(Base):
 class TestPredisposto(Base):
     def test_ufficio_predispone_autista_prende_in_carico(self):
         vid = self.abbina()
-        self.entra("autista")
-        self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="")
-        with self.app.app_context():
-            self.assertEqual(Ddt.query.count(), 0)  # l'autista non può predisporre
-
         self.entra("ufficio")
         self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
         d = self.ddt()
@@ -1005,10 +1000,11 @@ class TestDdtGestione(Base):
             self.assertEqual((documento.revisione, len(documento.revisioni)), (1, 1))
             self.assertEqual(documento.movimento.conducente, "Anna Verdi")
         self.arrivo(d)
+        # dal 10/11/2026 ogni mansione interna può correggere un DDT anche dopo l'arrivo; il fornitore no
         self.entra("autista")
-        self.assertEqual(self.c.post(f"/ddt/{d}/modifica", data=dati).status_code, 403)
-        self.entra("ufficio")
         self.assertEqual(self.c.get(f"/ddt/{d}/modifica").status_code, 200)
+        self.entra("carr")
+        self.assertEqual(self.c.post(f"/ddt/{d}/modifica", data=dati).status_code, 403)
 
     def test_eliminazione_solo_admin_senza_motivo_e_senza_traccia(self):
         vid = self.abbina()
@@ -1722,7 +1718,7 @@ class TestRegole0311Sera(Base):
         self.assertIn("VW Golf", self.c.get("/lavorazioni?stato=corso").get_data(as_text=True))
         vuota = self.c.get("/lavorazioni?stato=ritardo").get_data(as_text=True)
         self.assertIn("Nessuna auto in ritardo", vuota)
-        self.assertIn('class="tile-numero ritardo attivo"', vuota)
+        self.assertIn('class="stato-voce ritardo attivo', vuota)
         self.assertNotIn("dai fornitori</span>", vuota)  # il totale non c'è più: solo i 3 stati
         self.assertIn('class="interruttore filtro-gruppo in-riga"', vuota)  # tipi di lavorazione su una riga
         self.assertNotIn("<span>in preparazione</span>", self.c.get("/preparazione").get_data(as_text=True))
@@ -1928,7 +1924,7 @@ class TestPagineDemoPulite(unittest.TestCase):
         with app.app_context():
             demo.carica()
         auth._falliti.clear()
-        for ruolo in ("admin", "ufficio", "autista", "venditore", "carrozzeria", "officina"):
+        for ruolo in ("admin", "ufficio", "autista", "venditore", "preparatore", "responsabile", "carrozzeria", "officina"):
             c = app.test_client()
             c.post("/login", data={"email": f"{ruolo}@demo.it", "password": "demo"})
             home = c.get("/").get_data(as_text=True)
@@ -2011,19 +2007,19 @@ class TestAccessi(Base):
         self.assertEqual(self.posta, [])
         # l'admin crea un utente: niente email, ma il link da copiare
         r = self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo Autista",
-                                                              "email": "nuovo@t.it", "ruolo": "autista"})
+                                                              "email": "nuovo@t.it", "ruolo": "consegne"})
         testo = r.get_data(as_text=True)
         self.assertIn("non è ancora attivo", testo)
         self.assertIn("https://getvingo.com/imposta-password/", testo)
 
     def test_invito_utente_nuovo(self):
         r = self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Luca Bianchi",
-                                                              "email": "Luca@t.it", "ruolo": "ufficio"})
+                                                              "email": "Luca@t.it", "ruolo": "backoffice"})
         self.assertIn("Email mandata", r.get_data(as_text=True))
         with self.app.app_context():
             u = Utente.query.filter_by(email="luca@t.it").one()
             self.assertTrue(u.invito_in_attesa)
-            self.assertEqual(u.ruolo, "ufficio")
+            self.assertEqual(u.ruolo, "backoffice")
         self.assertIn("Invito in attesa", self.c.get("/admin/aziende/concessionaria").get_data(as_text=True))
         link = self._link("luca@t.it")
         self.c.post("/logout")
@@ -2148,7 +2144,7 @@ class TestUtenzaMaster(Base):
         self.assertEqual(self.c.get(f"/veicolo/{self.v2}").status_code, 200)
         # modifica: aggiunge un utente al cliente (resta del cliente)
         self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo Altra",
-                                                          "email": "nuovo@altra.it", "ruolo": "ufficio"})
+                                                          "email": "nuovo@altra.it", "ruolo": "backoffice"})
         with self.app.app_context():
             u = Utente.query.execution_options(tutte_le_organizzazioni=True).filter_by(email="nuovo@altra.it").one()
             self.assertEqual(u.org_id, self.org2)
@@ -2441,7 +2437,7 @@ class TestConfigurazioneConcessionaria(Base):
             u = Utente.query.filter_by(email="giulia@t.it").one()
             self.assertEqual(u.ruolo, "venditore")
             self.assertTrue(u.interno)
-            self.assertFalse(u.gestione)
+            self.assertTrue(u.gestione)  # dal 10/11/2026 ogni mansione interna fa tutto (tranne Gestione)
         vid = self.abbina()
         self.c.post("/logout")
         self.c.post("/login", data={"email": "giulia@t.it", "password": "vendite12"})
@@ -2624,7 +2620,7 @@ class TestNovitaAdmin(Base):
 
     def test_elimina_utente(self):
         self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Da Togliere",
-                                                          "email": "togli@t.it", "ruolo": "autista", "password": "password1"})
+                                                          "email": "togli@t.it", "ruolo": "consegne", "password": "password1"})
         uid = self._id(Utente, email="togli@t.it")
         self.c.post(f"/admin/utenti/{uid}", data={"azione": "elimina"})
         with self.app.app_context():
@@ -2642,7 +2638,7 @@ class TestNovitaAdmin(Base):
             self.assertNotEqual(u.email, "autista@t.it")
         self.assertNotIn("autista@t.it", self.c.get("/admin/aziende/concessionaria").get_data(as_text=True))
         self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Nuovo", "email": "autista@t.it",
-                                                          "ruolo": "autista", "password": "password1"})
+                                                          "ruolo": "consegne", "password": "password1"})
         with self.app.app_context():
             self.assertEqual(Utente.query.filter_by(email="autista@t.it").count(), 1)
         # non si elimina sé stessi
@@ -2734,8 +2730,77 @@ class TestNovitaAdmin(Base):
                 db.session.add(Preparazione(veicolo=v, pronta_entro_at=entro))
             db.session.commit()
         t = self.c.get("/preparazione").get_data(as_text=True)
-        self.assertIn("<b>1</b><span>in tempo</span>", t)
-        self.assertIn("<b>1</b><span>in ritardo</span>", t)
+        self.assertRegex(t, r'(?s)stato-voce tempo[^>]*>\s*<span class="stato-riga">.*?<b>1</b>.*?Nei tempi')
+        self.assertRegex(t, r'(?s)stato-voce ritardo[^>]*>\s*<span class="stato-riga">.*?<b>1</b>.*?In ritardo')
         tempo = self.c.get("/preparazione?vista=corso&stato=tempo").get_data(as_text=True)
         self.assertIn("Prova0", tempo)
         self.assertNotIn("Prova1", tempo)
+
+
+class TestNovita1011(TestLavorazioniStimaESolleciti):
+    """10/11/2026: mansioni della concessionaria, calendario delle lavorazioni, filtri di stato, ✕ sull'anteprima."""
+    def test_mansioni_e_conversione_dei_ruoli_vecchi(self):
+        from getvingo import migrazioni
+        self.assertEqual(set(Utente.RUOLI_INTERNI),
+                         {"backoffice", "venditore", "consegne", "preparatore", "resp_commerciale", "admin"})
+        self.assertTrue(all(len(k) <= 20 for k in Utente.RUOLI))  # la colonna ruolo è di 20 caratteri
+        with self.app.app_context():
+            u = Utente.query.filter_by(email="autista@t.it").one()
+            u.ruolo = "autista"  # come prima del 10/11/2026
+            db.session.commit()
+            self.assertEqual(migrazioni.aggiorna_ruoli(), 1)
+            db.session.expire_all()
+            u = Utente.query.filter_by(email="autista@t.it").one()
+            self.assertEqual(u.ruolo, "consegne")
+            self.assertTrue(u.interno and u.gestione)
+        scheda = self.c.get("/admin/aziende/concessionaria").get_data(as_text=True)
+        for nome in ("Backoffice", "Venditore", "Consegne", "Preparatore", "Responsabile commerciale"):
+            self.assertIn(nome, scheda)
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Elena", "email": "elena@t.it",
+                                                          "ruolo": "resp_commerciale", "password": "password1"})
+        with self.app.app_context():
+            self.assertEqual(Utente.query.filter_by(email="elena@t.it").one().ruolo, "resp_commerciale")
+        # tutte le mansioni vedono tutto, Gestione resta all'amministratore
+        self.c.post("/logout")
+        self.c.post("/login", data={"email": "elena@t.it", "password": "password1"})
+        for pagina in ("/", "/stock", "/lavorazioni", "/preparazione", "/ddt", "/danni"):
+            self.assertEqual(self.c.get(pagina).status_code, 200, pagina)
+        self.assertEqual(self.c.get("/admin/").status_code, 403)
+
+    def test_calendario_lavorazioni_e_fine_con_data(self):
+        vid, mid = self.in_carrozzeria(2)
+        with self.app.app_context():
+            arrivo = db.session.get(Movimento, mid).arrivo_at
+        fine = (arrivo + timedelta(days=7)).strftime("%Y-%m-%d")
+        self.c.post(f"/movimento/{mid}/stima", data={"fine": fine})
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Movimento, mid).stima_giorni, 7)
+        self.c.post(f"/movimento/{mid}/stima", data={"fine": arrivo.strftime("%Y-%m-%d")})  # non prima dell'arrivo
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Movimento, mid).stima_giorni, 7)
+        mese = (arrivo + timedelta(days=7)).strftime("%Y-%m")
+        cal = self.c.get(f"/lavorazioni?modo=calendario&mese={mese}").get_data(as_text=True)
+        self.assertIn("cal-auto ev fine_prevista", cal)
+        self.assertIn("Lavorazione da finire", cal)
+        self.assertNotIn("barra-lavoro", cal)  # in calendario niente carte
+        elenco = self.c.get("/lavorazioni").get_data(as_text=True)
+        self.assertIn("Cambia la fine prevista", elenco)
+        self.assertIn('class="stato-filtri"', elenco)
+        self.assertIn("Nei tempi", elenco)
+        # niente collegamento in Panoramica
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertNotIn("/lavorazioni?modo=calendario", home)
+        self.assertNotIn("/lavorazioni?stato", home)
+
+    def test_preparazione_senza_scheda_in_preparazione_e_anteprima_con_chiudi(self):
+        prep = self.c.get("/preparazione").get_data(as_text=True)
+        self.assertNotIn('class="filtri una-riga"', prep)  # le schede doppie dei filtri non ci sono più
+        for testo in ("Nei tempi", "In ritardo", "Pronte", "Consegnate"):
+            self.assertIn(testo, prep)
+        pronte = self.c.get("/preparazione?vista=pronte").get_data(as_text=True)
+        self.assertIn('aria-current="true"', pronte)  # il filtro attivo si toglie toccandolo di nuovo
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        anteprima = self.c.get(f"/ddt/{self.ddt()}/anteprima").get_data(as_text=True)
+        self.assertIn('aria-label="Chiudi l\'anteprima"', anteprima)
+        self.assertIn("data-scarica-pdf", anteprima)

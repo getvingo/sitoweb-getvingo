@@ -68,9 +68,11 @@ def carica():
     utenti = {}
     for chiave, nome, email, ruolo, sede in [
             ("admin", "Admin Demo", "admin@demo.it", "admin", None),
-            ("ufficio", "Laura Ufficio", "ufficio@demo.it", "ufficio", None),
-            ("autista", "Mario Autista", "autista@demo.it", "autista", None),
+            ("ufficio", "Laura Backoffice", "ufficio@demo.it", "backoffice", None),
+            ("autista", "Mario Consegne", "autista@demo.it", "consegne", None),
             ("venditore", "Giulia Venditrice", "venditore@demo.it", "venditore", None),
+            ("preparatore", "Luca Preparatore", "preparatore@demo.it", "preparatore", None),
+            ("responsabile", "Elena Responsabile", "responsabile@demo.it", "resp_commerciale", None),
             ("carrozzeria", "Paolo Rossi", "carrozzeria@demo.it", "fornitore", carrozzeria),
             ("carrozzeria2", "Sara Rossi", "carrozzeria2@demo.it", "fornitore", carrozzeria),
             ("officina", "Anna Bianchi", "officina@demo.it", "fornitore", officina)]:
@@ -106,7 +108,7 @@ def carica():
         db.session.flush()
         return v
 
-    def viaggio(v, dest, causale, lavorazione, note, quando, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Autista"):
+    def viaggio(v, dest, causale, lavorazione, note, quando, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Consegne"):
         dati = dict(a_sede_id=dest.id, causale=causale, vettore_id=vettore.id, conducente=conducente,
                     lavorazione=lavorazione, lavorazione_note=note, mezzo=mezzo)
         return servizi.crea_movimento(v, dati, utenti["autista"], firma_conducente=firma_autista,
@@ -116,7 +118,7 @@ def carica():
         servizi.registra_arrivo(m, chi, m.a_sede.lat, m.a_sede.lon)  # sul posto, dentro l'area
         m.arrivo_at = quando
 
-    def in_lavorazione(v, fornitore, chi, lavorazione, note, giorni, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Autista"):
+    def in_lavorazione(v, fornitore, chi, lavorazione, note, giorni, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Consegne"):
         m = viaggio(v, fornitore, "Invio lavorazione",
                     lavorazione, note, _indietro(days=giorni, hours=2), mezzo, vettore, conducente)
         arriva(m, chi, _indietro(days=giorni))
@@ -127,7 +129,7 @@ def carica():
         m = in_lavorazione(v, fornitore, chi, "Carrozzeria", "Ritocchi carrozzeria", giorni_fa)
         rientro = servizi.completa_lavorazione(m, chi).movimento
         m.lavorazione_completata_at = _indietro(days=giorni_fa - giorni_lav)
-        servizi.prendi_in_carico(rientro, utenti["autista"], "Mario Autista", firma_autista, mezzo=mezzo)
+        servizi.prendi_in_carico(rientro, utenti["autista"], "Mario Consegne", firma_autista, mezzo=mezzo)
         rientro.partenza_at = m.lavorazione_completata_at + timedelta(hours=ore_attesa)
         rientro.ddt.emesso_at = m.lavorazione_completata_at
         arriva(rientro, utenti["autista"], rientro.partenza_at + timedelta(minutes=35))

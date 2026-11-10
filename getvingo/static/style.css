@@ -1830,3 +1830,58 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 .password-generata { font-size: 1.4rem !important; letter-spacing: .08em; text-align: center; }
 .riepilogo-pagina.quattro { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 420px) { .riepilogo-pagina.quattro .tile-numero { padding: 10px 8px; } .riepilogo-pagina.quattro .tile-numero span { font-size: .75rem; } }
+
+/* Filtri di stato (10/11/2026) — Lavorazioni e Preparazione. Un quadro segmentato al posto dei riquadri
+   separati: barra delle proporzioni in alto (quanto lavoro è nei tempi / in ritardo / pronto), poi una voce
+   per stato con icona, numero e nome. La voce attiva si colora del suo stato e mostra la ✕ per toglierla. */
+.stato-filtri { --c: var(--bordo-forte); position: relative; margin: 4px 0 16px; background: var(--carta);
+  border: 1px solid var(--bordo); border-radius: var(--r); overflow: hidden; box-shadow: var(--ombra); }
+.stato-filtri .corso, .stato-filtri .tempo { --c: var(--in-tempo); --c-tenue: var(--in-tempo-tenue); --c-testo: var(--in-tempo-testo); }
+.stato-filtri .ritardo { --c: var(--in-ritardo); --c-tenue: var(--in-ritardo-tenue); --c-testo: var(--in-ritardo-testo); }
+.stato-filtri .finita, .stato-filtri .pronte { --c: var(--pronta-verde); --c-tenue: var(--ok-tenue); --c-testo: var(--ok); }
+.stato-filtri .consegnate { --c: var(--consegnata-verde); --c-tenue: var(--spento-tenue); --c-testo: var(--consegnata-verde); }
+.stato-quota { display: flex; height: 5px; gap: 2px; background: var(--bordo); }
+.stato-quota span { background: var(--c); min-width: 6px; }
+.stato-voci { display: grid; grid-template-columns: repeat(var(--voci), minmax(0, 1fr)); }
+.stato-voce { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 64px; padding: 10px 12px;
+  color: var(--testo); text-decoration: none; border-left: 1px solid var(--bordo); transition: background .15s ease; }
+.stato-voce:first-child { border-left: 0; }
+.stato-voce:hover { text-decoration: none; background: var(--superficie); }
+.stato-voce:focus-visible { outline: 3px solid var(--segnale); outline-offset: -3px; }
+.stato-riga { display: flex; align-items: center; gap: 8px; }
+.stato-icona { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; flex: none;
+  background: var(--c-tenue, var(--superficie)); color: var(--c-testo, var(--testo-2)); }
+.stato-icona svg { width: 15px; height: 15px; }
+.stato-voce b { font-size: 1.55rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--c-testo, var(--testo)); }
+.stato-nome { font-size: .85rem; font-weight: 600; color: var(--testo-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stato-voce.zero b, .stato-voce.zero .stato-nome { color: var(--testo-2); opacity: .7; }
+.stato-voce.zero .stato-icona { background: var(--superficie); color: var(--testo-2); }
+.stato-voce.attivo { background: var(--c-tenue); box-shadow: inset 0 -3px 0 var(--c); }
+.stato-voce.attivo .stato-nome { color: var(--c-testo); }
+.stato-voce.attivo .stato-icona { background: var(--c); color: var(--carta); }
+.stato-togli { margin-left: auto; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: .72rem; font-weight: 700; background: var(--carta); color: var(--c-testo); }
+.stato-voce:active { background: var(--c-tenue, var(--superficie)); }
+@media (max-width: 560px) {
+  .stato-voce { padding: 9px 8px; min-height: 60px; }
+  .stato-riga { gap: 6px; }
+  .stato-icona { width: 22px; height: 22px; }
+  .stato-icona svg { width: 13px; height: 13px; }
+  .stato-voce b { font-size: 1.3rem; }
+  .stato-nome { font-size: .75rem; }
+  .stato-togli { width: 18px; height: 18px; font-size: .65rem; }
+}
+@media (max-width: 380px) { .stato-filtri[style*="--voci:4"] .stato-icona { display: none; } }
+@media (prefers-reduced-motion: reduce) { .stato-voce { transition: none; } }
+
+/* Calendario delle lavorazioni esterne: da finire (azzurro), in ritardo (rosso aranciato), finite (verde) */
+.pagina-lavorazioni .cal-auto.ev.fine_prevista, .pagina-lavorazioni .legenda-calendario .ev.fine_prevista { background: var(--in-tempo-tenue); color: var(--in-tempo-testo); }
+.pagina-lavorazioni .cal-auto.ev.ritardo, .pagina-lavorazioni .legenda-calendario .ev.ritardo { background: var(--in-ritardo-tenue); color: var(--in-ritardo-testo); }
+.pagina-lavorazioni .cal-auto.ev.lavoro_finita, .pagina-lavorazioni .legenda-calendario .ev.lavoro_finita { background: var(--ok-tenue); color: var(--ok); }
+
+/* Anteprima del DDT: barra fissa con ✕ Chiudi (sul telefono, app installata, non c'è il tasto indietro del browser) */
+.anteprima-barra .anteprima-chiudi { flex: 0 0 auto; width: 48px; padding: 0; justify-content: center; font-size: 1.15rem; }
+.anteprima-titolo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 4px; }
+.anteprima-titolo h1 { margin: 0; font-size: 1.3rem; }
+.anteprima-barra .btn { white-space: nowrap; padding-inline: 12px; }
+.anteprima-barra { background: var(--superficie); padding: 6px 0; margin-top: 0; }

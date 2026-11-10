@@ -296,7 +296,7 @@ def utenti():
 # Ogni azienda ha i suoi dati e una sola firma, condivisi da tutti i suoi utenti:
 # la concessionaria (admin, ufficio, autisti) e ogni fornitore esterno.
 
-RUOLI_INTERNI = {k: v for k, v in Utente.RUOLI.items() if k != "fornitore"}
+RUOLI_INTERNI = {k: Utente.RUOLI[k] for k in Utente.RUOLI_INTERNI}
 
 
 def _crea_utente(ruolo, sede_id=None):
@@ -360,7 +360,7 @@ def gruppo_concessionaria():
     a = Azienda.query.first() or Azienda(ragione_sociale="")
     if request.method == "POST":
         if request.form.get("azione") == "utente":
-            ruolo = request.form.get("ruolo") if request.form.get("ruolo") in RUOLI_INTERNI else "autista"
+            ruolo = request.form.get("ruolo") if request.form.get("ruolo") in RUOLI_INTERNI else "backoffice"
             esito = _crea_utente(ruolo)
             if esito is not None:
                 return esito

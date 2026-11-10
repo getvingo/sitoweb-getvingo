@@ -120,7 +120,7 @@ def compila_ddt(testo, veicolo, utente):
     except ValueError:
         raise ErroreIA("Non ho capito la risposta dell'assistente: riprova.")
     # se il nome non è stato detto, si propone chi sta usando il telefono
-    if not dati.get("conducente") and utente.ruolo in ("autista", "venditore", "fornitore"):
+    if not dati.get("conducente") and utente.ruolo != "admin":
         dati["conducente"] = utente.nome
     if not dati.get("vettore_id"):
         dati["vettore_id"] = servizi.ultimo_vettore_id(utente) or (vettori[0].id if vettori else 0)

@@ -122,6 +122,7 @@ def init_app(app):
         return int((adesso() - momento).total_seconds()) if momento else 0
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
+    app.jinja_env.globals["timedelta"] = timedelta
     from .servizi import destinatario_conferma_ovunque, stima_viaggio
     app.jinja_env.globals["stima_viaggio"] = stima_viaggio
     app.jinja_env.globals["destinatario_conferma_ovunque"] = destinatario_conferma_ovunque

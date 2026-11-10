@@ -1005,6 +1005,20 @@ def puo_gestire_lavorazione(mov, utente):
     return utente.interno or (utente.sede_id is not None and utente.sede_id == mov.sede_arrivo_effettiva.id)
 
 
+def giorni_fino_a(mov, testo_data):
+    """Fine prevista scelta come data (AAAA-MM-GG) → giorni di lavorazione dall'arrivo dal fornitore."""
+    try:
+        fine = datetime.strptime(testo_data, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise Vietato("Data di fine non valida.")
+    if not mov.arrivo_at:
+        raise Vietato("L'auto non è ancora arrivata dal fornitore.")
+    giorni = (fine - mov.arrivo_at.date()).days
+    if giorni < 1:
+        raise Vietato(f"La fine deve essere dopo l'arrivo dal fornitore ({mov.arrivo_at:%d/%m}).")
+    return giorni
+
+
 def imposta_stima(mov, utente, giorni):
     if not puo_gestire_lavorazione(mov, utente):
         raise Vietato("La stima la indica la concessionaria o il fornitore che ha l'auto.")

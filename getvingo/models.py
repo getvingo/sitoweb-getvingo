@@ -105,14 +105,19 @@ class Azienda(PerOrganizzazione, ConIndirizzo, db.Model):
 
 
 class Utente(PerOrganizzazione, db.Model):
-    RUOLI = {"autista": "Autista", "venditore": "Venditore", "ufficio": "Ufficio", "admin": "Amministratore",
-             "fornitore": "Fornitore esterno"}
+    # Mansioni della concessionaria (10/11/2026): per ora tutte vedono e fanno tutto; l'amministratore
+    # in più ha Gestione e le correzioni. "resp_commerciale" corto: la colonna è di 20 caratteri.
+    RUOLI = {"backoffice": "Backoffice", "venditore": "Venditore", "consegne": "Consegne", "preparatore": "Preparatore",
+             "resp_commerciale": "Responsabile commerciale", "admin": "Amministratore", "fornitore": "Fornitore esterno"}
+    RUOLI_INTERNI = ("backoffice", "venditore", "consegne", "preparatore", "resp_commerciale", "admin")
+    # ruoli di prima del 10/11/2026, convertiti all'avvio (migrazioni.aggiorna_ruoli)
+    RUOLI_VECCHI = {"ufficio": "backoffice", "autista": "consegne"}
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(200), unique=True, nullable=False)
     password_hash = db.Column(db.String(300), nullable=False)
-    ruolo = db.Column(db.String(20), nullable=False, default="autista")
+    ruolo = db.Column(db.String(20), nullable=False, default="backoffice")
     # Solo per i fornitori: la sede (carrozzeria, officina…) per cui operano
     sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     attivo = db.Column(db.Boolean, default=True)
@@ -135,11 +140,12 @@ class Utente(PerOrganizzazione, db.Model):
 
     @property
     def interno(self):
-        return self.ruolo in ("autista", "venditore", "ufficio", "admin")
+        return self.ruolo in self.RUOLI_INTERNI
 
     @property
     def gestione(self):
-        return self.ruolo in ("ufficio", "admin")
+        # per ora ogni mansione interna può fare tutto (DDT da ritirare, modifiche dopo l'arrivo)
+        return self.interno
 
     def imposta_password(self, password):
         # pbkdf2: lo scrypt di default non c'è nel Python di sistema macOS (LibreSSL)

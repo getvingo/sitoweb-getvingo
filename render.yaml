@@ -31,6 +31,10 @@ services:
         sync: false
       - key: GETVINGO_ADMIN_PASSWORD
         sync: false
+      # assistente IA (Claude): chiave API da console.anthropic.com → API Keys.
+      # Su un servizio già creato si aggiunge a mano: Render → getvingo → Environment → Add variable
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
 databases:
   - name: getvingo-db

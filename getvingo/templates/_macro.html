@@ -201,10 +201,30 @@
     {% if d.giorno %}<span class="cal-numero" data-mese="{{ c.titolo }}">{{ d.giorno }}</span>
     {% for e in d.eventi %}<a class="cal-auto ev {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ url_for('main.veicolo', veicolo_id=e.v.id) }}"
        title="{{ tipi[e.tipo] }} · {{ e.v.descrizione }} · {{ e.v.vin }}{{ ' · ' ~ e.nota if e.nota }}">
-      <b>{{ e.at|data('%H:%M') }}</b> {{ e.v.modello or e.v.descrizione }} <span class="vin">…{{ e.v.vin[-8:] }}</span></a>{% endfor %}{% endif %}
+      {% if not e.giornata %}<b>{{ e.at|data('%H:%M') }}</b> {% endif %}{{ e.v.modello or e.v.descrizione }} <span class="vin">…{{ e.v.vin[-8:] }}</span></a>{% endfor %}{% endif %}
   </div>
   {% endfor %}{% endfor %}
 </div>
+{% endmacro %}
+
+{# Filtri di stato in testa a Lavorazioni e Preparazione (10/11/2026): un unico quadro segmentato.
+   La sottile barra in alto mostra le proporzioni del lavoro aperto; ogni voce è un filtro (icona + numero +
+   stato a parole). Toccando di nuovo quella attiva si torna a tutte (la ✕ lo ricorda).
+   voci: (chiave, numero, testo, icona, url, nella_barra) #}
+{% macro filtri_stato(voci, attivo, etichetta='Filtra per stato') %}
+{% set ns = namespace(tot=0) %}{% for v in voci if v[5] %}{% set ns.tot = ns.tot + v[1] %}{% endfor %}
+<nav class="stato-filtri" aria-label="{{ etichetta }}" style="--voci:{{ voci|length }}">
+  {% if ns.tot %}<div class="stato-quota" aria-hidden="true">{% for v in voci if v[5] and v[1] %}<span class="{{ v[0] }}" style="flex-grow:{{ v[1] }}"></span>{% endfor %}</div>{% endif %}
+  <div class="stato-voci">
+  {% for k, n, testo, icona, url, _ in voci %}
+    <a href="{{ url }}" class="stato-voce {{ k }} {{ 'attivo' if k == attivo }} {{ 'zero' if not n }}"
+       {% if k == attivo %}aria-current="true" title="Filtro attivo: tocca per vederle tutte"{% else %}title="Mostra solo: {{ testo|lower }}"{% endif %}>
+      <span class="stato-riga"><span class="stato-icona">{{ i(icona, 's') }}</span><b>{{ n }}</b>{% if k == attivo %}<span class="stato-togli" aria-hidden="true">✕</span>{% endif %}</span>
+      <span class="stato-nome">{{ testo }}</span>
+    </a>
+  {% endfor %}
+  </div>
+</nav>
 {% endmacro %}
 
 {# Freccia "Indietro": torna alla pagina precedente del portale; se si arriva da fuori, va a "dove" #}

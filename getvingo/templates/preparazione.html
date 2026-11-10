@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block classe_pagina %}pagina-preparazione{% endblock %}
-{% from "_macro.html" import i, marchio, icona_fase, csrf_input, riepilogo_lavorazione, pillole, tappe_preparazione, annulla, fase_css, calendario_mese, interruttore_modo, filtro_tipologia, scegli_slot %}
+{% from "_macro.html" import i, marchio, icona_fase, csrf_input, riepilogo_lavorazione, pillole, tappe_preparazione, annulla, fase_css, calendario_mese, interruttore_modo, filtro_tipologia, scegli_slot, filtri_stato %}
 {% block titolo %}Preparazione · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
@@ -33,19 +33,16 @@
   </form>
 </section>
 {% endif %}
-{# i 4 numeri sono filtri (in tempo, in ritardo, pronte, consegnate): toccandoli si vede solo quel gruppo #}
-{# il totale in preparazione non serve: è già nella scheda "In preparazione" qui sotto #}
-<nav class="riepilogo-pagina quattro" aria-label="Filtra per stato">
-  <a class="tile-numero corso {{ 'attivo' if stato_prep == 'tempo' }}" href="{{ url_for('main.preparazione', vista='corso', stato=none if stato_prep == 'tempo' else 'tempo', tipologia=tipologia) }}"><b>{{ conteggi.tempo }}</b><span>in tempo</span></a>
-  <a class="tile-numero ritardo {{ 'attivo' if solo_ritardo }}" href="{{ url_for('main.preparazione', vista='corso', stato=none if solo_ritardo else 'ritardo', tipologia=tipologia) }}"><b>{{ conteggi.ritardo }}</b><span>in ritardo</span></a>
-  <a class="tile-numero finita {{ 'attivo' if vista == 'pronte' }}" href="{{ url_for('main.preparazione', vista='pronte', tipologia=tipologia) }}"><b>{{ conteggi.pronte }}</b><span>pronte</span></a>
-  <a class="tile-numero consegnate {{ 'attivo' if vista == 'consegnate' }}" href="{{ url_for('main.preparazione', vista='consegnate', tipologia=tipologia) }}"><b>{{ conteggi.consegnate }}</b><span>consegnate</span></a>
-</nav>
-{{ pillole([
-  ('corso', 'In preparazione', url_for('main.preparazione', vista='corso', tipologia=tipologia), conteggi.corso, 'brilla', 'In corso'),
-  ('pronte', 'Pronte per la consegna', url_for('main.preparazione', vista='pronte', tipologia=tipologia), conteggi.pronte, 'bandiera', 'Pronte'),
-  ('consegnate', 'Consegnate', url_for('main.preparazione', vista='consegnate', tipologia=tipologia), conteggi.consegnate, 'archivio', 'Consegnate'),
-], vista, a_destra=('consegnate',), una_riga=True) }}
+{# Filtri di stato: in preparazione nei tempi / in ritardo, pronte, consegnate. Senza filtro si vedono tutte
+   le auto in preparazione; toccando di nuovo il filtro attivo si torna lì (niente schede doppie) #}
+{% set attivo = stato_prep if vista == 'corso' else vista %}
+{% set corso = url_for('main.preparazione', vista='corso', tipologia=tipologia) %}
+{{ filtri_stato([
+  ('tempo', conteggi.tempo, 'Nei tempi', 'orologio', corso if attivo == 'tempo' else url_for('main.preparazione', vista='corso', stato='tempo', tipologia=tipologia), True),
+  ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', corso if attivo == 'ritardo' else url_for('main.preparazione', vista='corso', stato='ritardo', tipologia=tipologia), True),
+  ('pronte', conteggi.pronte, 'Pronte', 'bandiera', corso if attivo == 'pronte' else url_for('main.preparazione', vista='pronte', tipologia=tipologia), True),
+  ('consegnate', conteggi.consegnate, 'Consegnate', 'archivio', corso if attivo == 'consegnate' else url_for('main.preparazione', vista='consegnate', tipologia=tipologia), False),
+], attivo) }}
 {{ filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato=stato_prep) }}
 
 {% if vista == 'corso' %}

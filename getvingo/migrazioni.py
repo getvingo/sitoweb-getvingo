@@ -170,6 +170,20 @@ def aggiungi_colonne():
     return aggiunte
 
 
+def aggiorna_ruoli():
+    """Ruoli di prima del 10/11/2026 (ufficio, autista) alle mansioni nuove (backoffice, consegne)."""
+    from sqlalchemy import text
+    from .models import Utente
+    if "utente" not in inspect(db.engine).get_table_names():
+        return 0
+    cambiati = 0
+    with db.engine.begin() as conn:
+        for vecchio, nuovo in Utente.RUOLI_VECCHI.items():
+            cambiati += conn.execute(text("UPDATE utente SET ruolo = :nuovo WHERE ruolo = :vecchio"),
+                                     {"nuovo": nuovo, "vecchio": vecchio}).rowcount or 0
+    return cambiati
+
+
 def assicura_vettori_propri():
     """Ogni concessionaria ha il suo vettore (mezzi propri): per quelle nate prima si adotta quello
     con il nome della concessionaria, altrimenti si crea. Idempotente, a ogni avvio."""

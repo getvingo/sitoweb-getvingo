@@ -31,7 +31,7 @@
     <label class="campo"><span>Nome e cognome</span><input name="nome" required></label>
     <label class="campo"><span>Email</span><input type="email" name="email" required></label>
     <label class="campo"><span>Password <span class="tenue">(facoltativa)</span></span><input type="password" name="password" minlength="8" autocomplete="new-password"><small>Consigliato: lasciala vuota. Riceve un invito e sceglie la sua.</small></label>
-    {% if ruoli|length > 1 %}<label class="campo"><span>Ruolo</span><select name="ruolo">{% for k, n in ruoli.items() %}<option value="{{ k }}" {{ 'selected' if k == 'autista' }}>{{ n }}</option>{% endfor %}</select></label>{% endif %}
+    {% if ruoli|length > 1 %}<label class="campo"><span>Ruolo</span><select name="ruolo">{% for k, n in ruoli.items() %}<option value="{{ k }}" {{ 'selected' if k == 'backoffice' }}>{{ n }}</option>{% endfor %}</select></label>{% endif %}
   </div>
   <button class="btn primario">{{ i('utente', 's') }} Aggiungi e invita</button>
 </form>

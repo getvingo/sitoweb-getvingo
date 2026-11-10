@@ -321,8 +321,24 @@ def lavorazioni():
     if stato:
         fornitori = [(sede, [(v, m) for v, m in voci if stato_lavorazione(m) == stato]) for sede, voci in fornitori]
         fornitori = [(sede, voci) for sede, voci in fornitori if voci]
+    modo = "calendario" if request.args.get("modo") == "calendario" else "elenco"
+    calendario = None
+    if modo == "calendario":  # il giorno in cui ogni lavorazione deve finire (o è finita)
+        calendario = _calendario([_evento_lavorazione(v, m) for _, voci in fornitori for v, m in voci],
+                                 request.args.get("mese"), verso_il_futuro=True)
     return render_template("lavorazioni.html", fornitori=fornitori, tipo=tipo, tipi=tipi, riepilogo=riepilogo,
-                           totale=sum(conta.values()), tipologia=tipologia, stato=stato)
+                           totale=sum(conta.values()), tipologia=tipologia, stato=stato, modo=modo,
+                           totale_visibili=sum(len(voci) for _, voci in fornitori),
+                           calendario=calendario, tipi_evento=TIPI_EVENTO)
+
+
+def _evento_lavorazione(v, m):
+    """Evento del calendario delle lavorazioni esterne: fine prevista (o fine vera, se già finita)."""
+    nota = f"{m.lavorazione} · {m.sede_arrivo_effettiva.nome}"
+    if m.lavorazione_completata_at:
+        return {"at": m.lavorazione_completata_at, "tipo": "lavoro_finita", "v": v, "nota": nota}
+    return {"at": m.lavorazione_prevista_at, "tipo": "fine_prevista", "v": v, "nota": nota,
+            "ritardo": bool(m.giorni_ritardo), "giornata": True}
 
 
 def stato_lavorazione(m):
@@ -341,7 +357,10 @@ def stima_lavorazione(mov_id):
     """Giorni di lavorazione stimati: da qui si calcolano avanzamento e ritardo."""
     mov = db.get_or_404(Movimento, mov_id)
     try:
-        servizi.imposta_stima(mov, g.utente, request.form.get("giorni", type=int))
+        giorni = request.form.get("giorni", type=int)
+        if request.form.get("fine"):  # fine prevista scelta sul calendario: diventa giorni dall'arrivo
+            giorni = servizi.giorni_fino_a(mov, request.form.get("fine"))
+        servizi.imposta_stima(mov, g.utente, giorni)
         db.session.commit()
         flash(f"{mov.veicolo.descrizione}: lavorazione stimata in {mov.stima_giorni} giorni, "
               f"pronta il {mov.lavorazione_prevista_at:%d/%m}.", "ok")
@@ -458,7 +477,8 @@ MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", 
 
 
 # tipi di evento del calendario: etichetta e classe css
-TIPI_EVENTO = {"consegnata": "Consegnata", "pronta_entro": "Pronta entro", "consegna_prevista": "Consegna prevista"}
+TIPI_EVENTO = {"consegnata": "Consegnata", "pronta_entro": "Pronta entro", "consegna_prevista": "Consegna prevista",
+               "fine_prevista": "Lavorazione da finire", "lavoro_finita": "Lavorazione finita"}
 
 
 def _eventi_preparazione():
@@ -1054,7 +1074,7 @@ def veicolo(veicolo_id):
     v = _veicolo_visibile(veicolo_id)
     mov = v.movimento_aperto
     ultimo = v.ultimo_arrivo
-    valori = {"conducente": g.utente.nome if g.utente.ruolo in ("autista", "venditore", "fornitore") else "",
+    valori = {"conducente": g.utente.nome if g.utente.ruolo != "admin" else "",
               "vettore_id": servizi.ultimo_vettore_id(g.utente)}
     if v.sede and v.sede.esterna and ultimo:
         valori.update(a_sede_id=ultimo.da_sede_id, causale="Reso lavorazione",

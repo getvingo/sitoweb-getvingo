@@ -3,9 +3,12 @@
 {% from "_auto.html" import in_viaggio_da, tocchi %}
 {% block titolo %}Anteprima DDT {{ d.sigla }} · Getvingo{% endblock %}
 {% block contenuto %}
-{{ indietro(url_for('main.ddt_dettaglio', ddt_id=d.id)) }}
+{# ✕ sempre visibile in alto a sinistra della barra fissa: sul telefono (app installata) è l'unico modo per uscire #}
 <div class="anteprima-barra">
-  <a class="btn primario" href="{{ url_for('main.ddt_pdf', ddt_id=d.id, scarica=1) }}" download="DDT_{{ d.numero }}_{{ d.anno }}.pdf">{{ i('scarica', 's') }} Scarica PDF</a>
+  <a class="btn anteprima-chiudi" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}" data-indietro data-chiudi-esc
+     aria-label="Chiudi l'anteprima" title="Chiudi">✕</a>
+  <a class="btn primario" href="{{ url_for('main.ddt_pdf', ddt_id=d.id, scarica=1) }}" download="DDT_{{ d.numero }}_{{ d.anno }}.pdf"
+     data-scarica-pdf data-nome="DDT_{{ d.numero }}_{{ d.anno }}.pdf">{{ i('scarica', 's') }} Scarica PDF</a>
   <button type="button" class="btn" data-condividi-pdf="{{ url_for('main.ddt_pdf', ddt_id=d.id) }}"
           data-nome="DDT_{{ d.numero }}_{{ d.anno }}.pdf" data-titolo="DDT n. {{ d.sigla }} · {{ m.veicolo.descrizione }}">{{ i('invia', 's') }} Condividi</button>
 </div>
