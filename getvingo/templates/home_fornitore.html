@@ -29,7 +29,7 @@
 <h2>{{ i('camion') }} In arrivo · da confermare</h2>
 <div class="lista">
 {% for m in in_arrivo %}
-  <a class="voce" href="{{ url_for('main.arrivo_da_tap', ddt_id=m.ddt.id) }}">
+  <a class="voce impila" href="{{ url_for('main.arrivo_da_tap', ddt_id=m.ddt.id) }}">
     <span class="tondo in_viaggio">{{ i('camion') }}</span>
     <div class="corpo">
       <h3>{{ m.veicolo.descrizione }}{{ condizione(m.veicolo) }}</h3>
@@ -48,12 +48,12 @@
 <div class="lista">
 {% for v, m in presenti %}
   <div class="voce" style="display:block">
-    <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" style="display:flex;gap:12px;align-items:center;color:inherit">
+    <a class="voce-riga impila" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">
       {{ icona_fase(v) }}
       <div class="corpo">
         <h3>{{ v.descrizione }}{{ condizione(v) }}</h3>
         <div class="tenue piccolo">{{ v.vin|vin }}</div>
-        {% if m %}<div class="tratta">{{ i('chiave', 's') }} {{ m.lavorazione }}{% if m.lavorazione_note %} · {{ m.lavorazione_note }}{% endif %}</div>{% endif %}
+        {% if m and m.con_lavorazione %}<div class="tratta">{{ i('chiave', 's') }} {{ m.lavorazione }}{% if m.lavorazione_note %} · {{ m.lavorazione_note }}{% endif %}</div>{% endif %}
       </div>
       <div class="lato">{{ badge_veicolo(v) }}</div>
     </a>

@@ -33,13 +33,18 @@
 <a class="voce" href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}" style="margin-bottom:12px">
   <span class="tondo {{ 'da_ritirare' if ultimo.lavorazione_completata_at else 'lavorazione' }}">{{ i('chiave') }}</span>
   <div class="corpo">
+    {% if ultimo.con_lavorazione %}
     <div class="etichetta">{{ 'Lavorazione finita' if ultimo.lavorazione_completata_at else 'In lavorazione' }} presso {{ v.sede.nome }}</div>
     <h3>{{ ultimo.lavorazione }}</h3>
+    {% else %}
+    <div class="etichetta">Presso {{ v.sede.nome }}</div>
+    <h3>Solo trasferimento · nessuna lavorazione</h3>
+    {% endif %}
     {% if ultimo.lavorazione_note %}<div class="lavoro-dettaglio">{{ ultimo.lavorazione_note }}</div>{% endif %}
     {% if ultimo.lavorazione_completata_at %}
       <div class="tratta" style="color:var(--ok);font-weight:650">{{ i('check', 's') }} Completata {{ ultimo.lavorazione_completata_at|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}</div>
     {% else %}
-      <div class="tratta">arrivata il {{ ultimo.arrivo_at|data('%d/%m/%Y') }} · la fine lavorazione la segna {{ v.sede.nome }}</div>
+      <div class="tratta">arrivata il {{ ultimo.arrivo_at|data('%d/%m/%Y') }}{% if ultimo.con_lavorazione %} · la fine lavorazione la segna {{ v.sede.nome }}{% endif %}</div>
     {% endif %}
   </div>
   {{ giorni(ultimo.giorni_lavorazione) }}
@@ -214,7 +219,7 @@
 
 {% if g.utente.interno %}
 <details class="scheda note-interne" id="note-interne" {{ 'open' if v.cliente_nome or v.venditore_id or v.note_interne }}>
-  <summary>{{ i('matita', 's') }} Note interne <span class="tenue piccolo">· solo concessionaria, non vanno sul DDT</span>
+  <summary>{{ i('matita', 's') }} Note interne <span class="tenue piccolo">Solo per la concessionaria, non vanno sul DDT</span>
     {% if v.cliente_nome or v.venditore %}<span class="note-riassunto">{{ v.cliente_nome }}{{ ' · ' if v.cliente_nome and v.venditore }}{{ ('venditore ' ~ v.venditore.nome) if v.venditore }}</span>{% endif %}</summary>
   <form method="post" action="{{ url_for('main.note_interne', veicolo_id=v.id) }}" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -232,7 +237,7 @@
 {% if v.lat is not none and v.stato != 'consegnato' %}
 <h2>{{ i('pin') }} Sulla mappa</h2>
 <div id="mappa" data-lat="{{ v.lat }}" data-lon="{{ v.lon }}"></div>
-{% if v.sede and v.sede.esterna and v.stato == 'in_sede' %}<a class="btn pieno portami" href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}" target="_blank" rel="noopener">{{ i('pin') }} <span>Portami qui <span class="tenue piccolo portami-dove">· navigazione verso {{ v.sede.nome }}</span></span></a>{% endif %}
+{% if v.sede and v.sede.esterna and v.stato == 'in_sede' %}<a class="btn pieno portami" href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}" target="_blank" rel="noopener">{{ i('pin') }} <span>Portami qui <span class="tenue piccolo portami-dove">Navigazione verso {{ v.sede.nome }}</span></span></a>{% endif %}
 {% endif %}
 
 {% if v.stato not in ('consegnato', 'in_viaggio') %}
@@ -264,7 +269,7 @@
 {% block script %}
 {% if v.lat is not none and v.stato != 'consegnato' %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{{ url_for('static', filename='mappe.js') }}"></script>
+<script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
 <script>
   (function () {
     var el = document.getElementById('mappa');

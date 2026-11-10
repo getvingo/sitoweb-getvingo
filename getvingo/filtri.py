@@ -123,6 +123,12 @@ def init_app(app):
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
     app.jinja_env.globals["timedelta"] = timedelta
+    # versione di CSS e JS nell'indirizzo: dopo un aggiornamento i telefoni scaricano subito quelli nuovi
+    import os
+    cartella = os.path.join(app.root_path, "static")
+    app.jinja_env.globals["versione_statici"] = str(max(
+        int(os.path.getmtime(os.path.join(cartella, f))) for f in os.listdir(cartella)
+        if f.endswith((".css", ".js"))))
     from .servizi import destinatario_conferma_ovunque, stima_viaggio
     app.jinja_env.globals["stima_viaggio"] = stima_viaggio
     app.jinja_env.globals["destinatario_conferma_ovunque"] = destinatario_conferma_ovunque

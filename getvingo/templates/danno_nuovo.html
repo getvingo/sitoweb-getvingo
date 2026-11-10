@@ -21,4 +21,4 @@
   <div class="barra-azione"><button class="btn primario pieno" style="background:var(--errore);border-color:var(--errore)">{{ i('attenzione') }} Invia segnalazione</button></div>
 </form>
 {% endblock %}
-{% block script %}<script src="{{ url_for('static', filename='foto.js') }}"></script>{% endblock %}
+{% block script %}<script src="{{ url_for('static', filename='foto.js', v=versione_statici) }}"></script>{% endblock %}

@@ -136,7 +136,7 @@
 </form>
 {% endif %}
 
-{% if m.partenza_at and not d.annullato_at %}
+{% if m.partenza_at and not d.annullato_at and (m.stato == 'aperto' or tocchi_viaggio(m)) %}
 <h2>{{ i('cronometro', 's') }} Tempi del viaggio</h2>
 {% if m.stato == 'aperto' %}<p class="ddt-mini-viaggio grande">{{ i('camion', 's') }} In viaggio da {{ in_viaggio_da(m) }} · partito alle {{ m.partenza_at|data('%H:%M') }}</p>{% endif %}
 {{ tocchi(m) }}

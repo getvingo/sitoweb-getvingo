@@ -10,7 +10,7 @@
   <link rel="icon" href="{{ url_for('static', filename='icona.svg') }}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icone/apple-touch-icon.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=versione_statici) }}">
   {% block head %}{% endblock %}
 </head>
 <body class="{% block classe_pagina %}{% endblock %}" {{ 'data-demo' if config.DEMO }}>
@@ -122,12 +122,12 @@
 {% endif %}
 <script>window.GETVINGO_GMAPS = {{ config.GOOGLE_MAPS_KEY|tojson }};</script>
 <script>window.DOVIN_CSRF ="{{ csrf_token() if g.utente else '' }}";</script>
-<script src="{{ url_for('static', filename='voce.js') }}"></script>
-<script src="{{ url_for('static', filename='ia.js') }}"></script>
-<script src="{{ url_for('static', filename='firma.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}"></script>
-<script src="{{ url_for('static', filename='mappe.js') }}"></script>
-<script src="{{ url_for('static', filename='indirizzo.js') }}"></script>
+<script src="{{ url_for('static', filename='voce.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='ia.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='firma.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='app.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='indirizzo.js', v=versione_statici) }}"></script>
 {% block script %}{% endblock %}
 </body>
 </html>

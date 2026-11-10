@@ -53,7 +53,7 @@
     {% endfor %}
   </section>
 
-  {% if m.partenza_at %}
+  {% if m.partenza_at and tocchi_viaggio(m) %}
   <section>
     <h3 class="foglio-titolo">Tocchi del viaggio</h3>
     {{ tocchi(m) }}

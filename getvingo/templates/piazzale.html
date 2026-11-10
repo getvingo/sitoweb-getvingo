@@ -87,7 +87,7 @@
 {% block script %}
 {% if piazzali %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{{ url_for('static', filename='mappe.js') }}"></script>
+<script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
 <script>
   (function () {
     if (!document.getElementById('mappa-piazzale')) return;  // nessun piazzale con la posizione
