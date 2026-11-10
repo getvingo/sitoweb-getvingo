@@ -37,7 +37,7 @@
 {% for k, nome in filtri_stato.items() if k != 'annullati' or g.utente.ruolo == 'admin' %}
   {% set _ = voci.append((k, nome, url_for('main.archivio_ddt', stato=k, **f_attivi), conteggi.get(k, 0), icone[k])) %}
 {% endfor %}
-{{ pillole(voci, stato, a_destra=('chiuso',)) }}
+{{ pillole(voci, stato, a_destra=('chiuso', 'annullati'), etichetta='Filtra i DDT per stato') }}
 
 <div class="lista lista-ddt">
 {% for d in elenco %}
@@ -52,7 +52,7 @@
       <h3>{{ m.veicolo.descrizione }}{{ condizione(m.veicolo) }} <span class="tenue piccolo" style="font-weight:400">{{ m.veicolo.vin|vin }}</span></h3>
       {% endif %}
       <div class="tratta" style="margin-top:2px">{{ m.da_sede.nome if m.da_sede else '—' }} {{ i('freccia', 's') }} <b style="color:var(--testo)">{{ m.sede_arrivo_effettiva.nome }}</b></div>
-      <div class="tratta">{{ i('utente', 's') }} {{ m.conducente or 'da indicare' }} · {{ i('chiave', 's') }} {{ m.lavorazione }} · <span>creato da {{ d.creato_da.nome }}, {{ d.emesso_at|data }}</span></div>
+      <div class="tratta tenue">{{ i('utente', 's') }} {{ m.conducente or 'da indicare' }}{% if m.con_lavorazione %} · {{ i('chiave', 's') }} {{ m.lavorazione }}{% endif %} · {{ d.emesso_at|data('%d/%m %H:%M') }}</div>
       {% if d.annullato_at %}<div class="tratta" style="color:var(--errore)">Cancellato da {{ d.annullato_da.nome }}: {{ d.motivo_annullamento }}</div>{% endif %}
     </div>
     <div class="lato">{{ badge_ddt(d) }}<div style="margin-top:6px">{{ giorni(m.giorni_lavorazione if not m.lavorazione_completata_at else none) }}</div></div>

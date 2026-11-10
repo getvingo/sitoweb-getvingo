@@ -130,13 +130,14 @@
 
 {% macro giorni_testo(n) %}{% if n == 0 %}in giornata{% elif n == 1 %}1 giorno{% else %}{{ n }} giorni{% endif %}{% endmacro %}
 
-{# Pillole di filtro senza scorrimento: quelle vuote non compaiono, "a_destra" vanno in fondo a destra.
-   Una voce può avere un 6° elemento: l'etichetta corta usata sul telefono. una_riga: sul telefono stanno
-   tutte su una riga, a larghezze uguali (senza icone, con l'etichetta corta) #}
-{% macro pillole(voci, attiva, a_destra=(), una_riga=False) %}
-<nav class="filtri {{ 'una-riga' if una_riga }}">
-  {% for v in voci if v[3] or v[0] == attiva or v[0] == 'tutti' %}{% set chiave, etichetta, url, n, icona = v[0], v[1], v[2], v[3], v[4] %}
-  <a href="{{ url }}" class="{{ 'attivo' if chiave == attiva }} {{ 'a-destra' if chiave in a_destra }}">{% if icona %}{{ i(icona) }} {% endif %}{% if v|length > 5 %}<span class="et-lunga">{{ etichetta }}</span><span class="et-corta">{{ v[5] }}</span>{% else %}{{ etichetta }}{% endif %}{% if n is not none %} <span class="n">{{ n }}</span>{% endif %}</a>
+{# Schede di filtro (DDT, Danni): lo stesso selettore segmentato di Tutti / Vetture / Commerciali (10/11/2026).
+   Quelle vuote non compaiono; "a_destra" vanno in fondo. Se non stanno su una riga si compattano e poi vanno
+   a capo in colonne (app.js). Il 6° elemento di una voce (etichetta corta) e una_riga restano accettati. #}
+{% macro pillole(voci, attiva, a_destra=(), una_riga=False, etichetta='Filtra') %}
+{% set visibili = [] %}{% for v in voci if v[3] or v[0] == attiva or v[0] == 'tutti' %}{% set _ = visibili.append(v) %}{% endfor %}
+<nav class="interruttore filtro-gruppo in-riga schede-filtro" aria-label="{{ etichetta }}">
+  {% for v in (visibili|rejectattr('0', 'in', a_destra)|list) + (visibili|selectattr('0', 'in', a_destra)|list) %}{% set chiave, nome, url, n, icona = v[0], v[1], v[2], v[3], v[4] %}
+  <a href="{{ url }}" class="{{ 'attivo' if chiave == attiva }}" {{ 'aria-current=true' if chiave == attiva }} title="{{ nome }}">{% if icona %}{{ i(icona, 's') }} {% endif %}<span class="nome">{{ nome }}</span>{% if n is not none %} <span class="n">{{ n }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
 {% endmacro %}

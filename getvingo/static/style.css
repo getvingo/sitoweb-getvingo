@@ -37,6 +37,8 @@
   --fs-20: 1.25rem; --fs-24: 1.5rem; --fs-30: 1.875rem;
   /* arrotondamenti: piccolo (chip, targhe) · medio (comandi interni) · --r-s campi · --r carte · grande · pillola */
   --r-xs: 6px; --r-m: 10px; --r-l: 18px; --r-pillola: 999px;
+  /* bordo colorato a sinistra di schede e righe (stato, gravità, danno): uno spessore solo */
+  --bordo-stato: 5px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -215,12 +217,6 @@ a.voce:hover { text-decoration: none; border-color: var(--bordo-forte); }
 .contatori strong { display: block; font-size: var(--fs-30); line-height: 1.1; font-variant-numeric: tabular-nums; }
 .contatori span { font-size: var(--fs-13); color: var(--testo-2); font-weight: 600; }
 
-/* Filtri a pillola */
-.filtri { display: flex; gap: 6px; margin: 12px 0 14px; flex-wrap: wrap; }
-.filtri a { padding: 8px 14px; border-radius: var(--r-pillola); background: var(--carta); border: 1px solid var(--bordo);
-  color: var(--testo-2); font-weight: 650; font-size: var(--fs-14); white-space: nowrap; }
-.filtri a.attivo { background: var(--inchiostro); border-color: var(--inchiostro); color: #fff; }
-.filtri a:hover { text-decoration: none; }
 
 /* Documento DDT a schermo */
 .documento { background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); overflow: hidden;
@@ -390,9 +386,6 @@ code { font-family: var(--mono); font-size: var(--fs-13); word-break: break-all;
 
 h2 { display: flex; align-items: center; gap: 8px; }
 h2 .icona { width: 16px; height: 16px; }
-.filtri a { display: inline-flex; align-items: center; gap: 6px; }
-.filtri a .icona { width: 16px; height: 16px; }
-.filtri a .n { font-variant-numeric: tabular-nums; opacity: .75; }
 
 /* tempi per fase */
 .tempi { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--bordo); border-radius: var(--r-s); overflow: hidden; }
@@ -420,8 +413,6 @@ h2 .icona { width: 16px; height: 16px; }
 .avviso.info { background: var(--segnale-tenue); color: var(--segnale); }
 
 /* ---------- v5 ---------- */
-.filtri a.a-destra { margin-left: auto; }
-.filtri a.a-destra ~ a { margin-left: 0; }
 .barra-filtri { display: grid; gap: 0 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .barra-filtri .campo { margin-bottom: 10px; }
 .barra-filtri select, .barra-filtri input { min-height: 48px; padding: 10px 12px; }
@@ -449,7 +440,7 @@ h2 .icona { width: 16px; height: 16px; }
 .mini-lista li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--bordo); }
 .mini-lista li:last-child { border-bottom: 0; }
 .coordinate { font-family: var(--mono); font-size: var(--fs-13); color: var(--testo-2); }
-.da-fare .voce { border-left: 6px solid var(--liv-3); }
+.da-fare .voce { border-left: var(--bordo-stato) solid var(--liv-3); }
 /* Da fare per gravità: 1 urgente (arancio bruciato), 2 presto (arancio), 3 da pianificare (ambra chiara) */
 .da-fare .voce.l1 { border-color: var(--liv-1); background: var(--liv-1-fondo); }
 .da-fare .voce.l1 .tratta { color: var(--liv-1-testo); font-weight: 700; }
@@ -558,7 +549,7 @@ h2.importante .icona { color: var(--arancio); width: 18px; height: 18px; }
   .tondo.lavorazione, .badge.lavorazione, .tondo.in_viaggio, .badge.in_viaggio, .tondo.pronta, .badge.pronta,
   .tondo.da_ritirare, .badge.da_ritirare, .tondo.preparazione, .badge.preparazione { color: var(--notte); }
 }
-.voce.fase { border-left: 6px solid var(--fase); }
+.voce.fase { border-left: var(--bordo-stato) solid var(--fase); }
 .legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 4px; font-size: var(--fs-13); color: var(--testo-2); }
 .legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .legenda i { width: 12px; height: 12px; border-radius: var(--r-xs); background: var(--fase); display: inline-block; }
@@ -582,8 +573,8 @@ main { padding-bottom: calc(var(--barra-sotto) + env(safe-area-inset-bottom) + 3
 
 /* Tocco: niente riquadro grigio di sistema, ma una risposta visibile al dito */
 a, button, summary, label { -webkit-tap-highlight-color: transparent; }
-.btn, .voce, .riquadri a, .filtri a, .chip, .nav-basso a { transition: transform .08s ease; }
-.btn:active, a.voce:active, .riquadri a:active, .filtri a:active, .chip:active { transform: scale(.97); }
+.btn, .voce, .riquadri a, .chip, .nav-basso a { transition: transform .08s ease; }
+.btn:active, a.voce:active, .riquadri a:active, .chip:active { transform: scale(.97); }
 .nav-basso a:active { transform: scale(.92); }
 .nav-basso a.attivo { position: relative; }
 .nav-basso a.attivo::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px;
@@ -605,7 +596,6 @@ a, button, summary, label { -webkit-tap-highlight-color: transparent; }
   .lista-ddt > .voce > .corpo { order: 2; flex-basis: 100%; }
 
   /* Pillole: su più righe niente spinta a destra (resterebbe una pillola sola isolata) */
-  .filtri a.a-destra { margin-left: 0; }
 
   /* Riquadri numerici: l'etichetta sta su una riga */
   .riquadri a { padding: 12px; gap: 10px; }
@@ -660,7 +650,7 @@ a, button, summary, label { -webkit-tap-highlight-color: transparent; }
 @media (prefers-color-scheme: dark) { .logo-marca.sigla { color: var(--testo); } }
 
 /* Danni: negli elenchi solo i dati (scheda cliccabile), le foto grandi nella pagina del danno */
-.scheda-danno.aperto { border-left: 5px solid var(--danno); }
+.scheda-danno.aperto { border-left: var(--bordo-stato) solid var(--danno); }
 .apri-danno { display: flex; gap: 12px; align-items: flex-start; color: inherit; }
 .apri-danno:hover { text-decoration: none; }
 .apri-danno .lato { text-align: right; flex: none; color: var(--testo-2); }
@@ -687,7 +677,7 @@ a, button, summary, label { -webkit-tap-highlight-color: transparent; }
 .metodo:hover, .metodo[aria-expanded="true"] { border-color: var(--arancio); background: var(--arancio-tenue); }
 .metodo .tondo { background: var(--arancio-tenue); color: var(--arancio-testo); }
 .metodo span:not(.tondo) { font-size: var(--fs-13); color: var(--testo-2); }
-.voce.caricata { padding: 10px 14px; border-left: 5px solid var(--arancio); }
+.voce.caricata { padding: 10px 14px; border-left: var(--bordo-stato) solid var(--arancio); }
 .risultati { margin-top: 8px; }
 #caricate:not(:empty) { margin-bottom: 14px; }
 
@@ -883,7 +873,7 @@ input, select { min-height: var(--alt-normale); }
 input[type=file] { height: auto; }
 .btn-mic-piccolo { width: var(--alt-piccola); height: var(--alt-piccola); }
 /* pillole, interruttori e chip: tutti alti uguali */
-.filtri a, .chip, .interruttore a { min-height: 40px; }
+.chip, .interruttore a { min-height: 40px; }
 /* scelte con casella: tutta la riga è toccabile */
 .spunta { min-height: var(--alt-normale); align-items: center; }
 .zone label { min-height: var(--alt-piccola); }
@@ -898,7 +888,7 @@ details.ripiega > summary, details.dettagli-auto > summary, details.filtri-ripie
 /* avatar del menu: area toccabile 44 px */
 .menu-utente > summary { padding: 6px; margin: -6px; border-radius: 50%; }
 @media (max-width: 1023px), (pointer: coarse) {
-  .filtri a, .chip, .interruttore a { min-height: var(--alt-piccola); }
+  .chip, .interruttore a { min-height: var(--alt-piccola); }
 }
 /* azioni pericolose (cancella DDT, elimina auto): sempre rosse e staccate dal resto */
 details.zona-pericolo > summary { color: var(--danno-scuro); font-weight: 650; }
@@ -1028,7 +1018,7 @@ details.zona-pericolo > summary { color: var(--danno-scuro); font-weight: 650; }
 .condizione-mancante { width: 100%; align-items: center; padding: 8px 12px; border: 1px dashed var(--bordo-forte); border-radius: var(--r-s); }
 
 /* ================= Pagina del DDT: dati leggibili ================= */
-.ddt-tratta { background: var(--carta); border: 1px solid var(--bordo); border-left: 5px solid var(--primario); border-radius: var(--r);
+.ddt-tratta { background: var(--carta); border: 1px solid var(--bordo); border-left: var(--bordo-stato) solid var(--primario); border-radius: var(--r);
   padding: 14px 16px; box-shadow: var(--ombra); margin-bottom: 12px; }
 .ddt-luoghi { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
 .ddt-luoghi .etichetta { display: block; margin-bottom: 2px; }
@@ -1213,7 +1203,7 @@ a.destinazione-btn { text-decoration: none; }
 .tocco-ddt-blocco .conta { min-width: 24px; padding: 1px 8px; border-radius: var(--r-pillola); background: var(--segnale-tenue);
   color: var(--segnale); font-size: var(--fs-13); text-align: center; }
 .ddt-mini { padding: 12px 14px; margin-bottom: 8px; background: var(--carta); border: 1px solid var(--bordo);
-  border-left: 5px solid var(--bordo-forte); border-radius: var(--r); }
+  border-left: var(--bordo-stato) solid var(--bordo-forte); border-radius: var(--r); }
 .ddt-mini.stato-aperto { border-left-color: var(--st-viaggio); }
 .ddt-mini.stato-chiuso { border-left-color: var(--ok); }
 .ddt-mini.stato-predisposto, .ddt-mini.stato-scaduto { border-left-color: var(--st-ritiro-pieno); }
@@ -1487,7 +1477,7 @@ a.dettaglio-stato:hover { background: rgba(255,255,255,.26); text-decoration: no
 .griglia-lavori { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1024px) { .griglia-lavori { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .carta-lavoro { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; background: var(--carta); border: 1px solid var(--bordo);
-  border-left: 5px solid var(--st-lavoro); border-radius: var(--r); box-shadow: var(--ombra); }
+  border-left: var(--bordo-stato) solid var(--st-lavoro); border-radius: var(--r); box-shadow: var(--ombra); }
 .carta-lavoro.lavoro-ritardo { border-left-color: var(--arancio); }
 .carta-lavoro.lavoro-finita { border-left-color: var(--ok); }
 .carta-lavoro-testa { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
@@ -1615,7 +1605,6 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
 
 /* ============ Telefono (analisi UX 03/11/2026) ============
    Meno spazio sprecato in alto, nessuna etichetta tagliata, bersagli da 44 px, testi minimi da 12 px */
-.filtri .et-corta { display: none; }
 .cambia-stima > summary { display: flex; align-items: center; gap: 6px; min-height: 44px; }
 .portami-dove { font-weight: 500; }
 @media (max-width: 559px) {
@@ -1627,16 +1616,6 @@ p.scadenza-prep.in-ritardo b { font-weight: 800; }
   .descrizione-pagina.tagliata { cursor: pointer; }
   .demo-barra { min-height: 40px; margin-bottom: 10px; font-size: var(--fs-14); }
   .dettaglio-stato { min-height: 40px; }
-
-  /* numeri in cima a Lavorazioni e Preparazione: tre in fila, etichetta su una riga */
-
-  /* schede In corso / Pronte / Consegnate: una riga, larghezze uguali, etichette corte */
-  .filtri.una-riga { flex-wrap: nowrap; gap: 4px; }
-  .filtri.una-riga a { flex: 1 1 0; min-width: 0; justify-content: center; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
-  .filtri.una-riga a .icona { display: none; }
-  .filtri.una-riga a.a-destra { margin-left: 0; }
-  .filtri .et-lunga { display: none; }
-  .filtri .et-corta { display: inline; }
 
   /* Panoramica: l'etichetta del riquadro va su due righe invece di essere tagliata */
   .riquadri span.et { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
@@ -1874,3 +1853,8 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   .impila > .corpo { flex: 1 1 calc(100% - 64px); }
   .impila > .lato { flex-basis: 100%; text-align: left; padding-left: 58px; }
 }
+
+/* Filtri ripiegabili: su schermo largo il titolo "Filtri" non serve (dopo la regola dei summary, che lo riaccendeva) */
+@media (min-width: 560px) { details.filtri-ripiegabili > summary { display: none; } }
+/* Schede di filtro (DDT, Danni) nel selettore segmentato: un po' d'aria sotto */
+.schede-filtro { margin: 4px 0 16px; }

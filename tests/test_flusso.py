@@ -2794,7 +2794,7 @@ class TestNovita1011(TestLavorazioniStimaESolleciti):
 
     def test_preparazione_senza_scheda_in_preparazione_e_anteprima_con_chiudi(self):
         prep = self.c.get("/preparazione").get_data(as_text=True)
-        self.assertNotIn('class="filtri una-riga"', prep)  # le schede doppie dei filtri non ci sono più
+        self.assertNotIn('>In preparazione <span class="n">', prep)  # le schede doppie dei filtri non ci sono più
         for testo in ("Nei tempi", "In ritardo", "Pronte", "Consegnate"):
             self.assertIn(testo, prep)
         pronte = self.c.get("/preparazione?vista=pronte").get_data(as_text=True)
@@ -2804,3 +2804,21 @@ class TestNovita1011(TestLavorazioniStimaESolleciti):
         anteprima = self.c.get(f"/ddt/{self.ddt()}/anteprima").get_data(as_text=True)
         self.assertIn('aria-label="Chiudi l\'anteprima"', anteprima)
         self.assertIn("data-scarica-pdf", anteprima)
+
+
+class TestSistemaDesign(Base):
+    """10/11/2026: schede di filtro nel selettore segmentato, versione di CSS e JS, solo trasferimento dal fornitore."""
+    def test_schede_filtro_e_versione_statici(self):
+        ddt = self.c.get("/ddt").get_data(as_text=True)
+        self.assertIn('class="interruttore filtro-gruppo in-riga schede-filtro"', ddt)
+        self.assertRegex(ddt, r'style\.css\?v=\d+')
+        self.assertIn('class="interruttore filtro-gruppo in-riga schede-filtro"', self.c.get("/danni").get_data(as_text=True))
+
+    def test_solo_trasferimento_dal_fornitore(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B", lavorazione="Nessuna (solo trasferimento)", causale="Invio lavorazione")
+        self.arrivo(self.ddt())
+        scheda = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        if "Presso Carrozzeria B" in scheda:
+            self.assertIn("Solo trasferimento · nessuna lavorazione", scheda)
+            self.assertNotIn("In lavorazione presso", scheda)
