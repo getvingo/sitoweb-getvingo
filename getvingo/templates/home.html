@@ -7,6 +7,9 @@
     <p class="descrizione-pagina">Cosa c'è da fare adesso e dove sono le auto, a colpo d'occhio.</p></div>
 </div>
 
+{# Barra "Trova" (11/11/2026): risultati mentre si scrive (auto, DDT, adesivi). Invio: se c'è un solo risultato
+   lo apre, altrimenti la pagina Cerca. La chat con l'assistente torna con CHAT_PANORAMICA (routes.py) #}
+{% if chat_panoramica %}
 {# Barra unica: cerca o chiedi. Toccandola si allarga e diventa la chat con l'assistente #}
 <section class="chiedi" id="chiedi" data-ia="{{ '1' if ia_attiva else '' }}">
   <form class="chiedi-barra" id="chat-form" action="{{ url_for('main.cerca') }}">
@@ -33,6 +36,19 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
     </div>
   </div>
 </section>
+{% else %}
+<section class="chiedi trova" id="trova" role="search">
+  <form class="chiedi-barra" id="trova-form" action="{{ url_for('main.cerca') }}">
+    {{ i('cerca') }}
+    <input id="trova-testo" name="q" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"
+           placeholder="Trova: VIN, targa, modello, n. DDT, adesivo" aria-label="Trova un'auto, un DDT o un adesivo"
+           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trova-risultati">
+    <button type="button" class="btn-mic-piccolo" id="trova-mic" aria-label="Detta cosa cercare">{{ i('mic') }}</button>
+  </form>
+  <div class="trova-risultati" id="trova-risultati" role="listbox" aria-label="Risultati" hidden></div>
+  <p class="nascosto" id="trova-stato" role="status" aria-live="polite"></p>
+</section>
+{% endif %}
 
 <div class="panoramica">
 {% if danni %}
@@ -102,4 +118,81 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 {% endfor %}
 </section>
 </div>
+{% endblock %}
+{% block script %}
+<script>
+  // Trova: risultati mentre si scrive (frecce per scegliere, Invio per aprire, Esc per chiudere)
+  (function () {
+    var box = document.getElementById('trova');
+    if (!box) return;
+    var form = document.getElementById('trova-form'), campo = document.getElementById('trova-testo');
+    var lista = document.getElementById('trova-risultati'), stato = document.getElementById('trova-stato');
+    var mic = document.getElementById('trova-mic');
+    var GRUPPI = [['auto', 'Auto'], ['ddt', 'DDT'], ['adesivi', 'Adesivi NFC']];
+    var link = [], scelto = -1, timer = null, ultima = '', richiesta = 0;
+    function apri(si) { lista.hidden = !si; box.classList.toggle('aperta', si); campo.setAttribute('aria-expanded', si ? 'true' : 'false'); }
+    function evidenzia(n) {
+      link.forEach(function (a, k) { a.classList.toggle('scelto', k === n); a.setAttribute('aria-selected', k === n ? 'true' : 'false'); });
+      scelto = n;
+      if (link[n]) link[n].scrollIntoView({ block: 'nearest' });
+    }
+    function mostra(dati, q) {
+      lista.innerHTML = ''; link = []; scelto = -1;
+      var tot = 0;
+      GRUPPI.forEach(function (gr) {
+        var voci = dati[gr[0]] || [];
+        if (!voci.length) return;
+        var h = document.createElement('div'); h.className = 'trova-gruppo'; h.textContent = gr[1]; lista.appendChild(h);
+        voci.forEach(function (v) {
+          var a = document.createElement(v.url ? 'a' : 'div');
+          a.className = 'trova-voce' + (v.fase ? ' fase-' + v.fase : ''); a.setAttribute('role', 'option');
+          if (v.url) { a.href = v.url; link.push(a); }
+          var t = document.createElement('b'); t.textContent = v.titolo; a.appendChild(t);
+          if (v.targa) { var tg = document.createElement('span'); tg.className = 'targa'; tg.textContent = v.targa; t.appendChild(document.createTextNode(' ')); t.appendChild(tg); }
+          if (v.vin) { var vn = document.createElement('span'); vn.className = 'vin'; vn.textContent = v.vin.slice(0, 9); var fine = document.createElement('b'); fine.textContent = v.vin.slice(9); vn.appendChild(fine); a.appendChild(vn); }
+          var s = document.createElement('small'); s.textContent = v.sotto; a.appendChild(s);
+          lista.appendChild(a); tot++;
+        });
+      });
+      if (!tot) {
+        var vuoto = document.createElement('div'); vuoto.className = 'trova-vuoto';
+        vuoto.textContent = 'Niente con “' + q + '”. Prova le ultime cifre del VIN, la targa o il numero del DDT.';
+        lista.appendChild(vuoto);
+      } else {
+        var tutte = document.createElement('a'); tutte.className = 'trova-tutte'; tutte.href = form.action + '?q=' + encodeURIComponent(q);
+        tutte.textContent = 'Tutte le auto con “' + q + '” e i filtri →'; lista.appendChild(tutte); link.push(tutte);
+      }
+      stato.textContent = tot ? tot + ' risultati' : 'Nessun risultato';
+      apri(true);
+    }
+    function cerca() {
+      var q = campo.value.trim();
+      if (q === ultima) return;
+      ultima = q;
+      if (q.length < 2) { apri(false); return; }
+      var n = ++richiesta;
+      fetch('/api/trova?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (n === richiesta) mostra(d, q); })
+        .catch(function () {});
+    }
+    campo.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(cerca, 160); });
+    campo.addEventListener('focus', function () { if (campo.value.trim().length >= 2 && lista.childNodes.length) apri(true); });
+    campo.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && link.length) { e.preventDefault(); evidenzia(Math.min(scelto + 1, link.length - 1)); }
+      else if (e.key === 'ArrowUp' && link.length) { e.preventDefault(); evidenzia(Math.max(scelto - 1, 0)); }
+      else if (e.key === 'Escape') { apri(false); }
+    });
+    form.addEventListener('submit', function (e) {
+      // Invio: la voce scelta con le frecce, oppure l'unico risultato; altrimenti la pagina Cerca
+      var risultati = link.filter(function (a) { return !a.classList.contains('trova-tutte'); });
+      var vai = link[scelto] || (risultati.length === 1 ? risultati[0] : null);
+      if (vai && !lista.hidden) { e.preventDefault(); location.href = vai.href; }
+    });
+    document.addEventListener('pointerdown', function (e) { if (!box.contains(e.target)) apri(false); });
+    mic.addEventListener('click', function () {
+      DovinVoce.ascolta(mic, function (testo, finale) { campo.value = testo; if (finale) { campo.focus(); cerca(); } });
+    });
+  })();
+</script>
 {% endblock %}

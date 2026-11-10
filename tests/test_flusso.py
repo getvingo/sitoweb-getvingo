@@ -665,12 +665,27 @@ class TestAssistenteIA(Base):
         self.ia._cliente = lambda: cliente
         return cliente
 
-    def test_chat_visibile_in_panoramica_anche_senza_chiave(self):
+    def test_panoramica_con_trova_al_posto_della_chat(self):
+        # 11/11/2026: per il momento la barra è solo "Trova" (la chat torna con routes.CHAT_PANORAMICA)
         import os
         os.environ.pop("ANTHROPIC_API_KEY", None)
         pagina = self.c.get("/").get_data(as_text=True)
-        self.assertIn('id="chat-msg"', pagina)
-        self.assertIn("non è ancora attivo", pagina)
+        self.assertIn('id="trova-testo"', pagina)
+        self.assertNotIn('id="chat-msg"', pagina)
+
+    def test_trova_auto_ddt_e_adesivi(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        r = self.c.get("/api/trova?q=000123").get_json()  # ultime cifre del VIN
+        self.assertEqual([a["url"] for a in r["auto"]], [f"/veicolo/{vid}"])
+        self.assertIn("In viaggio", r["auto"][0]["sotto"])
+        self.assertEqual(self.c.get("/api/trova?q=golf").get_json()["auto"][0]["titolo"], "VW Golf Bianco")
+        d = self.c.get(f"/api/trova?q=1/{adesso().year}").get_json()["ddt"]
+        self.assertEqual(d[0]["titolo"], f"DDT 1/{adesso().year}")
+        self.assertEqual(self.c.get("/api/trova?q=abcd23").get_json()["adesivi"][0]["titolo"], "ABCD2345")
+        self.assertEqual(self.c.get("/api/trova?q=x").get_json()["auto"], [])  # almeno 2 caratteri
+        self.entra("carr")
+        self.assertNotEqual(self.c.get("/api/trova?q=golf").status_code, 200)  # solo personale interno
 
     def test_senza_chiave_messaggio_chiaro(self):
         import os

@@ -1896,3 +1896,21 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 /* Pericolo leggibile anche nel tema scuro (rosso chiaro: il testo diventa scuro) */
 @media (prefers-color-scheme: dark) { .btn.pericolo { color: var(--notte); } }
 .btn.pericolo:hover { filter: brightness(.94); background: var(--errore); border-color: var(--errore); }
+
+/* Trova (Panoramica, 11/11/2026): risultati sotto la barra, raggruppati (Auto · DDT · Adesivi NFC) */
+.trova-risultati { border-top: 1px solid var(--bordo); max-height: 60vh; overflow-y: auto; padding: 6px; }
+.trova-gruppo { padding: 10px 10px 4px; font-size: var(--fs-12); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
+.trova-voce { display: flex; flex-direction: column; gap: 2px; min-height: 48px; padding: 8px 10px; border-radius: var(--r-m);
+  color: var(--testo); text-decoration: none; border-left: 3px solid transparent; }
+.trova-voce:hover, .trova-voce.scelto { background: var(--superficie); text-decoration: none; }
+.trova-voce.scelto { outline: 2px solid var(--segnale); outline-offset: -2px; }
+.trova-voce > b { font-weight: 650; }
+.trova-voce .vin { font-size: var(--fs-14); color: var(--testo-2); }
+.trova-voce .vin b { color: var(--testo); }
+.trova-voce small { color: var(--testo-2); font-size: var(--fs-13); }
+.trova-voce.fase-in_viaggio { border-left-color: var(--st-viaggio); } .trova-voce.fase-lavorazione { border-left-color: var(--st-lavoro); }
+.trova-voce.fase-da_ritirare { border-left-color: var(--st-ritiro); } .trova-voce.fase-preparazione { border-left-color: var(--st-prep); }
+.trova-voce.fase-pronta { border-left-color: var(--st-pronta); } .trova-voce.fase-in_sede { border-left-color: var(--st-sede); }
+.trova-vuoto { padding: 14px 10px; color: var(--testo-2); font-size: var(--fs-14); }
+.trova-tutte { display: block; padding: 12px 10px; margin-top: 4px; border-top: 1px solid var(--bordo); font-weight: 650; font-size: var(--fs-14); }
+.trova-tutte.scelto { background: var(--superficie); }

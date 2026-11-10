@@ -277,7 +277,59 @@ def home():
                ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
     return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni,
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
-                           ia_attiva=ia.disponibile())
+                           ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
+
+
+# 11/11/2026: per il momento la barra della Panoramica è solo "Trova" (auto, DDT, adesivi). La chat con
+# l'assistente è pronta: basta rimettere True (serve ANTHROPIC_API_KEY)
+CHAT_PANORAMICA = False
+
+
+@bp.route("/api/trova")
+@solo_interni
+def api_trova():
+    """Risultati mentre si scrive nella barra della Panoramica: auto (VIN anche solo le ultime cifre, targa,
+    marca, modello, colore), DDT (numero, anche "12/2026"), adesivi NFC (codice). Al massimo 8 per gruppo."""
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return {"auto": [], "ddt": [], "adesivi": []}
+    like = f"%{q}%"
+    vin_q = vin_mod.normalizza(q)
+    auto = Veicolo.query.filter(or_(
+        Veicolo.vin.ilike(f"%{vin_q}%"), Veicolo.targa.ilike(f"%{q.replace(' ', '')}%"),
+        Veicolo.modello.ilike(like), Veicolo.marca.ilike(like), Veicolo.colore.ilike(like),
+        (Veicolo.marca + " " + Veicolo.modello).ilike(like)))
+    # prima quelle ancora in stock, poi le consegnate
+    auto = sorted(auto.limit(40).all(), key=lambda v: (v.stato == "consegnato", v.marca or "", v.modello or ""))[:8]
+    ddt = []
+    m = re.fullmatch(r"(?:ddt\s*)?(\d{1,6})(?:\s*/\s*(\d{4}))?", q, re.I)
+    if m:
+        cerca = Ddt.query.filter_by(numero=int(m.group(1)))
+        if m.group(2):
+            cerca = cerca.filter_by(anno=int(m.group(2)))
+        ddt = cerca.order_by(Ddt.anno.desc()).limit(8).all()
+    adesivi = Tag.query.filter(Tag.codice.ilike(like)).order_by(Tag.codice).limit(8).all()
+
+    def voce_auto(v):
+        _, stato = v.stato_per(g.utente)
+        dove = v.sede.nome if v.sede and v.stato != "in_viaggio" else ""
+        return {"url": url_for("main.veicolo", veicolo_id=v.id), "titolo": v.descrizione, "vin": v.vin,
+                "targa": v.targa or "", "sotto": " · ".join(x for x in (stato, dove) if x), "fase": v.fase}
+
+    def voce_ddt(d):
+        mv = d.movimento
+        auto_ddt = f"{len(d.movimenti)} auto" if d.multiplo else mv.veicolo.descrizione
+        return {"url": url_for("main.ddt_dettaglio", ddt_id=d.id), "titolo": f"DDT {d.sigla}",
+                "sotto": f"{auto_ddt} · {mv.da_sede.nome if mv.da_sede else '—'} → {mv.sede_arrivo_effettiva.nome}"}
+
+    def voce_adesivo(t):
+        if t.veicolo:
+            return {"url": url_for("main.veicolo", veicolo_id=t.veicolo.id), "titolo": t.codice,
+                    "sotto": f"Abbinato a {t.veicolo.descrizione}"}
+        return {"url": url_for("admin.tag") if g.utente.ruolo == "admin" else "", "titolo": t.codice,
+                "sotto": "Adesivo libero"}
+    return {"auto": [voce_auto(v) for v in auto], "ddt": [voce_ddt(d) for d in ddt],
+            "adesivi": [voce_adesivo(t) for t in adesivi]}
 
 
 def _home_fornitore():
