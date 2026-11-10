@@ -36,10 +36,14 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 
 <div class="panoramica">
 {% if danni %}
-<a class="allerta-danni area-danni" href="{{ url_for('main.danni') }}">
+{# Avviso proporzionato (10/11/2026): rosso pieno solo se un danno blocca una consegna (auto in preparazione o
+   pronta); altrimenti contenuto, sempre rosso ma senza coprire il resto della pagina #}
+{% set bloccanti = danni|selectattr('veicolo.fase', 'in', ['preparazione', 'pronta'])|list %}
+<a class="allerta-danni area-danni {{ 'pieno' if bloccanti else 'contenuto' }}" href="{{ url_for('main.danni') }}">
   <span class="tondo danno">{{ i('attenzione') }}</span>
-  <div><b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}</b>
-    <span>{{ danni[0].veicolo.descrizione }} · {{ danni[0].zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span></div>
+  <div><b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
+    {% set primo = bloccanti[0] if bloccanti else danni[0] %}
+    <span>{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span></div>
   {{ i('chevron') }}
 </a>
 {% endif %}
@@ -49,15 +53,16 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 <div class="riquadri">
   {% set tot_auto = [conteggi.in_viaggio + conteggi.da_ritirare + conteggi.lavorazione + conteggi.preparazione + conteggi.pronta + conteggi.stock, 1]|max %}
   {% macro riquadro(url, fase, icona, n, etichetta) %}
-  <a href="{{ url }}"><span class="tondo {{ fase }}">{{ i(icona) }}</span><div><strong data-conta="{{ n }}">{{ n }}</strong><span class="et">{{ etichetta }}</span></div>
+  <a href="{{ url }}" class="{{ 'zero' if not n }}"><span class="tondo {{ fase }}">{{ i(icona) }}</span><div><strong data-conta="{{ n }}">{{ n }}</strong><span class="et">{{ etichetta }}</span></div>
     <span class="barra-stato {{ fase }}" style="--quota: {{ '%.3f'|format(n / tot_auto) }}" aria-hidden="true"></span></a>
   {% endmacro %}
+  {# ordine fisso (si impara a memoria): prima ciò che chiede un'azione, poi ciò che è in corso, poi lo stock #}
+  {{ riquadro(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
+  {{ riquadro(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte consegna') }}
   {{ riquadro(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio,
      'In viaggio' ~ (' · ' ~ conteggi.ddt_in_viaggio ~ ' DDT' if conteggi.ddt_in_viaggio and conteggi.ddt_in_viaggio != conteggi.in_viaggio else '')) }}
-  {{ riquadro(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
   {{ riquadro(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
   {{ riquadro(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
-  {{ riquadro(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte consegna') }}
   {{ riquadro(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
 </div>
 

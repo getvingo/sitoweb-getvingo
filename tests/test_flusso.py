@@ -2822,3 +2822,17 @@ class TestSistemaDesign(Base):
         if "Presso Carrozzeria B" in scheda:
             self.assertIn("Solo trasferimento · nessuna lavorazione", scheda)
             self.assertNotIn("In lavorazione presso", scheda)
+
+    def test_avviso_danni_proporzionato_e_riquadri_in_ordine(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            db.session.add(Danno(veicolo_id=vid, zona="Tetto", descrizione="grandine", segnalato_da_id=1))
+            db.session.commit()
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("allerta-danni area-danni contenuto", home)  # auto in sede: non blocca consegne
+        self.assertLess(home.index("Da ritirare</span>"), home.index("In stock</span>"))
+        self.c.post("/t/ABCD2345", data=POS)
+        self.c.post(f"/veicolo/{vid}/preparazione")
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("allerta-danni area-danni pieno", home)
+        self.assertIn("blocca 1 consegna", home)

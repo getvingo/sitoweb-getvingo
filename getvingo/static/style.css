@@ -149,7 +149,14 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px calc(var(--barra-so
 .avviso.ok { background: var(--ok-tenue); color: var(--ok); }
 .avviso.errore { background: var(--errore-tenue); color: var(--errore); }
 
-/* Bottoni */
+/* Bottoni — 4 livelli (10/11/2026), uno per ruolo:
+   1. Primario  .btn.primario   viola pieno: l'azione principale della schermata (una sola per area)
+   2. Secondario .btn            bordo: le altre azioni. Variante "di stato" con bordo e testo del colore della
+                                 fase (.btn-predisponi magenta, .btn-prepara verde acqua, .btn-sollecito arancio,
+                                 .btn-danno rosso): si usa solo quando l'azione porta l'auto in quello stato
+   3. Terziario .btn-link        solo testo: annulla, togli, apri il dettaglio
+   4. Pericolo  .btn.pericolo    rosso pieno, sempre in fondo dentro .zona-pericolo (ripiegata, linea sopra)
+   Misure: .pieno 56 px a tutta riga · normale 48 px · .piccolo 44 px */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
   padding: 0 18px; border-radius: var(--r-s); border: 1px solid var(--bordo-forte); background: var(--carta);
   color: var(--testo); font: inherit; font-weight: 650; cursor: pointer; text-align: center;
@@ -1858,3 +1865,34 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 @media (min-width: 560px) { details.filtri-ripiegabili > summary { display: none; } }
 /* Schede di filtro (DDT, Danni) nel selettore segmentato: un po' d'aria sotto */
 .schede-filtro { margin: 4px 0 16px; }
+
+/* Panoramica (10/11/2026): riquadri a zero attenuati; avviso danni proporzionato */
+.riquadri a.zero .tondo { background: var(--superficie); color: var(--testo-2); }
+.riquadri a.zero strong, .riquadri a.zero .et { color: var(--testo-2); }
+.riquadri a.zero .barra-stato { display: none; }
+.allerta-danni.contenuto { background: var(--carta); color: var(--testo); border: 1px solid var(--bordo);
+  border-left: var(--bordo-stato) solid var(--danno); box-shadow: var(--ombra); }
+.allerta-danni.contenuto:hover { background: var(--danno-tenue); }
+.allerta-danni.contenuto b { color: var(--danno-scuro); }
+.allerta-danni.contenuto span:not(.tondo) { color: var(--testo-2); }
+.allerta-danni.contenuto .tondo.danno { background: var(--danno); color: #fff; animation: none; }
+
+/* Gestione (10/11/2026): ogni argomento è un elenco in una sola carta (righe separate da una linea), come le
+   impostazioni di un'app. Su computer due colonne bilanciate: Azienda + Persone a sinistra, Operatività a destra */
+.gruppo-gestione .menu-gestione { display: block; background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: var(--r); box-shadow: var(--ombra); overflow: hidden; }
+.gruppo-gestione .menu-gestione .voce { border: 0; border-radius: 0; box-shadow: none; background: none; padding: 14px 16px; }
+.gruppo-gestione .menu-gestione .voce + .voce { border-top: 1px solid var(--bordo); }
+.gruppo-gestione .menu-gestione .voce:hover { background: var(--superficie); }
+.gruppo-gestione .menu-gestione .voce h3 { margin: 0; }
+.gruppo-gestione .menu-gestione .voce .icona { width: 22px; height: 22px; }
+.gruppo-gestione .menu-gestione .voce > .icona:last-child { color: var(--testo-2); width: 18px; height: 18px; }
+@media (min-width: 1024px) {
+  .gruppi-gestione { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 4px 28px; }
+  .gruppo-gestione { align-self: start; }
+  .gruppo-gestione:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+/* Pericolo leggibile anche nel tema scuro (rosso chiaro: il testo diventa scuro) */
+@media (prefers-color-scheme: dark) { .btn.pericolo { color: var(--notte); } }
+.btn.pericolo:hover { filter: brightness(.94); background: var(--errore); border-color: var(--errore); }
