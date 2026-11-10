@@ -39,13 +39,16 @@ def configurata():
     return bool(s["host"] and s["utente"] and s["password"])
 
 
-def invia(destinatario, oggetto, modello, **dati):
-    """Manda l'email scritta nei modelli email/<modello>.txt e .html."""
+def invia(destinatario, oggetto, modello, allegati=None, in_sottofondo=False, **dati):
+    """Manda l'email scritta nei modelli email/<modello>.txt e .html.
+    allegati: [(nome_file, byte, "application/pdf")]. in_sottofondo: la spedizione non fa aspettare la pagina
+    (gli errori finiscono nel registro del server)."""
     testo = render_template(f"email/{modello}.txt", **dati)
     html = render_template(f"email/{modello}.html", oggetto=oggetto, **dati)
     if current_app.config.get("TESTING"):
         current_app.extensions.setdefault("posta_inviata", []).append(
-            {"a": destinatario, "oggetto": oggetto, "testo": testo, "html": html})
+            {"a": destinatario, "oggetto": oggetto, "testo": testo, "html": html,
+             "allegati": [nome for nome, _, _ in allegati or []]})
         return
     s = _impostazioni()
     if not configurata():
@@ -57,6 +60,18 @@ def invia(destinatario, oggetto, modello, **dati):
     msg["Message-ID"] = make_msgid(domain=s["utente"].split("@")[-1])
     msg.set_content(testo)
     msg.add_alternative(html, subtype="html")
+    for nome, dati_file, tipo in allegati or []:
+        principale, secondario = tipo.split("/", 1)
+        msg.add_attachment(dati_file, maintype=principale, subtype=secondario, filename=nome)
+    if in_sottofondo:
+        import threading
+        registro = current_app.logger
+        threading.Thread(target=_spedisci, args=(s, msg, destinatario, registro), daemon=True).start()
+        return
+    _spedisci(s, msg, destinatario, current_app.logger, solleva=True)
+
+
+def _spedisci(s, msg, destinatario, registro, solleva=False):
     try:
         if s["porta"] == 465:
             with smtplib.SMTP_SSL(s["host"], s["porta"], context=ssl.create_default_context(), timeout=20) as srv:
@@ -68,5 +83,6 @@ def invia(destinatario, oggetto, modello, **dati):
                 srv.login(s["utente"], s["password"])
                 srv.send_message(msg)
     except (smtplib.SMTPException, OSError) as e:
-        current_app.logger.error("Email a %s non inviata: %s", destinatario, e)
-        raise ErrorePosta("Il server di posta non ha accettato l'email: riprova più tardi.")
+        registro.error("Email a %s non inviata: %s", destinatario, e)
+        if solleva:
+            raise ErrorePosta("Il server di posta non ha accettato l'email: riprova più tardi.")

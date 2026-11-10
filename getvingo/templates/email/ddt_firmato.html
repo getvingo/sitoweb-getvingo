@@ -1,0 +1,9 @@
+{# TESTO PROVVISORIO (11/11/2026): grafica e messaggio dell email del DDT firmato sono da disegnare #}
+{% extends "email/_base.html" %}
+{% block corpo %}
+<p style="margin:0 0 12px">Buongiorno,</p>
+<p style="margin:0 0 12px">in allegato il <b>documento di trasporto n. {{ d.sigla }}</b> del {{ d.emesso_at.strftime('%d/%m/%Y') }}, completo delle firme.</p>
+<p style="margin:0 0 4px"><b>{{ tratta }}</b></p>
+<p style="margin:0 0 12px;color:#5A5470">{{ beni }}<br>Ricevuto il {{ m.arrivo_at.strftime('%d/%m/%Y alle %H:%M') }}</p>
+{% endblock %}
+{% block nota %}Conservate questa copia con i vostri documenti di trasporto: è il PDF definitivo, uguale per mittente e destinatario.{% endblock %}

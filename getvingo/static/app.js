@@ -180,6 +180,14 @@
       setTimeout(function () { a.innerHTML = prima; }, 1500);
     });
   });
+  // DDT appena chiuso: nel browser il PDF firmato si scarica da solo (nell'app installata resta il pulsante,
+  // perché lì serve un tocco per aprire Salva su File)
+  var subito = document.querySelector('[data-scarica-subito]');
+  if (subito && !installata) {
+    var copia = document.createElement('a');
+    copia.href = subito.href; copia.download = subito.dataset.nome; copia.hidden = true;
+    document.body.appendChild(copia); copia.click(); copia.remove();
+  }
   // Esc chiude le pagine-riquadro (anteprima del DDT) come i pannelli
   var chiudiEsc = document.querySelector('[data-chiudi-esc]');
   if (chiudiEsc) document.addEventListener('keydown', function (e) {

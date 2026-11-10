@@ -167,6 +167,16 @@ def aggiungi_colonne():
         with db.engine.begin() as conn:  # giorni di lavorazione stimati (avanzamento e solleciti)
             conn.exec_driver_sql("ALTER TABLE movimento ADD COLUMN lavorazione_stima_giorni INTEGER")
         aggiunte.append("movimento.lavorazione_stima_giorni")
+    # 11/11/2026: email per le copie dei DDT firmati, dati per le analisi
+    nuove = [("azienda", "email_ddt", "VARCHAR(200) DEFAULT ''"), ("sede", "email_ddt", "VARCHAR(200) DEFAULT ''"),
+             ("veicolo", "venduta_il", "DATE"), ("movimento", "lavorazione_stima_iniziale", "INTEGER"),
+             ("movimento", "stima_viaggio_min", "INTEGER"), ("movimento", "stima_viaggio_km", "FLOAT"),
+             ("ddt", "copie_inviate_at", "TIMESTAMP"), ("azienda", "invia_copie_ddt", "BOOLEAN DEFAULT FALSE"), ("ddt", "copie_inviate_a", "VARCHAR(500) DEFAULT ''")]
+    for tabella, colonna, tipo in nuove:
+        if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE {tabella} ADD COLUMN {colonna} {tipo}")
+            aggiunte.append(f"{tabella}.{colonna}")
     return aggiunte
 
 

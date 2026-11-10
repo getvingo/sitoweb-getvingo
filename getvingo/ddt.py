@@ -177,20 +177,7 @@ def pdf(ddt, invariante=False):
             c.drawCentredString(0, 0, "ANNULLATO")
             c.restoreState()
 
-        # Piede: tracciabilità
-        c.setStrokeColor(BORDO)
-        c.setLineWidth(0.6)
-        c.line(sx, 17 * mm, sx + larg, 17 * mm)
-        c.setFillColor(TENUE)
-        c.setFont("Helvetica", 7)
-        piede = f"Emesso da {ddt.creato_da.nome} il {ddt.emesso_at:%d/%m/%Y alle %H:%M}"
-        if ddt.revisione:
-            ultima = ddt.revisioni_ordinate[-1]
-            piede += f"  ·  ultima modifica (rev. {ultima.numero}) di {ultima.utente.nome} il {ultima.at:%d/%m/%Y %H:%M}"
-        c.drawString(sx, 12.5 * mm, piede)
-        c.drawString(sx, 9 * mm, f"{len(ddt.movimenti)} autoveicoli in questo DDT" if ddt.multiplo
-                     else f"Telaio {v.vin}  ·  movimento #{m.id}")
-        _scritta(c, sx + larg, 12.5 * mm, 8)
+        # Piede (11/11/2026): niente dati interni (chi l'ha emesso, modifiche, n. movimento) — solo la pagina
         c.setFillColor(TENUE)
         c.setFont("Helvetica", 7)
         c.drawRightString(sx + larg, 9 * mm, f"DDT {ddt.sigla}  ·  pagina {pagine[0]}")
@@ -227,22 +214,8 @@ def pdf(ddt, invariante=False):
     c.drawString(bx + 4 * mm, y - 10 * mm, ddt.sigla)
     c.setFont("Helvetica-Bold", 10)
     c.drawRightString(bx + bw - 4 * mm, y - 10 * mm, f"{ddt.emesso_at:%d/%m/%Y}")
-    if ddt.revisione:
-        c.setFont("Helvetica", 7)
-        c.drawRightString(bx + bw - 4 * mm, y - 13.5 * mm, f"Revisione {ddt.revisione}")
 
-    # Stato del documento
     y -= 21 * mm
-    chiave = "annullato" if ddt.annullato_at else m.stato
-    etichetta, colore = STATO.get(chiave, (chiave, TENUE))
-    c.setFillColor(colore)
-    larghezza_pill = c.stringWidth(etichetta.upper(), "Helvetica-Bold", 7.5) + 0.6 * len(etichetta) + 8 * mm
-    c.roundRect(sx, y - 5.5 * mm, larghezza_pill, 6 * mm, 3 * mm, stroke=0, fill=1)
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", 7.5)
-    c.drawString(sx + 4 * mm, y - 3.5 * mm, etichetta.upper(), charSpace=0.6)
-    y -= 9 * mm
-
     # Tratta: da dove a dove, e quando parte (il dato che si cerca per primo)
     c.setFillColor(FONDO)
     c.roundRect(sx, y - 14 * mm, larg, 14 * mm, 2 * mm, stroke=0, fill=1)
@@ -284,7 +257,7 @@ def pdf(ddt, invariante=False):
     vettore_kv.append(("Responsabile" if ddt.multiplo else "Conducente",
                        m.conducente or ("da indicare al ritiro" if da_ritirare else "-")))
     trasporto_kv = [("Causale", m.causale), ("Modalità", m.mezzo or ("da indicare al ritiro" if da_ritirare else "-")),
-                    ("Partenza da", m.da_sede.nome if m.da_sede else "-"), ("A cura del", "vettore")]
+                    ("A cura del", "vettore")]
     h = max(_altezza_kv(vettore_kv, meta), _altezza_kv(trasporto_kv, meta))
     _scheda_kv(c, sx, y, meta, "Vettore e conducente", vettore_kv, h)
     _scheda_kv(c, dx, y, meta, "Trasporto", trasporto_kv, h)
@@ -352,45 +325,16 @@ def pdf(ddt, invariante=False):
                                           f"{(m.mezzo or 'in movimento su strada').lower()}")
     y -= 7 * mm + spazio
 
-    # Lavorazione e consegna
+    # Lavorazione richiesta e, a consegna avvenuta, la ricezione (con la nota del destinatario)
     lavoro = [m.lavorazione or "Nessuna lavorazione indicata", m.lavorazione_note]
-    for mv in movimenti:
-        if mv.lavorazione_completata_at:
-            lavoro.append(f"{(mv.veicolo.modello or 'Auto') + ' …' + mv.veicolo.vin[-8:] + ': ' if len(movimenti) > 1 else ''}"
-                          f"completata il {mv.lavorazione_completata_at:%d/%m/%Y alle %H:%M}"
-                          f"{' da ' + mv.lavorazione_completata_da.nome if mv.lavorazione_completata_da else ''}"
-                          f"{' · ' + mv.lavorazione_note_fine if mv.lavorazione_note_fine else ''}")
     if m.stato == "chiuso":
-        consegna = [f"Ricezione confermata il {m.arrivo_at:%d/%m/%Y alle %H:%M}"
-                    + (f" ({len(movimenti)} auto)" if len(movimenti) > 1 else ""),
-                    f"da {m.arrivo_utente.nome}" + (" (per conto del destinatario)" if m.arrivo_per_conto else "")
-                    if m.arrivo_utente else "",
-                    f"Luogo effettivo di arrivo: {m.arrivo_sede.nome}" if m.arrivo_sede else "",
+        consegna = [f"Ricevuto il {m.arrivo_at:%d/%m/%Y alle %H:%M}",
+                    f"Luogo di arrivo: {m.arrivo_sede.nome}" if m.arrivo_sede and m.arrivo_sede != m.sede_arrivo_effettiva else "",
                     f"Note: {m.note_arrivo}" if m.note_arrivo else ""]
-    elif m.stato == "aperto":
-        consegna = ["In viaggio", "Consegna non ancora confermata dal destinatario"
-                    + (f" ({len(movimenti)} auto)" if len(movimenti) > 1 else "")]
+        y -= _coppia(c, sx, dx, y, meta, ("Lavorazione richiesta a destinazione", lavoro),
+                     ("Consegna", consegna)) + spazio
     else:
-        consegna = ["Da ritirare", "Trasporto non ancora iniziato"]
-    y -= _coppia(c, sx, dx, y, meta, ("Lavorazione richiesta a destinazione", lavoro),
-                 ("Consegna", consegna)) + spazio
-
-    # Storico modifiche (ultime 4)
-    if ddt.revisione:
-        righe = []
-        for r in ddt.revisioni_ordinate[-4:]:
-            cambi = "; ".join(f"{x['campo']}: {x['prima'] or '-'} → {x['dopo'] or '-'}" for x in r.modifiche)
-            righe.append(f"Rev. {r.numero} · {r.at:%d/%m/%Y %H:%M} · {r.utente.nome} — {cambi}")
-        c.setFillColor(BLU)
-        c.setFont("Helvetica-Bold", 6.8)
-        c.drawString(sx, y - 3 * mm, "STORICO MODIFICHE", charSpace=0.6)
-        y -= 7.5 * mm
-        c.setFillColor(TENUE)
-        c.setFont("Helvetica", 7.5)
-        for t in _righe(righe, "Helvetica", 7.5, larg):
-            c.drawString(sx, y, t)
-            y -= 3.6 * mm
-        y -= spazio
+        y -= _scheda(c, sx, y, larg, "Lavorazione richiesta a destinazione", lavoro) + spazio
 
     # Firme: in fondo alla pagina (o su una pagina nuova se il contenuto è arrivato troppo in basso)
     if y - 6 * mm < 52 * mm:
@@ -414,8 +358,7 @@ def pdf(ddt, invariante=False):
     firme = [
         ("Firma mittente", ddt.firma_mittente, nome_m, f"{ddt.emesso_at:%d/%m/%Y %H:%M}"),
         ("Firma responsabile" if ddt.multiplo else "Firma conducente", m.firma_conducente, m.conducente or "",
-         (f"{m.partenza_at:%d/%m/%Y %H:%M}" + (" · firma salvata, tocco NFC" if m.firma_salvata else ""))
-         if m.partenza_at else ""),
+         f"{m.partenza_at:%d/%m/%Y %H:%M}" if m.partenza_at else ""),
         ("Firma destinatario", m.firma_destinatario, destinatario[0],
          f"{m.arrivo_at:%d/%m/%Y %H:%M}" if m.arrivo_at else ""),
     ]

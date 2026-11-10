@@ -16,7 +16,9 @@
     </div>
     {% else %}<input type="hidden" name="tipo" value="{{ s.tipo }}">{% endif %}
     {{ campi_indirizzo(s) }}
-    {% if gruppo == 'esterne' %}{{ campi_fiscali(s, per_tipo=True) }}{% endif %}
+    {% if gruppo == 'esterne' %}{{ campi_fiscali(s, per_tipo=True) }}
+    <label class="campo"><span>Email per i DDT firmati <span class="tenue">(facoltativa)</span></span><input type="email" name="email_ddt" value="{{ s.email_ddt or '' }}" maxlength="200" placeholder="Es. amministrazione@azienda.it" autocomplete="off">
+    <small class="tenue">A ogni consegna arriva qui in automatico il PDF del DDT completo di firme. Se vuota, va agli utenti di questo fornitore (se ne ha).</small></label>{% endif %}
   </div>
   {% if s.tipo == 'propria' %}
   <p class="tenue piccolo">Firma: per le sedi e i piazzali della concessionaria vale quella in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>, non serve altro.</p>

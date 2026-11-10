@@ -1,12 +1,15 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, badge_ddt, indietro, immagine_firma %}
+{% from "_macro.html" import i %}
 {% from "_auto.html" import in_viaggio_da, tocchi %}
 {% block titolo %}Anteprima DDT {{ d.sigla }} · Getvingo{% endblock %}
+{# sul telefono l'anteprima è a tutto schermo (senza testata né menu in basso): si esce con la ✕ #}
+{% block classe_pagina %}pagina-anteprima{% endblock %}
 {% block contenuto %}
 {# ✕ sempre visibile in alto a sinistra della barra fissa: sul telefono (app installata) è l'unico modo per uscire #}
 <div class="anteprima-barra">
+  <span class="anteprima-nome">DDT {{ d.sigla }}</span>
   <a class="btn anteprima-chiudi" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}" data-indietro data-chiudi-esc
-     aria-label="Chiudi l'anteprima" title="Chiudi">✕</a>
+     aria-label="Chiudi l'anteprima" title="Chiudi">✕<span class="chiudi-testo">Chiudi</span></a>
   <a class="btn primario" href="{{ url_for('main.ddt_pdf', ddt_id=d.id, scarica=1) }}" download="DDT_{{ d.numero }}_{{ d.anno }}.pdf"
      data-scarica-pdf data-nome="DDT_{{ d.numero }}_{{ d.anno }}.pdf">{{ i('scarica', 's') }} Scarica PDF</a>
   <button type="button" class="btn" data-condividi-pdf="{{ url_for('main.ddt_pdf', ddt_id=d.id) }}"
@@ -20,59 +23,73 @@
 <div class="anteprima-stato chiuso">{{ i('check', 's') }} Arrivato il {{ m.arrivo_at|data('%d/%m/%Y alle %H:%M') }}{% if m.arrivo_per_conto %} · confermato per conto del destinatario{% endif %}</div>
 {% endif %}
 
-<article class="foglio-ddt">
-  <header class="foglio-testa">
-    <div><small>Mittente</small><b>{{ mittente[0] }}</b><span>{{ mittente[1] }}</span>{% if mittente[2] %}<span>P. IVA {{ mittente[2] }}</span>{% endif %}</div>
-    <div class="foglio-numero"><small>Documento di trasporto{% if d.multiplo %} multiplo{% endif %}</small><b>N. {{ d.sigla }}</b>
-      <span>{{ d.emesso_at|data('%d/%m/%Y alle %H:%M') }}</span>{% if d.revisione %}<span>Revisione {{ d.revisione }}</span>{% endif %}{{ badge_ddt(d) }}</div>
+{# Il foglio ricalca il PDF (11/11/2026): testata col numero, tratta, parti, trasporto, beni, firme.
+   Solo i dati del documento: niente storico, stato o dati interni #}
+{% set beni = d.movimenti or [m] %}
+<article class="foglio-ddt" aria-label="Documento di trasporto {{ d.sigla }}">
+  <header class="fg-testa">
+    <div class="fg-titolo"><b>Documento di trasporto{% if d.multiplo %} multiplo{% endif %}</b><small>D.D.T. ai sensi del D.P.R. 472/1996</small></div>
+    <div class="fg-numero"><div><small>Numero</small><b>{{ d.sigla }}</b></div><div><small>Data</small><b>{{ d.emesso_at|data('%d/%m/%Y') }}</b></div></div>
   </header>
 
-  <section class="foglio-tratta">
-    <div><small>Luogo di partenza</small><b>{{ m.da_sede.nome if m.da_sede else '—' }}</b><span>{{ m.da_sede.indirizzo if m.da_sede else '' }}</span></div>
-    <span class="foglio-freccia">{{ i('freccia') }}</span>
-    <div><small>Destinatario</small><b>{{ destinatario[0] }}</b><span>{{ destinatario[1] }}</span>{% if destinatario[2] %}<span>P. IVA {{ destinatario[2] }}</span>{% endif %}</div>
+  <section class="fg-tratta" aria-label="Tratta">
+    <div class="fg-tappa"><small>Partenza</small><b>{{ m.da_sede.nome if m.da_sede else '—' }}</b>{% if m.da_sede and m.da_sede.indirizzo %}<span>{{ m.da_sede.indirizzo }}</span>{% endif %}</div>
+    <div class="fg-tappa arrivo"><small>Destinazione</small><b>{{ m.sede_arrivo_effettiva.nome }}</b>{% if m.sede_arrivo_effettiva.indirizzo %}<span>{{ m.sede_arrivo_effettiva.indirizzo }}</span>{% endif %}</div>
+    <div class="fg-inizio"><small>Inizio trasporto</small><b>{{ m.partenza_at|data('%d/%m/%Y · %H:%M') if m.partenza_at else 'al ritiro' }}</b></div>
   </section>
 
-  <section class="foglio-griglia">
-    <div><small>Causale</small><b>{{ m.causale }}</b></div>
-    <div><small>Inizio trasporto</small><b>{{ m.partenza_at|data('%d/%m/%Y %H:%M') if m.partenza_at else 'da ritirare' }}</b></div>
-    <div><small>Modalità</small><b>{{ m.mezzo or '—' }}</b></div>
-    <div><small>{{ 'Responsabile' if d.multiplo else 'Conducente' }}</small><b>{{ m.conducente or '—' }}</b></div>
-    <div class="largo"><small>Vettore</small><b>{{ vettore[0] }}</b>{% if vettore[1] or vettore[2] %}<span>{{ vettore[1] }}{% if vettore[2] %} · P. IVA {{ vettore[2] }}{% endif %}</span>{% endif %}</div>
-    <div class="largo"><small>Lavorazione</small><b>{{ m.lavorazione or 'Da indicare' }}</b>{% if m.lavorazione_note %}<span>{{ m.lavorazione_note }}</span>{% endif %}</div>
+  <section class="fg-parti">
+    <div class="fg-riquadro"><small>Mittente</small><b>{{ mittente[0] }}</b><span>{{ mittente[1] }}</span>{% if mittente[2] %}<span>P. IVA {{ mittente[2] }}</span>{% endif %}</div>
+    <div class="fg-riquadro"><small>Destinatario</small><b>{{ destinatario[0] }}</b><span>{{ destinatario[1] }}</span>{% if destinatario[2] %}<span>P. IVA {{ destinatario[2] }}</span>{% endif %}</div>
   </section>
 
   <section>
-    <h3 class="foglio-titolo">Beni trasportati · {{ (d.movimenti or [m])|length }}</h3>
-    {% for x in d.movimenti or [m] %}{% set v = x.veicolo %}
-    <div class="foglio-bene">
-      <div><b>{{ v.marca }} {{ v.modello }}</b>{% if v.versione %} <span>{{ v.versione }}</span>{% endif %}
-        <small>{{ v.colore or '' }}{{ ' · ' ~ v.CONDIZIONI[v.condizione] if v.condizione }}{{ ' · ' ~ v.TIPOLOGIE[v.tipologia] }}</small></div>
-      <div class="foglio-bene-id">{{ v.vin|vin }}{% if v.targa %} <span class="targa">{{ v.targa }}</span>{% endif %}</div>
-    </div>
+    <h3 class="fg-sezione">Trasporto</h3>
+    <dl class="fg-dati">
+      <div><dt>Causale</dt><dd>{{ m.causale }}</dd></div>
+      <div><dt>Modalità</dt><dd>{{ m.mezzo or '—' }}</dd></div>
+      <div><dt>{{ 'Responsabile' if d.multiplo else 'Conducente' }}</dt><dd>{{ m.conducente or '—' }}</dd></div>
+      <div><dt>Vettore</dt><dd>{{ vettore[0] }}{% if vettore[1] or vettore[2] %}<span>{{ vettore[1] }}{% if vettore[2] %} · P. IVA {{ vettore[2] }}{% endif %}</span>{% endif %}</dd></div>
+      <div><dt>A cura del</dt><dd>vettore</dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <h3 class="fg-sezione">Beni trasportati{% if beni|length > 1 %} · {{ beni|length }} autoveicoli{% endif %}</h3>
+    <ul class="fg-beni">
+    {% for x in beni %}{% set v = x.veicolo %}
+      <li><div class="fg-bene-nome"><b>{{ v.marca }} {{ v.modello }}{% if v.versione %} {{ v.versione }}{% endif %}</b>
+          <span>{{ [v.colore, v.CONDIZIONI[v.condizione] if v.condizione else '', v.TIPOLOGIE[v.tipologia]]|select|join(' · ') }}</span></div>
+        <div class="fg-bene-id"><small>Telaio</small>{{ v.vin|vin }}{% if v.targa %}<small>Targa</small><span class="targa">{{ v.targa }}</span>{% endif %}</div></li>
     {% endfor %}
+    </ul>
   </section>
 
-  {% if m.partenza_at and tocchi_viaggio(m) %}
   <section>
-    <h3 class="foglio-titolo">Tocchi del viaggio</h3>
-    {{ tocchi(m) }}
+    <h3 class="fg-sezione">Lavorazione richiesta a destinazione</h3>
+    <p class="fg-testo"><b>{{ m.lavorazione or 'Da indicare' }}</b>{% if m.lavorazione_note %}<br>{{ m.lavorazione_note }}{% endif %}</p>
+  </section>
+
+  {% if m.arrivo_at %}
+  <section>
+    <h3 class="fg-sezione">Consegna</h3>
+    <p class="fg-testo"><b>Ricevuto il {{ m.arrivo_at|data('%d/%m/%Y alle %H:%M') }}</b>{% if m.note_arrivo %}<br>Note: {{ m.note_arrivo }}{% endif %}</p>
   </section>
   {% endif %}
 
-  {% if m.note_arrivo %}<section><h3 class="foglio-titolo">Annotazioni alla consegna</h3><p>{{ m.note_arrivo }}</p></section>{% endif %}
-
-  <section class="foglio-firme">
-    {{ immagine_firma(d.firma_mittente, 'Mittente') }}
-    {{ immagine_firma(m.firma_conducente, 'Conducente' ~ (' · firma salvata' if m.firma_salvata else '')) }}
-    {{ immagine_firma(m.firma_destinatario, 'Destinatario') }}
+  <section>
+    <h3 class="fg-sezione">Firme</h3>
+    <div class="fg-firme">
+      {% for etichetta, firma, chi, quando in [
+           ('Mittente', d.firma_mittente, mittente[0], d.emesso_at),
+           ('Responsabile' if d.multiplo else 'Conducente', m.firma_conducente, m.conducente, m.partenza_at),
+           ('Destinatario', m.firma_destinatario, destinatario[0], m.arrivo_at)] %}
+      <figure class="fg-firma">
+        <div class="fg-firma-spazio">{% if firma %}<img src="{{ firma }}" alt="Firma {{ etichetta|lower }}">{% else %}<span>In attesa</span>{% endif %}</div>
+        <figcaption><small>{{ etichetta }}</small><b>{{ chi or '—' }}</b>{% if quando %}<span>{{ quando|data('%d/%m/%Y %H:%M') }}</span>{% endif %}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
   </section>
-
-  {% if d.revisioni %}
-  <section><h3 class="foglio-titolo">Modifiche</h3>
-    <ul class="foglio-revisioni">{% for r in d.revisioni_ordinate %}<li><b>Rev. {{ r.numero }}</b> · {{ r.at|data('%d/%m/%Y %H:%M') }} · {{ r.utente.nome }}:
-      {% for c in r.modifiche %}{{ c.campo }} {{ c.prima }} → {{ c.dopo }}{{ '; ' if not loop.last }}{% endfor %}</li>{% endfor %}</ul>
-  </section>
-  {% endif %}
 </article>
 {% endblock %}

@@ -74,6 +74,7 @@
       <div class="menu-tendina">
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }} · {{ g.utente.sede.nome if g.utente.ruolo == 'fornitore' and g.utente.sede else g.utente.organizzazione.nome }}</span><span class="menu-email">{{ g.utente.email }}</span></div>
         <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
+        {% if g.utente.interno %}<a href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
         {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore" role="separator"></div>{% endif %}
         {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
         {% if gestore() %}<a href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}
@@ -103,6 +104,14 @@
     {% for categoria, messaggio in get_flashed_messages(with_categories=true) %}
       <div class="avviso {{ categoria }}" role="status" data-vibra="{{ categoria }}">{{ i('check' if categoria == 'ok' else 'orologio') }}<span>{{ messaggio }}</span></div>
     {% endfor %}
+    {# DDT appena chiuso: il PDF firmato si scarica da solo sul telefono di chi ha confermato l'arrivo (nell'app
+       installata si apre la scheda Salva su File); la stessa copia parte per email alle due parti #}
+    {% set scarica_id = session.pop('scarica_ddt', None) if g.utente else None %}
+    {% if scarica_id %}{% set dd = ddt_per_id(scarica_id) %}{% if dd %}
+    <div class="avviso ok ddt-firmato" role="status">{{ i('doc') }}<span><b>DDT {{ dd.sigla }} firmato</b>{% if dd.copie_inviate_a %} · copia inviata a {{ dd.copie_inviate_a }}{% endif %}</span>
+      <a class="btn piccolo primario" href="{{ url_for('main.ddt_pdf', ddt_id=dd.id, scarica=1) }}" download="DDT_{{ dd.numero }}_{{ dd.anno }}.pdf"
+         data-scarica-pdf data-scarica-subito data-nome="DDT_{{ dd.numero }}_{{ dd.anno }}.pdf">{{ i('scarica', 's') }} Salva il PDF</a></div>
+    {% endif %}{% endif %}
     {% block contenuto %}{% endblock %}
   </div>
 </main>

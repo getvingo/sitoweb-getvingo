@@ -10,6 +10,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, r
                    render_template, request, send_from_directory, session, url_for)
 from sqlalchemy import or_
 
+from . import copie
 from . import ddt as ddt_pdf_mod
 from . import ia
 from . import marchi
@@ -278,6 +279,15 @@ def home():
     return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni,
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
                            ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
+
+
+@bp.route("/analisi")
+@solo_interni
+def analisi():
+    """Tempi dalla vendita alla consegna, fase per fase; fornitori; tratte (stimato e reale)."""
+    from . import analisi as analisi_mod
+    dati = analisi_mod.calcola(request.args.get("periodo", "90"))
+    return render_template("analisi.html", a=dati, periodi=analisi_mod.PERIODI, durata=analisi_mod.durata)
 
 
 # 11/11/2026: per il momento la barra della Panoramica è solo "Trova" (auto, DDT, adesivi). La chat con
@@ -1115,6 +1125,11 @@ def note_interne(veicolo_id):
     venditore = db.session.get(Utente, vid) if vid else None
     v.venditore = venditore if venditore is not None and venditore.interno else None
     v.note_interne = request.form.get("note_interne", "").strip()[:2000]
+    venduta = request.form.get("venduta_il", "").strip()
+    try:  # data di vendita: serve alle analisi (dalla vendita alla consegna)
+        v.venduta_il = datetime.strptime(venduta, "%Y-%m-%d").date() if venduta else None
+    except ValueError:
+        pass
     db.session.commit()
     flash("Note interne salvate: restano nel portale, non vanno sul DDT.", "ok")
     return redirect(url_for("main.veicolo", veicolo_id=v.id) + "#note-interne")
@@ -1508,6 +1523,13 @@ def ddt_arrivo(ddt_id):
     documento = db.get_or_404(Ddt, ddt_id)
     risposta = _azione_ddt(ddt_id, arriva, "Arrivo confermato e DDT chiuso: posizione delle auto aggiornata."
                            if documento.multiplo else "Arrivo confermato e DDT chiuso: posizione dell'auto aggiornata.")
+    if all(m.stato == "chiuso" for m in documento.movimenti or [documento.movimento]):
+        # DDT completo: la copia firmata parte per email alle due parti e chi conferma la scarica sul telefono
+        try:
+            copie.invia(documento)
+        except Exception:  # l'invio non deve mai bloccare la chiusura del DDT
+            current_app.logger.exception("Copie del DDT %s non inviate", documento.sigla)
+        session["scarica_ddt"] = documento.id
     if documento.multiplo:
         return risposta
     m = documento.movimento

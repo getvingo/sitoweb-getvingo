@@ -123,6 +123,10 @@ def init_app(app):
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
     app.jinja_env.globals["timedelta"] = timedelta
+    def ddt_per_id(ddt_id):
+        from .models import Ddt, db as _db
+        return _db.session.get(Ddt, ddt_id)
+    app.jinja_env.globals["ddt_per_id"] = ddt_per_id
     # versione di CSS e JS nell'indirizzo: dopo un aggiornamento i telefoni scaricano subito quelli nuovi
     import os
     cartella = os.path.join(app.root_path, "static")

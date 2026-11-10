@@ -2851,3 +2851,68 @@ class TestSistemaDesign(Base):
         home = self.c.get("/").get_data(as_text=True)
         self.assertIn("allerta-danni area-danni pieno", home)
         self.assertIn("blocca 1 consegna", home)
+
+
+class TestDdtEssenzialeEAnalisi(TestLavorazioniStimaESolleciti):
+    """11/11/2026: DDT senza dati interni, copia firmata alle due parti, dati e pagina per le analisi."""
+    def test_pdf_e_anteprima_senza_storico(self):
+        from getvingo import ddt as ddt_pdf
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        self.c.post(f"/ddt/{d}/modifica", data=self.dati("Carrozzeria B", conducente="Luca Bianchi"))
+        with self.app.app_context():
+            documento = db.session.get(Ddt, d)
+            pdf = ddt_pdf.pdf(documento, invariante=True)
+        self.assertNotIn(b"STORICO MODIFICHE", pdf)
+        self.assertNotIn(b"Emesso da", pdf)
+        anteprima = self.c.get(f"/ddt/{d}/anteprima").get_data(as_text=True)
+        self.assertNotIn("Rev. 1", anteprima)
+        self.assertNotIn("Tocchi del viaggio", anteprima)
+        self.assertIn('class="pagina-anteprima"', anteprima)
+
+    def test_copia_firmata_alle_due_parti_e_download(self):
+        self.app.config["POSTA_ATTIVA"] = True
+        self.c.post("/admin/azienda", data={})  # niente: l'email si imposta sotto
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        self.arrivo(d)  # senza la spunta in Dati aziendali non parte nessuna email
+        self.assertFalse([e for e in self.app.extensions.get("posta_inviata", []) if "firmato" in e["oggetto"]])
+        pagina = self.c.get(f"/ddt/{d}").get_data(as_text=True)
+        self.assertIn("data-scarica-subito", pagina)  # il PDF firmato si scarica da solo, una volta sola
+        self.assertNotIn("data-scarica-subito", self.c.get(f"/ddt/{d}").get_data(as_text=True))
+        with self.app.app_context():
+            Azienda.query.first().invia_copie_ddt = True
+            Azienda.query.first().email_ddt = "ddt@concessionaria.it"
+            Sede.query.filter_by(nome="Carrozzeria B").one().email_ddt = "ddt@carrozzeria.it"
+            db.session.commit()
+        with self.app.test_request_context():
+            from flask import g as _g
+            from getvingo import copie
+            _g.utente = Utente.query.filter_by(email="admin@t.it").one()
+            copie.invia(db.session.get(Ddt, d))  # con la spunta la copia parte
+        inviate = self.app.extensions.get("posta_inviata", [])
+        # mittente, destinatario, backoffice (ufficio@t.it) e autista: chi ha avviato il trasporto (admin nel test)
+        self.assertEqual(sorted(e["a"] for e in inviate if "firmato" in e["oggetto"]),
+                         ["admin@t.it", "ddt@carrozzeria.it", "ddt@concessionaria.it", "ufficio@t.it"])
+        self.assertTrue(all(e["allegati"] == [f"DDT_{1}_{adesso().year}.pdf"] for e in inviate if "firmato" in e["oggetto"]))
+        with self.app.app_context():
+            self.assertIsNotNone(db.session.get(Ddt, d).copie_inviate_at)
+
+    def test_dati_per_le_analisi_e_pagina(self):
+        vid, mid = self.in_carrozzeria(2)
+        self.c.post(f"/movimento/{mid}/stima", data={"giorni": "9"})
+        with self.app.app_context():
+            m = db.session.get(Movimento, mid)
+            self.assertEqual((m.lavorazione_stima_iniziale, m.stima_giorni), (5, 9))  # la prima stima resta
+        self.c.post(f"/veicolo/{vid}/note", data={"venduta_il": "2026-11-01"})
+        with self.app.app_context():
+            self.assertEqual(str(db.session.get(Veicolo, vid).venduta_il), "2026-11-01")
+        pagina = self.c.get("/analisi?periodo=tutto")
+        self.assertEqual(pagina.status_code, 200)
+        testo = pagina.get_data(as_text=True)
+        self.assertIn("Le fasi, in media", testo)
+        self.assertIn("Viaggi per tratta", testo)
+        self.entra("carr")
+        self.assertNotEqual(self.c.get("/analisi").status_code, 200)

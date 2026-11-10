@@ -91,6 +91,10 @@ class Azienda(PerOrganizzazione, ConIndirizzo, db.Model):
     """Dati del mittente stampati sul DDT (una sola riga)."""
     id = db.Column(db.Integer, primary_key=True)
     ragione_sociale = db.Column(db.String(200), nullable=False)
+    # dove arriva in automatico la copia del DDT firmato quando la concessionaria è mittente o destinataria
+    email_ddt = db.Column(db.String(200), default="")
+    # interruttore: la copia del DDT firmato parte per email solo se spuntato (spento finché l'email non è pronta)
+    invia_copie_ddt = db.Column(db.Boolean, default=False)
     indirizzo = db.Column(db.String(300), default="")  # sede legale: via e civico
     piva = db.Column(db.String(30), default="")
     codice_fiscale = db.Column(db.String(16), default="")
@@ -172,6 +176,8 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     COMMERCIO = ("concessionario", "rivenditore")  # altri concessionari e rivenditori: conto visione o vendita
 
     id = db.Column(db.Integer, primary_key=True)
+    # dove arriva in automatico la copia del DDT firmato (fornitori, clienti, concessionari…)
+    email_ddt = db.Column(db.String(200), default="")
     nome = db.Column(db.String(200), nullable=False)
     indirizzo = db.Column(db.String(300), default="")
     comune = db.Column(db.String(120), default="")  # es. "Villorba": con la provincia dice dove si trova
@@ -260,6 +266,7 @@ class Veicolo(PerOrganizzazione, db.Model):
     posizione_at = db.Column(db.DateTime)
     creato_at = db.Column(db.DateTime, default=adesso)
     consegnato_at = db.Column(db.DateTime)
+    venduta_il = db.Column(db.Date)  # data di vendita al cliente (analisi: dalla vendita alla consegna)
     # auto pronta: dove e quando verrà consegnata al cliente (l'ultimo DDT la porta lì)
     consegna_sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     consegna_prevista_at = db.Column(db.DateTime)
@@ -453,6 +460,11 @@ class Movimento(PerOrganizzazione, db.Model):
     lavorazione_completata_da_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
     lavorazione_note_fine = db.Column(db.String(300), default="")
     lavorazione_stima_giorni = db.Column(db.Integer)  # stima del fornitore o della concessionaria (vuota = per tipo)
+    # solo per le analisi (mai sul DDT): la prima stima della lavorazione, prima di ogni cambio, e la stima del
+    # viaggio fissata alla partenza (per confrontare stimato e reale)
+    lavorazione_stima_iniziale = db.Column(db.Integer)
+    stima_viaggio_min = db.Column(db.Integer)
+    stima_viaggio_km = db.Column(db.Float)
 
     veicolo = db.relationship("Veicolo", backref="movimenti")
     da_sede = db.relationship("Sede", foreign_keys=[da_sede_id])
@@ -539,6 +551,9 @@ class Ddt(PerOrganizzazione, db.Model):
     annullato_at = db.Column(db.DateTime)
     annullato_da_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
     motivo_annullamento = db.Column(db.String(300), default="")
+    # copia del DDT firmato mandata in automatico alle due parti alla chiusura (prova dell'invio)
+    copie_inviate_at = db.Column(db.DateTime)
+    copie_inviate_a = db.Column(db.String(500), default="")
 
     # movimento capofila (il primo): per un DDT di una sola auto è l'unico
     movimento = db.relationship("Movimento", foreign_keys=[movimento_id])

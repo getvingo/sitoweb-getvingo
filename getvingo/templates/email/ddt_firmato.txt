@@ -1,0 +1,12 @@
+{#- TESTO PROVVISORIO (11/11/2026): messaggio da disegnare -#}
+Buongiorno,
+
+in allegato il documento di trasporto n. {{ d.sigla }} del {{ d.emesso_at.strftime('%d/%m/%Y') }}, completo delle firme.
+
+{{ tratta }}
+{{ beni }}
+Ricevuto il {{ m.arrivo_at.strftime('%d/%m/%Y alle %H:%M') }}.
+
+Conservate questa copia con i vostri documenti di trasporto.
+-- 
+Getvingo · email automatica, non rispondere.

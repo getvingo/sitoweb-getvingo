@@ -19,6 +19,10 @@
   <p class="tenue piccolo" style="margin-top:0">Compaiono come mittente su ogni DDT e valgono per tutti gli utenti della concessionaria; con gli stessi dati c'è anche il vettore della concessionaria, proposto a chi guida. I DDT già emessi non cambiano.</p>
   <label class="campo"><span>Ragione sociale</span><input name="ragione_sociale" value="{{ a.ragione_sociale or '' }}" required></label>
   {{ campi_fiscali(a) }}
+  <label class="spunta"><input type="checkbox" name="invia_copie_ddt" value="1" {{ 'checked' if a.invia_copie_ddt }}>
+    <span><b>Invia per email la copia del DDT firmato</b><br><span class="tenue piccolo">A ogni consegna il PDF completo parte a mittente, destinatario, backoffice e autista. Se non è spuntata non parte nessuna email.</span></span></label>
+  <label class="campo"><span>Email per i DDT firmati <span class="tenue">(facoltativa)</span></span><input type="email" name="email_ddt" value="{{ a.email_ddt or '' }}" maxlength="200" placeholder="Es. amministrazione@azienda.it" autocomplete="off">
+    <small class="tenue">A ogni consegna arriva qui in automatico il PDF del DDT completo di firme. Se vuota, va agli amministratori.</small></label>
   {{ campi_indirizzo(a, 'Sede legale') }}
   <p class="tenue piccolo" style="margin-top:-6px">La sede legale diventa anche una destinazione tra le Sedi e piazzali, sempre aggiornata.</p>
   {{ firma_pad("Firma del mittente (apposta in automatico sui DDT)", attuale=a.firma, timbro=True) }}

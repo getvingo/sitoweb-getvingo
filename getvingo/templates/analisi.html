@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}Analisi · Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{% block classe_pagina %}pagina-analisi{% endblock %}
+{% block contenuto %}
+<div class="titolo-pagina"><div><h1>Analisi</h1>
+  <p class="descrizione-pagina">Quanto dura ogni fase, dalla vendita alla consegna: dove le auto aspettano, come lavorano i fornitori, quanto durano davvero i viaggi.</p></div></div>
+
+<nav class="interruttore filtro-gruppo in-riga" aria-label="Periodo">
+  {% for k, (nome, _) in periodi.items() %}<a href="{{ url_for('main.analisi', periodo=k) }}" class="{{ 'attivo' if a.periodo == k }}" {{ 'aria-current=true' if a.periodo == k }}><span class="nome">{{ nome }}</span></a>{% endfor %}
+</nav>
+
+{# Il numero più importante: dalla vendita alla consegna #}
+<section class="analisi-eroe">
+  {% if a.vendita.n %}
+  <div><small>Dalla vendita alla consegna, in media</small><b>{{ a.vendita.testo }}</b><span>su {{ a.vendita.n }} {{ 'auto consegnata' if a.vendita.n == 1 else 'auto consegnate' }} con la data di vendita</span></div>
+  {% else %}
+  <div><small>Dalla vendita alla consegna</small><b class="tenue">—</b>
+    <span>Per vederlo serve la data di vendita: scheda dell'auto → Note interne → “Venduta il”.</span></div>
+  {% endif %}
+</section>
+
+<h2>{{ i('cronometro') }} Le fasi, in media</h2>
+<div class="scheda analisi-fasi" role="table" aria-label="Durata media di ogni fase">
+  {% for f in a.fasi %}
+  <div class="analisi-riga" role="row">
+    <div class="analisi-nome" role="rowheader"><b>{{ f.nome }}</b>
+      {% if f.nome == a.piu_lunga %}<span class="etichetta-analisi lunga">{{ i('attenzione', 's') }} la più lunga</span>{% endif %}
+      {% if f.attesa %}<span class="etichetta-analisi">attesa</span>{% endif %}
+      <small>{{ f.cosa }}</small></div>
+    <div class="analisi-barra" role="cell" title="{{ f.nome }}: {{ f.testo }} di media su {{ f.n }}"><span style="width:{{ f.quota }}%"></span></div>
+    <div class="analisi-valore" role="cell"><b>{{ f.testo }}</b><small>{{ f.n }} {{ 'caso' if f.n == 1 else 'casi' }}</small></div>
+  </div>
+  {% endfor %}
+</div>
+<p class="tenue piccolo">Le attese sono il tempo in cui l'auto è ferma senza che nessuno ci lavori: di solito è lì che si recupera di più.</p>
+
+<h2>{{ i('chiave') }} Fornitori</h2>
+{% if a.fornitori %}
+<div class="scheda tabella-scorre">
+<table class="tabella-analisi">
+  <thead><tr><th scope="col">Fornitore</th><th scope="col" class="num-col">Lavori finiti</th><th scope="col">Durata media</th>
+    <th scope="col" class="num-col">Rispetta la prima stima</th><th scope="col" class="num-col">Ritardo medio</th><th scope="col" class="num-col">Attesa del ritiro</th></tr></thead>
+  <tbody>
+  {% for r in a.fornitori %}
+  <tr><th scope="row"><b>{{ r.nome }}</b><small>{{ r.tipo }}</small></th>
+    <td class="num-col">{{ r.n }}</td>
+    <td><div class="cella-barra"><span class="analisi-barra"><span style="width:{{ r.quota }}%"></span></span><b>{{ durata(r.giorni * 24) }}</b></div></td>
+    <td class="num-col"><b>{{ r.entro_pct }}%</b></td>
+    <td class="num-col">{{ durata(r.ritardo * 24) if r.ritardo else '—' }}</td>
+    <td class="num-col">{{ durata(r.attesa) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="tenue piccolo">“Prima stima” = i giorni previsti all'arrivo dal fornitore, prima di ogni rinvio (registrata dall'11/11/2026; per i lavori precedenti vale la stima finale).</p>
+{% else %}
+<div class="vuoto">{{ i('chiave') }}Nessuna lavorazione finita in questo periodo.</div>
+{% endif %}
+
+<h2>{{ i('camion') }} Viaggi per tratta</h2>
+{% if a.tratte %}
+<div class="scheda tabella-scorre">
+<table class="tabella-analisi">
+  <thead><tr><th scope="col">Tratta</th><th scope="col" class="num-col">Viaggi</th><th scope="col" class="num-col">Durata reale</th>
+    <th scope="col" class="num-col">Stimata alla partenza</th><th scope="col" class="num-col">Scarto</th></tr></thead>
+  <tbody>
+  {% for t in a.tratte %}
+  <tr><th scope="row">{{ t.da }} {{ i('freccia', 's') }} <b>{{ t.a }}</b></th>
+    <td class="num-col">{{ t.n }}</td><td class="num-col"><b>{{ t.vero }}</b></td>
+    <td class="num-col">{{ t.stima or '—' }}</td>
+    <td class="num-col">{% if t.scarto is not none %}{{ '+' if t.scarto > 0 }}{{ t.scarto }}%{% else %}—{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="tenue piccolo">La stima del viaggio si salva alla partenza (dall'11/11/2026) e non compare sul DDT. Scarto positivo = più lento del previsto.</p>
+{% else %}
+<div class="vuoto">{{ i('camion') }}Nessun viaggio concluso in questo periodo.</div>
+{% endif %}
+{% endblock %}

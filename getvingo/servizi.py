@@ -194,6 +194,7 @@ def _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at=None):
     mov.partenza_utente_id = utente.id
     mov.partenza_lat, mov.partenza_lon = lat, lon
     mov.firma_conducente = firma_conducente
+    fissa_stima_viaggio(mov)
     db.session.add(mov)
     db.session.flush()
 
@@ -475,6 +476,7 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
     mov.partenza_utente_id = utente.id
     mov.partenza_lat, mov.partenza_lon = lat, lon
     mov.firma_conducente = firma_conducente
+    fissa_stima_viaggio(mov)
     mov.veicolo.stato, mov.veicolo.sede = "in_viaggio", None
     registra_evento(mov.veicolo, "partenza", utente, lat, lon, mov.ddt)
     registra_azione("presa_in_carico", utente, mov.veicolo, mov.ddt)
@@ -644,6 +646,8 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
     sede_finale = mov.sede_arrivo_effettiva
     mov.note_arrivo = (note or "").strip()[:300]
     mov.arrivo_at, mov.arrivo_utente_id = adesso(), utente.id
+    if mov.con_lavorazione and mov.lavorazione_stima_iniziale is None:  # per le analisi: la promessa iniziale
+        mov.lavorazione_stima_iniziale = mov.stima_giorni
     mov.arrivo_lat, mov.arrivo_lon = lat, lon
     mov.stato = "chiuso"
     destinatario_interno = sede_finale.tipo == "propria"
@@ -1026,6 +1030,8 @@ def imposta_stima(mov, utente, giorni):
         raise Vietato("La lavorazione è già finita.")
     if not giorni or not 1 <= giorni <= 120:
         raise Vietato("Indica i giorni di lavorazione stimati (da 1 a 120).")
+    if mov.lavorazione_stima_iniziale is None:  # la prima stima resta per le analisi
+        mov.lavorazione_stima_iniziale = mov.stima_giorni
     mov.lavorazione_stima_giorni = giorni
 
 
@@ -1325,6 +1331,13 @@ def traffico(quando):
     if ora >= 21 or ora < 6:
         return 0.9, "notte"
     return 1.0, "traffico normale"
+
+
+def fissa_stima_viaggio(mov):
+    """Alla partenza la stima del viaggio si salva (solo per le analisi, mai sul DDT): poi si confronta col reale."""
+    stima = stima_viaggio(mov)
+    if stima:
+        mov.stima_viaggio_min, mov.stima_viaggio_km = stima["minuti"], stima["km"]
 
 
 def stima_viaggio(mov):

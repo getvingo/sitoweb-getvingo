@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 import secrets
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
@@ -73,6 +74,8 @@ def azienda():
                 if not _testo("ragione_sociale"):
                     raise servizi.Vietato("La ragione sociale è obbligatoria.")
                 a.ragione_sociale = _testo("ragione_sociale")
+                a.email_ddt = _email_ddt()
+                a.invia_copie_ddt = request.form.get("invia_copie_ddt") == "1"
                 anagrafica.leggi_fiscali(a)
                 anagrafica.leggi_indirizzo(a)
             except servizi.Vietato as e:
@@ -222,11 +225,26 @@ def sede(sede_id):
         firma = servizi.firma_valida(request.form.get("firma"))
         if firma and s.tipo != "propria":
             s.firma = firma
+        if s.tipo != "propria":
+            try:
+                s.email_ddt = _email_ddt()
+            except servizi.Vietato as e:
+                db.session.rollback()
+                flash(str(e), "errore")
+                return redirect(url_for("admin.sede", sede_id=s.id))
         db.session.commit()
         flash("Luogo aggiornato. I DDT già emessi restano con i dati di quando sono stati emessi.", "ok")
         return redirect(url_for("admin.sedi", gruppo="proprie" if s.tipo == "propria" else "esterne"))
     tipi = {k: Sede.TIPI[k] for k in GRUPPI_LUOGHI[gruppo][2]}
     return render_template("admin/sede.html", s=s, tipi=tipi, gruppo=gruppo)
+
+
+def _email_ddt():
+    """Email (facoltativa) a cui mandare la copia del DDT firmato."""
+    email = (request.form.get("email_ddt") or "").strip().lower()[:200]
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", email):
+        raise servizi.Vietato(f"L'email per i DDT “{email}” non sembra valida.")
+    return email
 
 
 @bp.route("/vettori", methods=["GET", "POST"])
