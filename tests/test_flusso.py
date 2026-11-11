@@ -2567,7 +2567,7 @@ class TestAnagraficaEDDT(Base):
         esterne = self.c.get("/admin/sedi?gruppo=esterne").get_data(as_text=True)
         self.assertIn("Sede A", proprie)
         self.assertNotIn("<h3>Carrozzeria Nuova", proprie)
-        for testo in ("Fornitori per le lavorazioni", "Esposizioni", "Clienti", "Carrozzeria Nuova", "Mario Rossi"):
+        for testo in ("Partner lavorazioni", "Esposizioni", "Clienti", "Carrozzeria Nuova", "Mario Rossi"):
             self.assertIn(testo, esterne)
         self.assertNotIn(">Sede A<", esterne)
 
@@ -3010,7 +3010,7 @@ class TestCorreggiPosizione(Base):
 
     def test_admin_cambia_sede_e_punto_senza_traccia(self):
         prima = self._conta()
-        self.assertIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertIn("Sede, piazzale o partner lavorazioni", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.assertEqual(self.manda(lat="45.5001", lon="12.5002").status_code, 302)
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
@@ -3036,7 +3036,7 @@ class TestCorreggiPosizione(Base):
             self.assertEqual(self.c.get(p).status_code, 200, p)
         self.manda(sede_id=self._id(Sede, nome="Sede A"))
         self.entra("ufficio")
-        self.assertNotIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertNotIn("Sede, piazzale o partner lavorazioni", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.manda(modello="Polo")  # gli altri dati sì, la sede no
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
@@ -3044,7 +3044,7 @@ class TestCorreggiPosizione(Base):
 
     def test_non_in_viaggio(self):
         self.parti(self.vid, "Carrozzeria B")
-        self.assertNotIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertNotIn("Sede, piazzale o partner lavorazioni", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.manda()
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).stato, "in_viaggio")
@@ -3351,6 +3351,25 @@ class TestControlliDellaSera(Base):
         self.assertIn("Da verificare", pagina)
         self.assertIn("Preparazioni · oggi", pagina)
 
+    def test_viaggio_dal_fornitore_senza_stima(self):
+        """Rientro da un fornitore senza posizione sulla mappa: l'arrivo non si stima, ma dopo 3 ore è da verificare."""
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            m.a_sede.lat = m.a_sede.lon = None  # destinazione senza posizione: niente stima
+            m.stima_viaggio_min = None
+            m.partenza_at = adesso() - timedelta(hours=2)
+            db.session.commit()
+        self.assertNotIn("Viaggi in ritardo", self.c.get("/").get_data(as_text=True))
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            m.partenza_at = adesso() - timedelta(hours=4)
+            db.session.commit()
+        pagina = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Viaggi in ritardo", pagina)
+        self.assertIn("arrivo non stimabile", pagina)
+
     def test_analisi_solo_admin(self):
         self.assertEqual(self.c.get("/analisi").status_code, 200)
         self.entra("ufficio")
@@ -3390,6 +3409,8 @@ class TestUniforma(Base):
         self.assertEqual(uniforma.formatta("a3 sportback tdi"), "A3 Sportback TDI")
         self.assertEqual(uniforma.formatta("cx-30"), "CX-30")
         self.assertEqual(uniforma.formatta("q4 e-tron"), "Q4 e-tron")
+        for giusto in ("Serie 1 118i", "Formentor VZ", "600e La Prima", "Renegade 4xe", "Ypsilon LX", "C-HR", "Qashqai e-Power"):
+            self.assertEqual(uniforma.formatta(giusto), giusto)  # nomi già scritti bene non si toccano
         with self.app.app_context():
             self.assertEqual(uniforma.valore("marca", "vw"), "Volkswagen")
             self.assertEqual(uniforma.valore("marca", "mercedes benz"), "Mercedes-Benz")
@@ -3410,3 +3431,26 @@ class TestUniforma(Base):
             uniforma.auto(v2)
             self.assertEqual((v2.marca, v2.modello, v2.versione, v2.colore), ("Volkswagen", "Golf", "1.5 eTSI Life", "Bianco Puro"))
             self.assertEqual(v.descrizione, "Volkswagen Golf")  # il colore non è nel nome
+
+
+class TestUniformaEsistenti(Base):
+    """Gestione → Uniforma i dati delle auto: anteprima delle correzioni, poi si applicano col pulsante."""
+    def test_anteprima_e_applica(self):
+        with self.app.app_context():
+            g.org_id = 1
+            db.session.add_all([
+                Veicolo(vin="WVWZZZ1KZAW000801", marca="VW", modello="golf", colore="bianco", sede_id=1),
+                Veicolo(vin="WVWZZZ1KZAW000802", marca="Volkswagen", modello="Golf", colore="Bianco", sede_id=1),
+                Veicolo(vin="WVWZZZ1KZAW000803", marca="volkswagen ", modello="GOLF", versione="1.5 etsi", colore="BIANCO", sede_id=1)])
+            db.session.commit()
+        pagina = self.c.get("/admin/uniforma").get_data(as_text=True)
+        self.assertIn("Uniforma i dati delle auto", pagina)
+        self.assertIn("“VW”", pagina)
+        with self.app.app_context():
+            self.assertEqual(Veicolo.query.filter_by(marca="VW").count(), 1)  # l'anteprima non cambia niente
+        self.c.post("/admin/uniforma")
+        with self.app.app_context():
+            dati = {(v.marca, v.modello, v.colore) for v in Veicolo.query.filter(Veicolo.vin.like("%0008%"))}
+            self.assertEqual(dati, {("Volkswagen", "Golf", "Bianco")})
+            self.assertEqual(Veicolo.query.filter_by(vin="WVWZZZ1KZAW000803").one().versione, "1.5 eTSI")
+        self.assertIn("Niente da correggere", self.c.get("/admin/uniforma").get_data(as_text=True))

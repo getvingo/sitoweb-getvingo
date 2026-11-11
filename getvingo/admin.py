@@ -149,10 +149,10 @@ def elimina_chiusura(chiuso_id):
 GRUPPI_LUOGHI = {
     "proprie": ("Sedi e piazzali", "I luoghi della concessionaria: sede legale, sedi e piazzali dove stanno le auto.",
                 ("propria",)),
-    "esterne": ("Destinazioni esterne", "Fornitori per le lavorazioni, allestitori, altri concessionari, esposizioni e clienti: dove le auto vanno e da dove tornano.",
+    "esterne": ("Destinazioni esterne", "Partner lavorazioni, allestitori, altri concessionari, esposizioni e clienti: dove le auto vanno e da dove tornano.",
                 ("carrozzeria", "officina", "allestitore", "altro", "concessionario", "rivenditore", "esposizione", "cliente")),
 }
-SEZIONI_ESTERNE = [("Fornitori per le lavorazioni", ("carrozzeria", "officina", "altro")),
+SEZIONI_ESTERNE = [("Partner lavorazioni", ("carrozzeria", "officina", "altro")),
                    ("Allestitori (veicoli commerciali)", ("allestitore",)),
                    ("Concessionari", ("concessionario",)), ("Rivenditori", ("rivenditore",)),
                    ("Esposizioni", ("esposizione",)), ("Clienti", ("cliente",))]
@@ -458,7 +458,7 @@ def gruppo_fornitore(sede_id):
         return redirect(url_for("admin.gruppo_fornitore", sede_id=sede.id))
     return render_template("admin/gruppo.html", tipo="fornitore", nome=sede.nome, dati=sede,
                            utenti=sorted((u for u in sede.utenti if not u.eliminato), key=lambda u: u.nome),
-                           ruoli={"fornitore": "Fornitore"})
+                           ruoli={"fornitore": "Partner lavorazioni"})
 
 
 @bp.route("/utenti/<int:utente_id>", methods=["GET", "POST"])
@@ -572,6 +572,20 @@ def tag():
                            liberi=Tag.query.filter_by(veicolo_id=None).order_by(Tag.creato_at.desc()).all(),
                            abbinati=Tag.query.filter(Tag.veicolo_id.isnot(None)).count(),
                            sigla=g.utente.organizzazione.sigla)
+
+
+@bp.route("/uniforma", methods=["GET", "POST"])
+@ruolo_richiesto("admin")
+def uniforma_auto():
+    """Correzione una tantum delle auto già presenti con le regole di scrittura (uniforma.py):
+    prima l'elenco di cosa cambierebbe, poi si applica con un pulsante."""
+    if request.method == "POST":
+        n = uniforma.applica()
+        db.session.commit()
+        flash(f"{n} {'correzione applicata' if n == 1 else 'correzioni applicate'}: le auto ora sono scritte tutte "
+              "allo stesso modo." if n else "Niente da correggere.", "ok")
+        return redirect(url_for("admin.uniforma_auto"))
+    return render_template("admin/uniforma.html", elenco=uniforma.proposte())
 
 
 @bp.route("/import", methods=["GET", "POST"])

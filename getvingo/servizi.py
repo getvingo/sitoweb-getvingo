@@ -592,17 +592,27 @@ def puo_confermare_arrivo(mov, utente):
     return utente.interno or mov.a_sede is None or mov.a_sede.tipo != "propria"
 
 
+# viaggio senza stima possibile (manca la posizione della partenza o della destinazione, es. un fornitore
+# scritto a mano): si considera arrivato in ritardo dopo questo tempo dalla partenza
+MINUTI_VIAGGIO_SENZA_STIMA = 120
+
+
+def arrivo_atteso(mov):
+    """(quando doveva arrivare, True se stimato dalle posizioni / False se tempo di riferimento)."""
+    if mov.stima_viaggio_min:
+        return mov.partenza_at + timedelta(minutes=mov.stima_viaggio_min), True
+    stima = stima_viaggio(mov)
+    if stima is not None:
+        return stima["arrivo"], True
+    return mov.partenza_at + timedelta(minutes=MINUTI_VIAGGIO_SENZA_STIMA), False
+
+
 def viaggio_in_ritardo(mov):
-    """Minuti oltre l'arrivo stimato (stima salvata alla partenza, oppure calcolata), o None se non si sa."""
+    """Minuti oltre l'arrivo atteso (in tutte e due le direzioni, verso il fornitore e dal fornitore),
+    o None se il DDT non è in viaggio."""
     if mov.stato != "aperto" or mov.partenza_at is None:
         return None
-    if mov.stima_viaggio_min:
-        atteso = mov.partenza_at + timedelta(minutes=mov.stima_viaggio_min)
-    else:
-        stima = stima_viaggio(mov)
-        if stima is None:
-            return None
-        atteso = stima["arrivo"]
+    atteso, _ = arrivo_atteso(mov)
     return max(0, int((adesso() - atteso).total_seconds() // 60))
 
 
@@ -966,7 +976,7 @@ def correggi_posizione(v, utente, sede, lat=None, lon=None, lavorazione=None, la
     if not puo_correggere_posizione(v, utente):
         raise Vietato("Solo un amministratore può correggere la posizione di un'auto ferma in stock.")
     if not luogo_ammesso(sede):
-        raise Vietato("Scegli una sede della concessionaria o un fornitore esterno.")
+        raise Vietato("Scegli una sede della concessionaria o un partner lavorazioni.")
     if sede.esterna:
         qui = v.arrivo_qui if sede.id == v.sede_id else None
         if qui is None or (qui.senza_ddt and not qui.lavorazione_completata_at):

@@ -112,7 +112,7 @@ class Utente(PerOrganizzazione, db.Model):
     # Mansioni della concessionaria (10/11/2026): per ora tutte vedono e fanno tutto; l'amministratore
     # in più ha Gestione e le correzioni. "resp_commerciale" corto: la colonna è di 20 caratteri.
     RUOLI = {"backoffice": "Backoffice", "venditore": "Venditore", "consegne": "Consegne", "preparatore": "Preparatore",
-             "resp_commerciale": "Responsabile commerciale", "admin": "Amministratore", "fornitore": "Fornitore esterno"}
+             "resp_commerciale": "Responsabile commerciale", "admin": "Amministratore", "fornitore": "Partner lavorazioni"}
     RUOLI_INTERNI = ("backoffice", "venditore", "consegne", "preparatore", "resp_commerciale", "admin")
     # ruoli di prima del 10/11/2026, convertiti all'avvio (migrazioni.aggiorna_ruoli)
     RUOLI_VECCHI = {"ufficio": "backoffice", "autista": "consegne"}

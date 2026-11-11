@@ -67,7 +67,7 @@
       <option value="">Chi va a prenderla…</option>
       {% set interni = assegnabili|selectattr('interno')|list %}{% set esterni = assegnabili|rejectattr('interno')|list %}
       {% if interni %}<optgroup label="Concessionaria">{% for u in interni %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
-      {% if esterni %}<optgroup label="{{ esterni[0].sede.nome if esterni[0].sede else 'Fornitore' }}">{% for u in esterni %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+      {% if esterni %}<optgroup label="{{ esterni[0].sede.nome if esterni[0].sede else 'Partner lavorazioni' }}">{% for u in esterni %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
     </select>
     <small>Solo questa persona potrà prenderlo in carico, sul posto (entro 200 m dalla partenza)</small>
   </label>

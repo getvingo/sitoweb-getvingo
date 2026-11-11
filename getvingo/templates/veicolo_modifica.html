@@ -41,9 +41,9 @@
     <h3 style="margin-top:0">{{ i('pin', 's') }} Dove si trova</h3>
     <input type="hidden" name="lat" value="{{ form.get('lat', '') }}">
     <input type="hidden" name="lon" value="{{ form.get('lon', '') }}">
-    <label class="campo"><span>Sede, piazzale o fornitore</span>
+    <label class="campo"><span>Sede, piazzale o partner lavorazioni</span>
       <select name="sede_id" required>
-        {% for gruppo, elenco in [('Sedi e piazzali', sedi|rejectattr('esterna')|list), ('Fornitori esterni', sedi|selectattr('esterna')|list)] if elenco %}
+        {% for gruppo, elenco in [('Sedi e piazzali', sedi|rejectattr('esterna')|list), ('Partner lavorazioni', sedi|selectattr('esterna')|list)] if elenco %}
         <optgroup label="{{ gruppo }}">{% for s in elenco %}<option value="{{ s.id }}" data-lavoro="{{ '1' if s.esterna and s.id != con_ddt_id else '' }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id|string == form.get('sede_id')|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</optgroup>
         {% endfor %}</select></label>
     <div class="lavoro-fornitore" data-lavoro-fornitore>

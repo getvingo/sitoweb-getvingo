@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}Uniforma i dati delle auto · Getvingo{% endblock %}
+{% block contenuto %}
+{# Correzione una tantum: le auto già presenti con le stesse regole del salvataggio (uniforma.py) #}
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div>
+  <h1>Uniforma i dati delle auto</h1>
+  <p class="descrizione-pagina">Marca, modello, versione e colore delle auto già presenti, corretti con le stesse regole usate quando si salva un'auto. Controlla l'elenco: si applica solo con il pulsante in fondo.</p></div></div>
+{% if elenco %}
+<p><b>{{ elenco|length }} {{ 'correzione' if elenco|length == 1 else 'correzioni' }}</b> su {{ elenco|map(attribute='0')|unique|list|length }} auto.</p>
+<div class="scheda" style="overflow-x:auto">
+<table class="tabella-uniforma">
+  <thead><tr><th scope="col">Auto</th><th scope="col">Campo</th><th scope="col">Prima</th><th scope="col">Dopo</th></tr></thead>
+  <tbody>
+  {% for v, campo, etichetta, prima, dopo in elenco %}
+  <tr><td><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ v.vin|vin }}</a></td><td>{{ etichetta }}</td>
+      <td class="tenue">“{{ prima }}”</td><td><b>{{ dopo }}</b></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<form method="post" data-una-volta onsubmit="return confirm('Applicare le {{ elenco|length }} correzioni?')">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <div class="barra-azione"><button class="btn primario pieno">{{ i('check') }} Applica le {{ elenco|length }} correzioni</button></div>
+</form>
+{% else %}
+<div class="vuoto">{{ i('check') }}Niente da correggere: le auto sono già scritte tutte allo stesso modo.</div>
+{% endif %}
+{% endblock %}

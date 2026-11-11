@@ -2043,3 +2043,7 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 .pagina-fornitore .rientrate { margin-top: 22px; }
 .pagina-fornitore .rientrate > summary { list-style: none; cursor: pointer; }
 .pagina-fornitore .rientrate > summary::-webkit-details-marker { display: none; }
+/* Gestione → Uniforma i dati delle auto (12/11/2026) */
+.tabella-uniforma { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
+.tabella-uniforma th, .tabella-uniforma td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
+.tabella-uniforma th { font-size: var(--fs-12); color: var(--testo-2); text-transform: uppercase; letter-spacing: .04em; }

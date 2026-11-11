@@ -238,11 +238,15 @@ def home():
         m = v.movimento_aperto
         ritardo = servizi.viaggio_in_ritardo(m) if m else None
         if ritardo is not None and ritardo > 60:
-            ore = ritardo // 60
+            ore, (_, stimato) = ritardo // 60, servizi.arrivo_atteso(m)
+            tratta = f"da {m.da_sede.nome} a {m.a_sede.nome}" if m.da_sede else f"verso {m.a_sede.nome}"
+            partita = f"partita alle {m.partenza_at:%H:%M}" + (
+                f" del {m.partenza_at:%d/%m}" if m.partenza_at.date() != adesso().date() else "")
+            ritardo_txt = f"da {ore} {'ora' if ore == 1 else 'ore'}"
             aggiungi("viaggi", 1 if ritardo > 180 else 2, "Da verificare", v,
-                     f"DDT {m.ddt.sigla} verso {m.a_sede.nome}: doveva arrivare "
-                     f"{'da ' + str(ore) + (' ora' if ore == 1 else ' ore') if ore else 'da poco'} · "
-                     f"partita alle {m.partenza_at:%H:%M}" + (f" del {m.partenza_at:%d/%m}" if m.partenza_at.date() != adesso().date() else ""),
+                     f"DDT {m.ddt.sigla} {tratta}: " + (f"doveva arrivare {ritardo_txt}" if stimato else
+                     f"in viaggio da oltre {int((adesso() - m.partenza_at).total_seconds() // 3600)} ore (arrivo non stimabile: "
+                     "manca la posizione di un luogo)") + f" · {partita}",
                      url_for("main.ddt_dettaglio", ddt_id=m.ddt.id))
     tra_un_giorno = adesso() + timedelta(hours=24)
     for m in _movimenti("predisposto").order_by(Movimento.ritiro_entro_at):
@@ -1226,7 +1230,7 @@ def modifica_auto(veicolo_id):
     sposta = puo_posizione and f.get("sede_id")  # senza sede nel modulo la posizione non cambia
     sede = Sede.query.filter_by(id=f.get("sede_id", type=int)).first() if sposta else None
     if not errore and sposta and not servizi.luogo_ammesso(sede):
-        errore = "Scegli una sede della concessionaria o un fornitore esterno."
+        errore = "Scegli una sede della concessionaria o un partner lavorazioni."
     if errore:
         flash(errore, "errore")
         return pagina(f)

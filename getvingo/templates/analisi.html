@@ -36,11 +36,11 @@
 </div>
 <p class="tenue piccolo">Le attese sono il tempo in cui l'auto è ferma senza che nessuno ci lavori: di solito è lì che si recupera di più.</p>
 
-<h2>{{ i('chiave') }} Fornitori</h2>
+<h2>{{ i('chiave') }} Partner lavorazioni</h2>
 {% if a.fornitori %}
 <div class="scheda tabella-scorre">
 <table class="tabella-analisi">
-  <thead><tr><th scope="col">Fornitore</th><th scope="col" class="num-col">Lavori finiti</th><th scope="col">Durata media</th>
+  <thead><tr><th scope="col">Partner</th><th scope="col" class="num-col">Lavori finiti</th><th scope="col">Durata media</th>
     <th scope="col" class="num-col">Rispetta la prima stima</th><th scope="col" class="num-col">Ritardo medio</th><th scope="col" class="num-col">Attesa del ritiro</th></tr></thead>
   <tbody>
   {% for r in a.fornitori %}
