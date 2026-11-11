@@ -2945,7 +2945,7 @@ class TestCorreggiPosizione(Base):
 
     def test_admin_cambia_sede_e_punto_senza_traccia(self):
         prima = self._conta()
-        self.assertIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.assertEqual(self.manda(lat="45.5001", lon="12.5002").status_code, 302)
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
@@ -2958,12 +2958,16 @@ class TestCorreggiPosizione(Base):
             v = db.session.get(Veicolo, self.vid)
             self.assertEqual((v.lat, v.lon), (45.5, 12.5))
 
-    def test_solo_admin_e_solo_sedi_proprie(self):
-        self.manda(sede_id=self._id(Sede, nome="Carrozzeria B"))
+    def test_solo_admin_sedi_proprie_e_fornitori(self):
+        self.manda(sede_id=self._id(Sede, nome="Cliente C"))  # un cliente no
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).sede.nome, "Sede A")
+        self.manda(sede_id=self._id(Sede, nome="Carrozzeria B"))  # un fornitore sì, e si può riportarla indietro
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Veicolo, self.vid).sede.nome, "Carrozzeria B")
+        self.manda(sede_id=self._id(Sede, nome="Sede A"))
         self.entra("ufficio")
-        self.assertNotIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertNotIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.manda(modello="Polo")  # gli altri dati sì, la sede no
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
@@ -2971,7 +2975,7 @@ class TestCorreggiPosizione(Base):
 
     def test_non_in_viaggio(self):
         self.parti(self.vid, "Carrozzeria B")
-        self.assertNotIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertNotIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
         self.manda()
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).stato, "in_viaggio")

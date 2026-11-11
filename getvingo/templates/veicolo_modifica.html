@@ -41,10 +41,13 @@
     <h3 style="margin-top:0">{{ i('pin', 's') }} Dove si trova</h3>
     <input type="hidden" name="lat" value="{{ form.get('lat', '') }}">
     <input type="hidden" name="lon" value="{{ form.get('lon', '') }}">
-    <label class="campo"><span>Sede o piazzale</span>
-      <select name="sede_id" required>{% for s in sedi %}<option value="{{ s.id }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id|string == form.get('sede_id')|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select></label>
+    <label class="campo"><span>Sede, piazzale o fornitore</span>
+      <select name="sede_id" required>
+        {% for gruppo, elenco in [('Sedi e piazzali', sedi|rejectattr('esterna')|list), ('Fornitori esterni', sedi|selectattr('esterna')|list)] if elenco %}
+        <optgroup label="{{ gruppo }}">{% for s in elenco %}<option value="{{ s.id }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id|string == form.get('sede_id')|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</optgroup>
+        {% endfor %}</select></label>
     <div class="correggi-mappa" style="height:300px;border-radius:var(--r-s);overflow:hidden;margin-bottom:8px"></div>
-    <p class="tenue piccolo" style="margin:0">Trascina il segnaposto o tocca la mappa sul punto esatto; cambiando sede il punto va sulla sede scelta. Solo amministratore: niente DDT e nessuna traccia, “Posizione aggiornata” non cambia.</p>
+    <p class="tenue piccolo" style="margin:0">Trascina il segnaposto o tocca la mappa sul punto esatto; cambiando luogo il punto va sul luogo scelto. Da un fornitore l'auto risulta “in lavorazione” e il fornitore la vede tra le sue. Solo amministratore: niente DDT e nessuna traccia, “Posizione aggiornata” non cambia.</p>
   </div>
   {% endif %}
   <div class="barra-azione">

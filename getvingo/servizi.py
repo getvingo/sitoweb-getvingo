@@ -824,9 +824,14 @@ def elimina_ddt(ddt, utente):
 
 
 def puo_correggere_posizione(v, utente):
-    """L'amministratore corregge dove si trova un'auto ferma in stock (in una sede propria)."""
-    return (utente.ruolo == "admin" and v.stato == "in_sede" and (v.sede is None or not v.sede.esterna)
+    """L'amministratore corregge dove si trova un'auto ferma (in una sede propria o da un fornitore)."""
+    return (utente.ruolo == "admin" and v.stato == "in_sede"
             and v.movimento_aperto is None and v.movimento_predisposto is None)
+
+
+def luogo_ammesso(sede):
+    """Dove l'amministratore può ubicare un'auto senza DDT: sedi proprie e fornitori esterni."""
+    return sede is not None and sede.attiva and (sede.tipo == "propria" or sede.esterna)
 
 
 def correggi_posizione(v, utente, sede, lat=None, lon=None):
@@ -834,8 +839,8 @@ def correggi_posizione(v, utente, sede, lat=None, lon=None):
     niente evento, niente azione, l'orario dell'ultimo aggiornamento resta quello di prima."""
     if not puo_correggere_posizione(v, utente):
         raise Vietato("Solo un amministratore può correggere la posizione di un'auto ferma in stock.")
-    if sede is None or not sede.attiva or sede.esterna:
-        raise Vietato("Scegli una sede della concessionaria.")
+    if not luogo_ammesso(sede):
+        raise Vietato("Scegli una sede della concessionaria o un fornitore esterno.")
     if lat is None or lon is None:
         lat, lon = (sede.lat, sede.lon) if sede.id != v.sede_id or v.lat is None else (v.lat, v.lon)
     v.sede_id = sede.id

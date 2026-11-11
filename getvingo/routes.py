@@ -1083,7 +1083,8 @@ def modifica_auto(veicolo_id):
     quello cambia solo con un DDT o con "Correggi la posizione" dell'amministratore)."""
     v = _veicolo_visibile(veicolo_id)
     puo_posizione = servizi.puo_correggere_posizione(v, g.utente)
-    sedi = Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all() if puo_posizione else []
+    sedi = (Sede.query.filter(Sede.attiva.is_(True), Sede.tipo.in_(("propria",) + Sede.FORNITORI))
+            .order_by(Sede.tipo != "propria", Sede.nome).all() if puo_posizione else [])
 
     def pagina(form):
         return render_template("veicolo_modifica.html", v=v, form=form, puo_posizione=puo_posizione, sedi=sedi)
@@ -1118,8 +1119,8 @@ def modifica_auto(veicolo_id):
         errore = "L'auto è consegnata: la targa non si può togliere."
     sposta = puo_posizione and f.get("sede_id")  # senza sede nel modulo la posizione non cambia
     sede = Sede.query.filter_by(id=f.get("sede_id", type=int)).first() if sposta else None
-    if not errore and sposta and (sede is None or sede.esterna or not sede.attiva):
-        errore = "Scegli una sede della concessionaria."
+    if not errore and sposta and not servizi.luogo_ammesso(sede):
+        errore = "Scegli una sede della concessionaria o un fornitore esterno."
     if errore:
         flash(errore, "errore")
         return pagina(f)
