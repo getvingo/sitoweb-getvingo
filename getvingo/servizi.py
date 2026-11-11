@@ -172,7 +172,10 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
         raise Vietato("Un'auto pronta si sposta solo con l'ultimo DDT, verso la sede di consegna indicata.")
     if not puo_emettere_dal_luogo(veicolo, utente):
         raise Vietato(f"La bolla la emette {veicolo.sede.nome} con il suo account.")
-    if veicolo.sede is not None and veicolo.sede.esterna and not account_del_luogo(veicolo.sede, utente):
+    if (not predisponi_ore and veicolo.sede is not None and veicolo.sede.esterna
+            and not account_del_luogo(veicolo.sede, utente)):
+        # partenza subito dal fornitore: solo sul posto. Il DDT da ritirare invece si predispone anche
+        # dall'ufficio: sul posto ci va chi lo prende in carico toccando l'adesivo.
         # posizione = quella vera del telefono (lat/lon possono essere quelle note dell'auto)
         controlla_sul_posto(veicolo.sede, *(posizione if posizione is not None else (lat, lon)))
     # si confrontano gli oggetti, non gli id: l'id si aggiorna solo al salvataggio

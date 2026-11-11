@@ -431,6 +431,18 @@ class TestSpostamentoColTocco(Base):
             self.assertEqual((m.da_sede.nome, m.causale, m.stato), ("Carrozzeria B", "Reso lavorazione", "aperto"))
             self.assertEqual(servizi.mittente(m)[0], "Carrozzeria B")  # il mittente resta il fornitore
 
+    def test_rientro_da_ritirare_si_predispone_dall_ufficio(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        self.entra("autista")  # lontano dal fornitore, senza tocco
+        self.c.post(f"/veicolo/{vid}/partenza", data={**self.dati("Sede A", causale="Reso lavorazione",
+                                                                  lavorazione="Nessuna (solo trasferimento)"),
+                                                      "azione": "predisponi", "ore_ritiro": "24"})
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            self.assertEqual((m.da_sede.nome, m.a_sede.nome, m.stato), ("Carrozzeria B", "Sede A", "predisposto"))
+
     def test_rientro_lo_crea_il_fornitore_da_ovunque(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
