@@ -2920,14 +2920,22 @@ class TestDdtEssenzialeEAnalisi(TestLavorazioniStimaESolleciti):
         self.assertNotEqual(self.c.get("/analisi").status_code, 200)
 
 
+
 class TestCorreggiPosizione(Base):
-    """L'amministratore sposta un'auto in stock senza DDT e senza lasciare traccia."""
+    """In "Modifica dati" l'amministratore sposta un'auto in stock senza DDT e senza lasciare traccia."""
     def setUp(self):
         super().setUp()
         with self.app.app_context():
             db.session.add(Sede(nome="Piazzale B", tipo="propria", lat=45.5, lon=12.5))
             db.session.commit()
         self.vid = self.abbina()
+
+    def manda(self, **extra):
+        d = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "VW", "modello": "Golf",
+             "colore": "Bianco", "in_stock_dal": adesso().date().isoformat(),
+             "sede_id": self._id(Sede, nome="Piazzale B")}
+        d.update(extra)
+        return self.c.post(f"/veicolo/{self.vid}/modifica", data=d)
 
     def _conta(self):
         from getvingo.models import Evento
@@ -2937,38 +2945,36 @@ class TestCorreggiPosizione(Base):
 
     def test_admin_cambia_sede_e_punto_senza_traccia(self):
         prima = self._conta()
-        self.assertIn("Correggi la posizione", self.c.get(f"/veicolo/{self.vid}").get_data(as_text=True))
-        r = self.c.post(f"/veicolo/{self.vid}/correggi-posizione",
-                        data={"sede_id": self._id(Sede, nome="Piazzale B"), "lat": "45.5001", "lon": "12.5002"})
-        self.assertEqual(r.status_code, 302)
+        self.assertIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.assertEqual(self.manda(lat="45.5001", lon="12.5002").status_code, 302)
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
             self.assertEqual((v.sede.nome, v.lat, v.lon), ("Piazzale B", 45.5001, 12.5002))
         self.assertEqual(self._conta(), prima)
 
     def test_senza_punto_vale_la_sede(self):
-        self.c.post(f"/veicolo/{self.vid}/correggi-posizione", data={"sede_id": self._id(Sede, nome="Piazzale B")})
+        self.manda()
         with self.app.app_context():
             v = db.session.get(Veicolo, self.vid)
             self.assertEqual((v.lat, v.lon), (45.5, 12.5))
 
     def test_solo_admin_e_solo_sedi_proprie(self):
-        self.c.post(f"/veicolo/{self.vid}/correggi-posizione",
-                    data={"sede_id": self._id(Sede, nome="Carrozzeria B")})
-        self.entra("ufficio")
-        self.assertNotIn("Correggi la posizione", self.c.get(f"/veicolo/{self.vid}").get_data(as_text=True))
-        self.c.post(f"/veicolo/{self.vid}/correggi-posizione", data={"sede_id": self._id(Sede, nome="Piazzale B")})
+        self.manda(sede_id=self._id(Sede, nome="Carrozzeria B"))
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).sede.nome, "Sede A")
+        self.entra("ufficio")
+        self.assertNotIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.manda(modello="Polo")  # gli altri dati sì, la sede no
+        with self.app.app_context():
+            v = db.session.get(Veicolo, self.vid)
+            self.assertEqual((v.sede.nome, v.modello), ("Sede A", "Polo"))
 
     def test_non_in_viaggio(self):
         self.parti(self.vid, "Carrozzeria B")
-        self.assertNotIn("Correggi la posizione", self.c.get(f"/veicolo/{self.vid}").get_data(as_text=True))
-        self.c.post(f"/veicolo/{self.vid}/correggi-posizione", data={"sede_id": self._id(Sede, nome="Piazzale B")})
+        self.assertNotIn("Sede o piazzale", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))
+        self.manda()
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).stato, "in_viaggio")
-
-
 
 class TestModificaDatiAuto(Base):
     """Un solo "Modifica dati": gli stessi campi dell'ingresso in stock, per tutto il personale interno."""

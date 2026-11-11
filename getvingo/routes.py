@@ -1082,11 +1082,18 @@ def modifica_auto(veicolo_id):
     """Tutti i dati dell'auto, con gli stessi campi dell'ingresso in stock (tranne dove si trova:
     quello cambia solo con un DDT o con "Correggi la posizione" dell'amministratore)."""
     v = _veicolo_visibile(veicolo_id)
+    puo_posizione = servizi.puo_correggere_posizione(v, g.utente)
+    sedi = Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all() if puo_posizione else []
+
+    def pagina(form):
+        return render_template("veicolo_modifica.html", v=v, form=form, puo_posizione=puo_posizione, sedi=sedi)
+
     if request.method == "GET":
-        form = {"vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
+        form = {"sede_id": v.sede_id, "lat": v.lat if v.lat is not None else "",
+                "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
                 "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
                 "colore": v.colore or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else ""}
-        return render_template("veicolo_modifica.html", v=v, form=form)
+        return pagina(form)
     f = request.form
     vin = vin_mod.normalizza(f.get("vin"))
     pulito = {k: " ".join(f.get(k, "").split()) for k in ("marca", "modello", "versione", "colore")}
@@ -1109,9 +1116,18 @@ def modifica_auto(veicolo_id):
         errore = _targa_insolita()
     elif not _targa() and v.stato == "consegnato":
         errore = "L'auto è consegnata: la targa non si può togliere."
+    sposta = puo_posizione and f.get("sede_id")  # senza sede nel modulo la posizione non cambia
+    sede = Sede.query.filter_by(id=f.get("sede_id", type=int)).first() if sposta else None
+    if not errore and sposta and (sede is None or sede.esterna or not sede.attiva):
+        errore = "Scegli una sede della concessionaria."
     if errore:
         flash(errore, "errore")
-        return render_template("veicolo_modifica.html", v=v, form=f)
+        return pagina(f)
+    if sposta:  # solo amministratore: niente DDT, niente traccia
+        lat, lon = f.get("lat", type=float), f.get("lon", type=float)
+        if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            lat = lon = None
+        servizi.correggi_posizione(v, g.utente, sede, lat, lon)
     v.vin, v.condizione, v.targa = vin, f["condizione"], _targa()
     if f.get("tipologia") in Veicolo.TIPOLOGIE:
         v.tipologia = f["tipologia"]
@@ -1208,7 +1224,6 @@ def veicolo(veicolo_id):
         sedi_consegna=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
         puo_predisporre=servizi.puo_predisporre(v, g.utente),
         puo_consegnare=servizi.puo_consegnare(v, g.utente),
-        puo_correggere_posizione=servizi.puo_correggere_posizione(v, g.utente),
         puo_lavorazione=ultimo is not None and servizi.puo_completare_lavorazione(ultimo, g.utente),
         puo_presa=v.movimento_predisposto is not None
         and servizi.puo_prendere_in_carico(v.movimento_predisposto, g.utente),
@@ -1245,25 +1260,6 @@ def partenza(veicolo_id):
     else:
         flash(f"DDT n. {documento.sigla} emesso. Buon viaggio.", "ok")
     return _torna_al_ddt(documento)
-
-
-@bp.route("/veicolo/<int:veicolo_id>/correggi-posizione", methods=["POST"])
-@solo_interni
-def correggi_posizione(veicolo_id):
-    v = db.get_or_404(Veicolo, veicolo_id)
-    lat, lon = request.form.get("lat", type=float), request.form.get("lon", type=float)
-    if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
-        lat = lon = None  # nessun punto valido sulla mappa: vale quello della sede
-    sede = Sede.query.filter_by(id=request.form.get("sede_id", type=int)).first()
-    try:
-        servizi.correggi_posizione(v, g.utente, sede, lat, lon)
-    except Vietato as e:
-        db.session.rollback()
-        flash(str(e), "errore")
-    else:
-        db.session.commit()
-        flash("Posizione corretta.", "ok")
-    return redirect(url_for("main.veicolo", veicolo_id=v.id))
 
 
 @bp.route("/veicolo/<int:veicolo_id>/riposiziona", methods=["POST"])
