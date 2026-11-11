@@ -585,8 +585,25 @@ def _distanza_leggibile(metri):
 
 def puo_confermare_arrivo(mov, utente):
     """Chiude il DDT chi si trova entro RAGGIO_ARRIVO_M dalla destinazione (la posizione la controlla
-    registra_arrivo); il fornitore destinatario anche da lontano."""
-    return mov.stato == "aperto"
+    registra_arrivo); il fornitore destinatario anche da lontano. In una sede o piazzale della
+    concessionaria la ricezione la conferma solo il suo personale (anche se l'auto la porta il fornitore)."""
+    if mov.stato != "aperto":
+        return False
+    return utente.interno or mov.a_sede is None or mov.a_sede.tipo != "propria"
+
+
+def viaggio_in_ritardo(mov):
+    """Minuti oltre l'arrivo stimato (stima salvata alla partenza, oppure calcolata), o None se non si sa."""
+    if mov.stato != "aperto" or mov.partenza_at is None:
+        return None
+    if mov.stima_viaggio_min:
+        atteso = mov.partenza_at + timedelta(minutes=mov.stima_viaggio_min)
+    else:
+        stima = stima_viaggio(mov)
+        if stima is None:
+            return None
+        atteso = stima["arrivo"]
+    return max(0, int((adesso() - atteso).total_seconds() // 60))
 
 
 def destinatario_conferma_ovunque(mov, utente):
@@ -700,6 +717,9 @@ def modifica_ddt(ddt, nuovi, utente):
 
 def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
     if not puo_confermare_arrivo(mov, utente):
+        if mov.stato == "aperto":
+            raise Vietato(f"La ricezione a {mov.a_sede.nome} la conferma la concessionaria, "
+                          "anche se l'auto la porta il fornitore.")
         raise Vietato("Questo DDT non è in viaggio.")
     if not mov.lavorazione:
         raise Vietato("Prima di chiudere il DDT indica la lavorazione da fare.")

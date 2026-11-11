@@ -5,7 +5,7 @@ import secrets
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 
-from . import accessi, anagrafica, posta, servizi
+from . import accessi, anagrafica, posta, servizi, uniforma
 from . import vin as vin_mod
 from .auth import ruolo_richiesto
 from datetime import datetime, timedelta
@@ -605,6 +605,7 @@ def importa():
             for campo in ("marca", "modello", "versione", "colore"):
                 if riga.get(campo):
                     setattr(veicolo, campo, riga[campo])
+            uniforma.auto(veicolo)
             cond = (riga.get("condizione") or riga.get("nuovo/usato") or riga.get("stato") or "").strip().lower()
             if cond in ("nuovo", "nuova", "n"):
                 veicolo.condizione = "nuovo"

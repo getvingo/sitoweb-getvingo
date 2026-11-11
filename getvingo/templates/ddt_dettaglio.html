@@ -126,6 +126,8 @@
 {% if puo_arrivo %}
 {% if not m.lavorazione %}{{ lavorazione_da_indicare(d, lavorazioni) }}{% endif %}
 {{ form_arrivo(d, m, raggio, 'arrivo') }}
+{% elif m.stato == 'aperto' and m.a_sede and m.a_sede.tipo == 'propria' and not g.utente.interno %}
+<p class="scheda" style="margin-top:16px">{{ i('sede', 's') }} <b>La ricezione la conferma {{ g.utente.organizzazione.nome }}</b> a {{ m.a_sede.nome }}: consegna l'auto al personale della sede, che conferma l'arrivo dal suo account.</p>
 {% endif %}
 
 {% if puo_lavorazione %}

@@ -281,7 +281,8 @@ class Veicolo(PerOrganizzazione, db.Model):
 
     @property
     def descrizione(self):
-        return " ".join(p for p in (self.marca, self.modello, self.colore) if p) or "Veicolo"
+        # nome negli elenchi: marca e modello (il colore sta nella carta dell'auto e nel DDT)
+        return " ".join(p for p in (self.marca, self.modello) if p) or "Veicolo"
 
     def _movimento(self, stato):
         # comprese le lavorazioni senza DDT (auto messa dal fornitore dall'amministratore)

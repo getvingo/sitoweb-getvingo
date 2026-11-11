@@ -1007,6 +1007,9 @@ details.zona-pericolo > summary { color: var(--danno-scuro); font-weight: 650; }
 .gruppo-fare .titolo-gruppo { margin: 0 0 10px; }
 .gruppo-fare.gruppo-lavorazioni .titolo-gruppo .icona { color: var(--arancio); }
 .gruppo-fare.gruppo-preparazione .titolo-gruppo .icona { color: var(--prep-2); }
+/* viaggi oltre l'arrivo stimato di più di un'ora (11/11/2026): viola come lo stato "in viaggio" */
+.gruppo-fare.gruppo-viaggi { border-color: var(--st-viaggio); background: color-mix(in srgb, var(--st-viaggio) 4%, transparent); }
+.gruppo-fare.gruppo-viaggi .titolo-gruppo .icona { color: var(--st-viaggio); }
 .gruppo-fare .da-fare .voce, .gruppo-fare .da-fare .voce.l1, .gruppo-fare .da-fare .voce.l2, .gruppo-fare .da-fare .voce.l3 {
   border: 1px solid var(--bordo); background: var(--carta); }
 @media (max-width: 559px) { .gruppo-fare { padding: 10px 10px 12px; } }

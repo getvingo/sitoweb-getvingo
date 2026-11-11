@@ -331,6 +331,6 @@
   <label class="campo"><span>Partita IVA <span class="tenue" data-piva-facoltativa hidden>(facoltativa per un privato)</span></span>
     <input name="piva" value="{{ o.piva if o and o.piva else '' }}" inputmode="numeric" maxlength="16" placeholder="11 cifre"></label>
   <label class="campo"><span>Codice fiscale</span>
-    <input name="codice_fiscale" value="{{ o.codice_fiscale if o and o.codice_fiscale else '' }}" maxlength="16" autocapitalize="characters" class="input-vin" placeholder="16 caratteri o 11 cifre"></label>
+    <input name="codice_fiscale" value="{{ o.codice_fiscale if o and o.codice_fiscale else '' }}" maxlength="16" autocapitalize="characters" style="text-transform:uppercase" placeholder="16 caratteri o 11 cifre"></label>
 </div>
 {% endmacro %}

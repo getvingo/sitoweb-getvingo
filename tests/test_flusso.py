@@ -68,7 +68,7 @@ class Base(unittest.TestCase):
 
     def abbina(self):
         r = self.c.post("/abbina/ABCD2345", data={
-            "vin": "wvwzzz1kzaw000123", "marca": "VW", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "vin": "wvwzzz1kzaw000123", "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
             "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"})
         self.assertEqual(r.status_code, 302)
         return self._id(Veicolo, vin=VIN)
@@ -136,7 +136,7 @@ class TestVinEAbbinamento(Base):
         from getvingo.models import Evento
         self.c.post("/t/ABCD2345", data={"lat": "45.5", "lon": "12.5"})
         r = self.c.post("/abbina/ABCD2345", data={
-            "vin": VIN, "marca": "VW", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "vin": VIN, "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
             "sede_id": self._id(Sede, nome="Sede A")})
         self.assertEqual(r.status_code, 302)
         with self.app.app_context():
@@ -154,7 +154,7 @@ class TestVinEAbbinamento(Base):
         with self.c.session_transaction() as s:
             s["posizione_tocco"]["at"] -= routes.VALIDITA_TOCCO_S + 1
         self.c.post("/abbina/ABCD2345", data={
-            "vin": VIN, "marca": "VW", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "vin": VIN, "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
             "sede_id": self._id(Sede, nome="Sede A")})
         from getvingo.models import Evento
         with self.app.app_context():
@@ -630,8 +630,8 @@ class TestLavorazioniEPreparazione(Base):
             v = db.session.get(Veicolo, vid)
             self.assertEqual((v.fase, v.tag), ("consegnato", None))
             self.assertIsNotNone(v.consegnato_at)
-        self.assertIn("VW Golf", self.c.get("/preparazione?vista=consegnate").get_data(as_text=True))
-        self.assertNotIn("VW Golf", self.c.get("/preparazione?vista=pronte").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/preparazione?vista=consegnate").get_data(as_text=True))
+        self.assertNotIn("Volkswagen Golf", self.c.get("/preparazione?vista=pronte").get_data(as_text=True))
 
     def test_solo_il_fornitore_completa_la_lavorazione(self):
         _, andata = self.arriva_in_carrozzeria()
@@ -643,8 +643,8 @@ class TestLavorazioniEPreparazione(Base):
     def test_filtro_tipo_lavorazione(self):
         self.arriva_in_carrozzeria()
         self.entra("ufficio")
-        self.assertIn("VW Golf", self.c.get("/lavorazioni?lavorazione=Carrozzeria").get_data(as_text=True))
-        self.assertNotIn("VW Golf", self.c.get("/lavorazioni?lavorazione=Revisione").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/lavorazioni?lavorazione=Carrozzeria").get_data(as_text=True))
+        self.assertNotIn("Volkswagen Golf", self.c.get("/lavorazioni?lavorazione=Revisione").get_data(as_text=True))
 
     def test_tap_in_viaggio_mostra_solo_arrivo(self):
         vid = self.abbina()
@@ -664,11 +664,11 @@ class TestCercaSimili(Base):
     def test_filtri_marca_modello(self):
         vid = self.abbina()
         with self.app.app_context():
-            db.session.add(Veicolo(vin="WVWZZZ1KZAW000999", marca="VW", modello="Golf", colore="Nero",
+            db.session.add(Veicolo(vin="WVWZZZ1KZAW000999", marca="Volkswagen", modello="Golf", colore="Nero",
                                    sede_id=1))
             db.session.add(Veicolo(vin="ZFA31200000123456", marca="Fiat", modello="500", sede_id=1))
             db.session.commit()
-        pagina = self.c.get("/cerca", query_string={"marca": "VW", "modello": "Golf"}).get_data(as_text=True)
+        pagina = self.c.get("/cerca", query_string={"marca": "Volkswagen", "modello": "Golf"}).get_data(as_text=True)
         self.assertEqual(pagina.count('class="voce fase'), 2)
         self.assertIn("1 simile<", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
 
@@ -677,7 +677,7 @@ class TestFiltriAdattivi(Base):
     def test_opzioni_solo_se_presenti(self):
         vid = self.abbina()
         pagina = self.c.get("/stock").get_data(as_text=True)
-        self.assertIn("VW Golf", pagina)
+        self.assertIn("Volkswagen Golf", pagina)
         # il menu c'è anche con un solo valore, ma elenca solo i valori presenti
         self.assertIn('name="tipologia"', pagina)
         self.assertNotIn("Veicolo commerciale", pagina)
@@ -690,7 +690,7 @@ class TestFiltriAdattivi(Base):
         self.assertIn("Veicolo commerciale", pagina)
         solo_comm = self.c.get("/stock?tipologia=commerciale").get_data(as_text=True)
         self.assertIn("Ducato", solo_comm)
-        self.assertNotIn("VW Golf", solo_comm)
+        self.assertNotIn("Volkswagen Golf", solo_comm)
         # archivio DDT: nessun DDT cancellato -> niente pillola "Cancellati"
         self.parti(vid, "Carrozzeria B")
         self.assertNotIn("Cancellati", self.c.get("/ddt").get_data(as_text=True))
@@ -746,7 +746,7 @@ class TestAssistenteIA(Base):
         r = self.c.get("/api/trova?q=000123").get_json()  # ultime cifre del VIN
         self.assertEqual([a["url"] for a in r["auto"]], [f"/veicolo/{vid}"])
         self.assertIn("In viaggio", r["auto"][0]["sotto"])
-        self.assertEqual(self.c.get("/api/trova?q=golf").get_json()["auto"][0]["titolo"], "VW Golf Bianco")
+        self.assertEqual(self.c.get("/api/trova?q=golf").get_json()["auto"][0]["titolo"], "Volkswagen Golf")
         d = self.c.get(f"/api/trova?q=1/{adesso().year}").get_json()["ddt"]
         self.assertEqual(d[0]["titolo"], f"DDT 1/{adesso().year}")
         self.assertEqual(self.c.get("/api/trova?q=abcd23").get_json()["adesivi"][0]["titolo"], "ABCD2345")
@@ -934,7 +934,7 @@ class TestPiazzaleMappa(Base):
     def test_un_punto_per_sede_esatti_se_filtro(self):
         self.abbina()
         with self.app.app_context():
-            db.session.add(Veicolo(vin="WVWZZZ1KZAW000999", marca="VW", modello="Golf", sede_id=1,
+            db.session.add(Veicolo(vin="WVWZZZ1KZAW000999", marca="Volkswagen", modello="Golf", sede_id=1,
                                    lat=45.0001, lon=12.0001))
             db.session.commit()
         pagina = self.c.get("/stock").get_data(as_text=True)
@@ -946,7 +946,7 @@ class TestPiazzaleMappa(Base):
 
 class TestStockEDati(Base):
     def test_nuova_auto_solo_con_adesivo(self):
-        dati = {"vin": VIN, "marca": "VW", "modello": "Golf", "targa": "gh 123 ab", "condizione": "usato",
+        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "targa": "gh 123 ab", "condizione": "usato",
                 "tipologia": "commerciale", "sede_id": self._id(Sede, nome="Sede A")}
         self.c.post("/piazzale/nuova", data=dati)  # senza adesivo non entra in stock
         with self.app.app_context():
@@ -955,11 +955,11 @@ class TestStockEDati(Base):
         with self.app.app_context():
             v = Veicolo.query.one()
             self.assertEqual((v.targa, v.tipologia, v.sede.nome, v.tag.codice), ("GH123AB", "commerciale", "Sede A", "ABCD2345"))
-        self.assertIn("VW Golf", self.c.get("/stock?q=gh123").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/stock?q=gh123").get_data(as_text=True))
 
     def test_modifica_dati_e_preparazione_diretta(self):
         vid = self.abbina()
-        self.c.post(f"/veicolo/{vid}/dati", data={"marca": "VW", "modello": "Golf GTI", "colore": "Rosso",
+        self.c.post(f"/veicolo/{vid}/dati", data={"marca": "Volkswagen", "modello": "Golf GTI", "colore": "Rosso",
                                                   "targa": "AB123CD", "tipologia": "vettura"})
         self.c.post(f"/veicolo/{vid}/dati", data={"targa": "ZZ999ZZ"})  # la targa inserita non si cambia
         self.c.post(f"/veicolo/{vid}/preparazione", data={"pronta_entro": "2026-11-20T16:00"})
@@ -1140,7 +1140,7 @@ class TestFornitoreVedeSoloIlSuo(Base):
         interne = ["/", "/cerca", "/cerca?q=000123", f"/veicolo/{vid}", "/ddt", "/ddt?stato=tutti&q=golf",
                    f"/ddt/{d}", f"/arrivo/{d}", "/lavorazioni", "/preparazione", "/preparazione?vista=pronte",
                    "/preparazione?vista=consegnate", "/stock", "/stock?tipologia=vettura",
-                   "/cerca?marca=VW&fase=in_viaggio"]
+                   "/cerca?marca=Volkswagen&fase=in_viaggio"]
         for url in interne + [f"/ddt/{d}/modifica", "/admin/", "/admin/sedi", "/admin/sedi/2",
                               "/admin/vettori", "/admin/vettori/1", "/admin/aziende", "/admin/aziende/concessionaria",
                               "/admin/aziende/fornitore/2", "/admin/utenti/1", "/admin/tag",
@@ -1224,7 +1224,7 @@ class TestPiuClienti(Base):
         self.assertNotIn("Golf", html)
         self.assertNotIn("<b>Sede A</b>", self.c.get("/admin/sedi").get_data(as_text=True))
         # stesso VIN ammesso in un'altra concessionaria, e il suo primo DDT è il n. 1
-        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "VW", "modello": "Polo", "colore": "Blu", "condizione": "usato",
+        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "Volkswagen", "modello": "Polo", "colore": "Blu", "condizione": "usato",
                                                  "sede_id": self._id2(Sede, nome="Sede Altra")})
         self.assertEqual(r.status_code, 302)
         with self.app.app_context():
@@ -1345,7 +1345,7 @@ class BaseMultiplo(Base):
         with self.app.app_context():
             sede = Sede.query.filter_by(nome="Sede A").first()
             for n, vin in enumerate(self.VINS):
-                db.session.add(Veicolo(vin=vin, marca="VW", modello=f"Golf {n}", sede=sede, stato="in_sede"))
+                db.session.add(Veicolo(vin=vin, marca="Volkswagen", modello=f"Golf {n}", sede=sede, stato="in_sede"))
             db.session.commit()
             self.ids = [Veicolo.query.filter_by(vin=v).first().id for v in self.VINS]
 
@@ -1561,13 +1561,13 @@ class TestRegoleNuove(Base):
 
     def test_stock_fino_a_pronta_e_conteggi(self):
         vid = self.abbina()
-        self.assertIn("VW Golf", self.c.get("/stock").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/stock").get_data(as_text=True))
         self.c.post(f"/veicolo/{vid}/preparazione")
         self.c.get("/")  # consuma il messaggio di conferma
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("Zona preparazione", stock)  # in preparazione resta in stock, nella sua zona
         self.assertIn("Passo 1 di 4 · Controllo rientro", stock)
-        self.assertIn("VW Golf", stock)
+        self.assertIn("Volkswagen Golf", stock)
         self.assertEqual(self.c.get("/piazzale").status_code, 302)  # vecchio indirizzo
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Da ritirare", pagina)
@@ -1579,18 +1579,18 @@ class TestRegoleNuove(Base):
             db.session.commit()
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("Pronte per la consegna", stock)
-        self.assertIn("VW Golf", stock)
+        self.assertIn("Volkswagen Golf", stock)
 
     def test_stock_tiene_lavorazioni_esterne_e_viaggi(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("In viaggio", stock)
-        self.assertIn("VW Golf", stock)
+        self.assertIn("Volkswagen Golf", stock)
         self.arrivo(self.ddt())
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("Lavorazioni esterne", stock)
-        self.assertIn("VW Golf", stock)
+        self.assertIn("Volkswagen Golf", stock)
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
         self.assertIn("Portami qui", pagina)  # solo dai fornitori esterni
         self.assertNotIn("Parcheggiata qui", pagina)
@@ -1674,7 +1674,7 @@ class TestCalendarioPreparazione(Base):
     def test_avvio_mette_in_calendario_e_scala_se_occupato(self):
         vid = self.abbina()
         with self.app.app_context():
-            v2 = Veicolo(vin="WVWZZZ1KZAW000999", marca="VW", modello="Polo", sede=Sede.query.filter_by(nome="Sede A").one(),
+            v2 = Veicolo(vin="WVWZZZ1KZAW000999", marca="Volkswagen", modello="Polo", sede=Sede.query.filter_by(nome="Sede A").one(),
                          condizione="nuovo")
             db.session.add(v2)
             db.session.commit()
@@ -1730,7 +1730,7 @@ class TestConsegna(Base):
         d = self.ddt()
         # in viaggio con l'ultimo DDT resta tra le pronte e in stock: esce solo alla consegna
         pronte = self.c.get("/preparazione?vista=pronte").get_data(as_text=True)
-        self.assertIn("VW Golf", pronte)
+        self.assertIn("Volkswagen Golf", pronte)
         self.assertIn("con l'ultimo DDT", pronte)
         self.assertIn("ultimo DDT, poi consegna", self.c.get("/stock").get_data(as_text=True))
         self.assertIn("in viaggio con l'ultimo DDT", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
@@ -1750,7 +1750,7 @@ class TestConsegna(Base):
             mese = f"{v.consegnato_at:%Y-%m}"
         cal = self.c.get(f"/preparazione?vista=consegnate&modo=calendario&mese={mese}").get_data(as_text=True)
         self.assertIn("cal-auto", cal)
-        self.assertIn("VW Golf", self.c.get("/preparazione?vista=consegnate&q=000123").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/preparazione?vista=consegnate&q=000123").get_data(as_text=True))
         self.assertIn("Nessuna auto consegnata con questi filtri",
                       self.c.get("/preparazione?vista=consegnate&dal=2000-01-01&al=2000-01-02").get_data(as_text=True))
 
@@ -1775,7 +1775,7 @@ class TestRegole0311Sera(Base):
         self.assertIn("in ritardo di", pagina)
         self.assertNotIn('name="pronta_entro" value="2020', pagina)  # niente campo per spostarlo
         self.assertIn("In preparazione da", pagina)
-        self.assertIn("VW Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
 
     def test_consegna_senza_appuntamento(self):
         """Getvingo calendarizza solo le preparazioni: per la consegna si indica la sede, il giorno lo
@@ -1797,7 +1797,7 @@ class TestRegole0311Sera(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
-        self.assertIn("VW Golf", self.c.get("/lavorazioni?stato=corso").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/lavorazioni?stato=corso").get_data(as_text=True))
         vuota = self.c.get("/lavorazioni?stato=ritardo").get_data(as_text=True)
         self.assertIn("Nessuna auto in ritardo", vuota)
         self.assertIn('class="stato-voce ritardo attivo', vuota)
@@ -1912,11 +1912,11 @@ class TestLoghiMarche(Base):
 class TestLoghiUfficiali(Base):
     def test_carica_logo_ufficiale_e_precedenza(self):
         self.app.instance_path = tempfile.mkdtemp()
-        self.abbina()  # VW
+        self.abbina()  # Volkswagen
         pagina = self.c.get("/admin/marchi").get_data(as_text=True)
-        self.assertIn("VW", pagina)
+        self.assertIn("Volkswagen", pagina)
         svg = b"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><circle r='5'/></svg>"
-        self.c.post("/admin/marchi", data={"marca": "VW", "file": (io.BytesIO(svg), "vw.svg")},
+        self.c.post("/admin/marchi", data={"marca": "Volkswagen", "file": (io.BytesIO(svg), "vw.svg")},
                     content_type="multipart/form-data")
         self.assertIn("Ufficiale · caricato in Gestione", self.c.get("/admin/marchi").get_data(as_text=True))
         self.assertIn("/marchi/ufficiali/volkswagen.svg", self.c.get("/stock").get_data(as_text=True))
@@ -1925,7 +1925,7 @@ class TestLoghiUfficiali(Base):
         self.assertIn("default-src 'none'", r.headers["Content-Security-Policy"])
         # un SVG con codice viene rifiutato
         cattivo = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
-        self.c.post("/admin/marchi", data={"marca": "VW", "file": (io.BytesIO(cattivo), "x.svg")},
+        self.c.post("/admin/marchi", data={"marca": "Volkswagen", "file": (io.BytesIO(cattivo), "x.svg")},
                     content_type="multipart/form-data")
         self.assertEqual(self.c.get("/marchi/ufficiali/volkswagen.svg").data, svg)
         self.entra("ufficio")
@@ -1953,18 +1953,18 @@ class TestCampiDdtEFiltri(Base):
         self.arrivo(d)
         self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt").get_data(as_text=True))          # "In corso"
         self.assertIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=chiuso").get_data(as_text=True))
-        self.assertNotIn("VW Golf", self.c.get("/lavorazioni").get_data(as_text=True))       # solo trasferimento
+        self.assertNotIn("Volkswagen Golf", self.c.get("/lavorazioni").get_data(as_text=True))       # solo trasferimento
 
     def test_filtro_vetture_commerciali_in_preparazione(self):
         vid = self.abbina()
         self.c.post(f"/veicolo/{vid}/preparazione")
-        self.assertIn("VW Golf", self.c.get("/preparazione?tipologia=vettura").get_data(as_text=True))
-        self.assertNotIn("VW Golf", self.c.get("/preparazione?tipologia=commerciale").get_data(as_text=True))
+        self.assertIn("Volkswagen Golf", self.c.get("/preparazione?tipologia=vettura").get_data(as_text=True))
+        self.assertNotIn("Volkswagen Golf", self.c.get("/preparazione?tipologia=commerciale").get_data(as_text=True))
 
 
 class TestNuovoUsato(Base):
     def test_scelta_obbligatoria_e_mostrata_ovunque(self):
-        dati = {"vin": VIN, "marca": "VW", "modello": "Golf", "tag": "ABCD2345", "sede_id": self._id(Sede, nome="Sede A")}
+        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "tag": "ABCD2345", "sede_id": self._id(Sede, nome="Sede A")}
         self.c.post("/piazzale/nuova", data=dati)  # senza nuova/usata non entra
         with self.app.app_context():
             self.assertEqual(Veicolo.query.count(), 0)
@@ -2807,7 +2807,7 @@ class TestNovitaAdmin(Base):
         with self.app.app_context():
             sede = Sede.query.filter_by(nome="Sede A").one()
             for n, entro in enumerate((adesso() + timedelta(days=3), adesso() - timedelta(days=1))):
-                v = Veicolo(vin=f"WVWZZZ1KZAW00{n}999", marca="VW", modello=f"Prova{n}", sede=sede, stato="in_sede")
+                v = Veicolo(vin=f"WVWZZZ1KZAW00{n}999", marca="Volkswagen", modello=f"Prova{n}", sede=sede, stato="in_sede")
                 db.session.add(v); db.session.flush()
                 db.session.add(Preparazione(veicolo=v, pronta_entro_at=entro))
             db.session.commit()
@@ -2996,7 +2996,7 @@ class TestCorreggiPosizione(Base):
         self.vid = self.abbina()
 
     def manda(self, **extra):
-        d = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "VW", "modello": "Golf",
+        d = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "Volkswagen", "modello": "Golf",
              "colore": "Bianco", "in_stock_dal": adesso().date().isoformat(),
              "sede_id": self._id(Sede, nome="Piazzale B")}
         d.update(extra)
@@ -3074,7 +3074,7 @@ class TestModificaDatiAuto(Base):
     def test_controlli(self):
         vid = self.abbina()
         with self.app.app_context():
-            db.session.add(Veicolo(vin="WVWZZZ1KZAW000777", marca="VW", modello="Up"))
+            db.session.add(Veicolo(vin="WVWZZZ1KZAW000777", marca="Volkswagen", modello="Up"))
             db.session.commit()
         for sbagliato in ({"vin": "WVWZZZ1KZAW000777"}, {"vin": "CORTO"}, {"in_stock_dal": "2999-01-01"},
                           {"modello": ""}, {"targa": "X1"}):
@@ -3128,7 +3128,7 @@ class TestHomeFornitore(Base):
 
     def test_admin_mette_dal_fornitore_con_lavorazione_obbligatoria(self):
         vid = self.abbina()
-        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "VW", "modello": "Golf",
+        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "Volkswagen", "modello": "Golf",
                 "colore": "Bianco", "in_stock_dal": adesso().date().isoformat(),
                 "sede_id": self._id(Sede, nome="Carrozzeria B")}
         self.c.post(f"/veicolo/{vid}/modifica", data=base)  # senza lavorazione: no
@@ -3246,7 +3246,7 @@ class TestHomeFornitore(Base):
             db.session.add(Tag(codice="ALTRA234"))
             db.session.commit()
         r = self.c.post("/abbina/ALTRA234", data={
-            "vin": "WVWZZZ1KZAW000999", "marca": "VW", "modello": "Polo", "colore": "Nero", "condizione": "nuovo",
+            "vin": "WVWZZZ1KZAW000999", "marca": "Volkswagen", "modello": "Polo", "colore": "Nero", "condizione": "nuovo",
             "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"})
         self.assertEqual(r.status_code, 302)
         return self._id(Veicolo, vin="WVWZZZ1KZAW000999")
@@ -3334,3 +3334,79 @@ class TestQui(Base):
                       "Completate · da ritirare"):
             self.assertIn(testo, pagina)
         self.assertNotIn("Completate · da ritirare", self.c.get("/?stato=ritardo").get_data(as_text=True))
+
+
+class TestControlliDellaSera(Base):
+    """Viaggi in ritardo da verificare, Analisi solo all'admin, ricezione in sede solo dalla concessionaria."""
+    def test_viaggio_oltre_un_ora_dall_arrivo_stimato(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.assertNotIn("Viaggi in ritardo", self.c.get("/").get_data(as_text=True))
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            m.partenza_at = adesso() - timedelta(minutes=(m.stima_viaggio_min or 20) + 90)
+            db.session.commit()
+        pagina = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Viaggi in ritardo", pagina)
+        self.assertIn("Da verificare", pagina)
+        self.assertIn("Preparazioni · oggi", pagina)
+
+    def test_analisi_solo_admin(self):
+        self.assertEqual(self.c.get("/analisi").status_code, 200)
+        self.entra("ufficio")
+        self.assertEqual(self.c.get("/analisi").status_code, 403)
+        self.assertNotIn("Analisi dei tempi", self.c.get("/").get_data(as_text=True))
+
+    def test_ricezione_in_sede_la_conferma_la_concessionaria(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        self.entra("carr")  # la carrozzeria la riporta lei, col suo DDT
+        self.c.post("/profilo-guida", data={"vettore_id": self._id(Vettore, nome="Vettore X"),
+                                            "mezzo": "Bisarca", "firma": FIRMA})
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Sede A"),
+                                                     "lat": "45.1", "lon": "12.1"})
+        d = self.ddt()
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "aperto")
+        self.assertIn("La ricezione la conferma", self.c.get(f"/ddt/{d}").get_data(as_text=True))
+        self.arrivo(d)  # il fornitore arrivato in Sede A non chiude il DDT
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "aperto")
+        self.entra("ufficio")
+        self.arrivo(d)
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "chiuso")
+
+
+class TestUniforma(Base):
+    """Vetture e furgoni caricati tutti allo stesso modo: le scritture diverse si correggono da sole."""
+    def test_regole_di_scrittura(self):
+        from getvingo import uniforma
+        self.assertEqual(uniforma.formatta("  grigio   moonstone "), "Grigio Moonstone")
+        self.assertEqual(uniforma.formatta("GOLF 8 etsi"), "Golf 8 eTSI")
+        self.assertEqual(uniforma.formatta("x3 xdrive"), "X3 xDrive")
+        self.assertEqual(uniforma.formatta("golf 8 eTSI"), "Golf 8 eTSI")  # lettere miste: restano
+        self.assertEqual(uniforma.formatta("a3 sportback tdi"), "A3 Sportback TDI")
+        self.assertEqual(uniforma.formatta("cx-30"), "CX-30")
+        self.assertEqual(uniforma.formatta("q4 e-tron"), "Q4 e-tron")
+        with self.app.app_context():
+            self.assertEqual(uniforma.valore("marca", "vw"), "Volkswagen")
+            self.assertEqual(uniforma.valore("marca", "mercedes benz"), "Mercedes-Benz")
+            self.assertEqual(uniforma.valore("marca", "bmw"), "BMW")
+
+    def test_riusa_la_scrittura_gia_presente(self):
+        vid = self.abbina()  # VW Golf Bianco
+        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "in_stock_dal": adesso().date().isoformat()}
+        self.c.post(f"/veicolo/{vid}/modifica", data={**base, "marca": "volkswagen", "modello": "golf",
+                                                      "versione": "1.5 etsi life", "colore": "bianco PURO"})
+        with self.app.app_context():
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.marca, v.modello, v.versione, v.colore), ("Volkswagen", "Golf", "1.5 eTSI Life", "Bianco Puro"))
+            v2 = Veicolo(vin="WVWZZZ1KZAW000777", marca="  VOLKSWAGEN", modello="GOLF ", versione="1.5 ETSI LIFE",
+                         colore="bianco  puro")
+            db.session.add(v2)
+            from getvingo import uniforma
+            uniforma.auto(v2)
+            self.assertEqual((v2.marca, v2.modello, v2.versione, v2.colore), ("Volkswagen", "Golf", "1.5 eTSI Life", "Bianco Puro"))
+            self.assertEqual(v.descrizione, "Volkswagen Golf")  # il colore non è nel nome

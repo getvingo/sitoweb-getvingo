@@ -74,7 +74,7 @@
       <div class="menu-tendina">
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }} · {{ g.utente.sede.nome if g.utente.ruolo == 'fornitore' and g.utente.sede else g.utente.organizzazione.nome }}</span><span class="menu-email">{{ g.utente.email }}</span></div>
         <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
-        {% if g.utente.interno %}<a href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
+        {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
         {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore" role="separator"></div>{% endif %}
         {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
         {% if gestore() %}<a href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}

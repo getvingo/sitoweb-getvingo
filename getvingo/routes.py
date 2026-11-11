@@ -14,9 +14,10 @@ from . import copie
 from . import ddt as ddt_pdf_mod
 from . import ia
 from . import marchi
+from . import uniforma
 from . import servizi
 from . import vin as vin_mod
-from .auth import login_richiesto
+from .auth import login_richiesto, ruolo_richiesto
 from .models import (Azione, Danno, DannoFoto, Ddt, Movimento, Preparazione, Sede, Sollecito, Tag, Utente,
                      Veicolo, Vettore, adesso, db)
 from .servizi import Vietato
@@ -232,6 +233,17 @@ def home():
         if v.id not in voci or livello < voci[v.id]["livello"]:
             voci[v.id] = {"gruppo": gruppo, "livello": livello, "etichetta": etichetta, "v": v, "testo": testo, "url": url}
 
+    # viaggi oltre l'arrivo stimato di più di un'ora: da verificare (cosa sta succedendo?)
+    for v in gruppi["in_viaggio"]:
+        m = v.movimento_aperto
+        ritardo = servizi.viaggio_in_ritardo(m) if m else None
+        if ritardo is not None and ritardo > 60:
+            ore = ritardo // 60
+            aggiungi("viaggi", 1 if ritardo > 180 else 2, "Da verificare", v,
+                     f"DDT {m.ddt.sigla} verso {m.a_sede.nome}: doveva arrivare "
+                     f"{'da ' + str(ore) + (' ora' if ore == 1 else ' ore') if ore else 'da poco'} · "
+                     f"partita alle {m.partenza_at:%H:%M}" + (f" del {m.partenza_at:%d/%m}" if m.partenza_at.date() != adesso().date() else ""),
+                     url_for("main.ddt_dettaglio", ddt_id=m.ddt.id))
     tra_un_giorno = adesso() + timedelta(hours=24)
     for m in _movimenti("predisposto").order_by(Movimento.ritiro_entro_at):
         url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
@@ -276,7 +288,8 @@ def home():
     ordinate = sorted(voci.values(), key=lambda x: x["livello"])
     oggi_d = adesso().date()
     oggi = [e for e in _eventi_preparazione() if e["at"].date() == oggi_d or e["ritardo"]]
-    da_fare = [("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
+    da_fare = [("viaggi", "Viaggi in ritardo", "camion", [x for x in ordinate if x["gruppo"] == "viaggi"]),
+               ("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
                ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
     return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni,
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
@@ -284,7 +297,7 @@ def home():
 
 
 @bp.route("/analisi")
-@solo_interni
+@ruolo_richiesto("admin")
 def analisi():
     """Tempi dalla vendita alla consegna, fase per fase; fornitori; tratte (stimato e reale)."""
     from . import analisi as analisi_mod
@@ -1071,6 +1084,7 @@ def abbina(codice):
                 setattr(veicolo, campo, valore)
         if not veicolo.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
             veicolo.marca = vin_mod.marca_da_vin(vin)
+        uniforma.auto(veicolo)  # scritte tutte allo stesso modo
         if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
             veicolo.tipologia = request.form["tipologia"]
         if request.form.get("condizione") not in Veicolo.CONDIZIONI:
@@ -1149,6 +1163,7 @@ def nuova_auto():
                     setattr(v, k, " ".join(request.form[k].split()))
             if not v.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
                 v.marca = vin_mod.marca_da_vin(vin)
+            uniforma.auto(v)
             tag.veicolo, tag.abbinato_at = v, adesso()
             servizi.registra_evento(v, "inserimento", g.utente, *_coord())
             db.session.commit()
@@ -1231,6 +1246,7 @@ def modifica_auto(veicolo_id):
         v.tipologia = f["tipologia"]
     v.marca, v.modello = pulito["marca"], pulito["modello"]
     v.versione, v.colore = pulito["versione"][:120], pulito["colore"][:80]
+    uniforma.auto(v)
     if v.creato_at is None or giorno != v.creato_at.date():
         v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
     db.session.commit()

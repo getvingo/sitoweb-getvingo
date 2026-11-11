@@ -82,9 +82,9 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
   {{ riquadro(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
 </div>
 
-{# La giornata di oggi dal calendario della preparazione #}
+{# La giornata di oggi dal calendario della preparazione: solo le preparazioni delle auto #}
 <div class="oggi-calendario">
-  <div class="oggi-testa"><h2>{{ i('orologio') }} Oggi · {{ oggi_data.strftime('%d/%m') }}</h2>
+  <div class="oggi-testa"><h2>{{ i('brilla') }} Preparazioni · oggi {{ oggi_data.strftime('%d/%m') }}</h2>
     <a class="btn piccolo apri-calendario" href="{{ url_for('main.preparazione', vista='corso', modo='calendario') }}">{{ i('orologio', 's') }} Apri calendario</a></div>
   {% for e in oggi %}
   <a class="oggi-voce ev {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ url_for('main.veicolo', veicolo_id=e.v.id) }}">
@@ -93,7 +93,7 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
       <small>{{ 'In ritardo · ' if e.ritardo }}{{ tipi_evento[e.tipo] }}{{ ' · ora: ' ~ e.nota if e.tipo == 'pronta_entro' and e.nota }}</small></span>
   </a>
   {% else %}
-  <p class="tenue piccolo" style="margin:0">Nessuna auto da finire o consegnare oggi.</p>
+  <p class="tenue piccolo" style="margin:0">Nessuna preparazione da finire oggi.</p>
   {% endfor %}
 </div>
 </section>
