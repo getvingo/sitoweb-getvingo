@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}{{ titolo }} · Getvingo{% endblock %}
+{% block contenuto %}
+{# Pagina d'errore in italiano (403 accesso negato, 404 non trovata) al posto di quella standard in inglese #}
+<div class="titolo-pagina"><div><div class="sopratitolo">Errore {{ codice }}</div><h1>{{ titolo }}</h1></div></div>
+<div class="scheda pila">
+  <p>{{ spiegazione }}</p>
+  {% if dettaglio %}<p class="tenue">{{ dettaglio }}</p>{% endif %}
+  <p><a class="btn primario" href="{{ url_for('main.home') }}">{{ i('home', 's') }} {{ 'Torna alla Panoramica' if g.get('utente') and g.utente.interno else 'Torna alle tue lavorazioni' if g.get('utente') else "Vai all'accesso" }}</a></p>
+</div>
+{% endblock %}

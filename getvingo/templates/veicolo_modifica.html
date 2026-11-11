@@ -44,10 +44,20 @@
     <label class="campo"><span>Sede, piazzale o fornitore</span>
       <select name="sede_id" required>
         {% for gruppo, elenco in [('Sedi e piazzali', sedi|rejectattr('esterna')|list), ('Fornitori esterni', sedi|selectattr('esterna')|list)] if elenco %}
-        <optgroup label="{{ gruppo }}">{% for s in elenco %}<option value="{{ s.id }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id|string == form.get('sede_id')|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</optgroup>
+        <optgroup label="{{ gruppo }}">{% for s in elenco %}<option value="{{ s.id }}" data-lavoro="{{ '1' if s.esterna and s.id != con_ddt_id else '' }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id|string == form.get('sede_id')|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</optgroup>
         {% endfor %}</select></label>
+    <div class="lavoro-fornitore" data-lavoro-fornitore>
+      <p class="tenue piccolo" style="margin-top:0">Dal fornitore l'auto va <b>in lavorazione</b>: indica cosa deve fare. Il fornitore la vede tra le sue e conferma la fine dei lavori.</p>
+      <div class="griglia-2">
+        <label class="campo"><span>Lavorazione da fare</span>
+          <select name="lavorazione"><option value="">Scegli…</option>
+            {% for l in lavorazioni %}<option {{ 'selected' if form.get('lavorazione') == l }}>{{ l }}</option>{% endfor %}</select></label>
+        <label class="campo"><span>Dettagli lavorazione</span>
+          <input name="lavorazione_note" maxlength="300" value="{{ form.get('lavorazione_note', '') }}" placeholder="Es. riparare paraurti posteriore"></label>
+      </div>
+    </div>
     <div class="correggi-mappa" style="height:300px;border-radius:var(--r-s);overflow:hidden;margin-bottom:8px"></div>
-    <p class="tenue piccolo" style="margin:0">Trascina il segnaposto o tocca la mappa sul punto esatto; cambiando luogo il punto va sul luogo scelto. Da un fornitore l'auto risulta “in lavorazione” e il fornitore la vede tra le sue. Solo amministratore: niente DDT e nessuna traccia, “Posizione aggiornata” non cambia.</p>
+    <p class="tenue piccolo" style="margin:0">Trascina il segnaposto o tocca la mappa sul punto esatto; cambiando luogo il punto va sul luogo scelto. Solo amministratore: niente DDT e nessuna traccia, “Posizione aggiornata” non cambia.</p>
   </div>
   {% endif %}
   <div class="barra-azione">
@@ -74,6 +84,15 @@
     function metti(q) { f.lat.value = q[0].toFixed(7); f.lon.value = q[1].toFixed(7); punto.setLatLng(q); }
     punto.on('dragend', function () { var q = punto.getLatLng(); metti([q.lat, q.lng]); });
     mappa.on('click', function (e) { metti([e.latlng.lat, e.latlng.lng]); });
+    // verso un fornitore: lavorazione e dettagli obbligatori (li indica la concessionaria)
+    var lavoro = box.querySelector('[data-lavoro-fornitore]');
+    function mostraLavoro() {
+      var chiedi = !!sel.options[sel.selectedIndex].dataset.lavoro;
+      lavoro.hidden = !chiedi;
+      f.lavorazione.required = f.lavorazione_note.required = chiedi;
+    }
+    mostraLavoro();
+    sel.addEventListener('change', mostraLavoro);
     sel.addEventListener('change', function () {
       var q = puntoSede();
       if (!q) { f.lat.value = ''; f.lon.value = ''; return; }  // sede senza posizione: decide il server

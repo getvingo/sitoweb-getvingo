@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from flask import g, has_app_context
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event
+from sqlalchemy import event, or_
 from sqlalchemy.orm import Session, declared_attr, with_loader_criteria
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -284,8 +284,10 @@ class Veicolo(PerOrganizzazione, db.Model):
         return " ".join(p for p in (self.marca, self.modello, self.colore) if p) or "Veicolo"
 
     def _movimento(self, stato):
-        return (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(
-            Movimento.veicolo_id == self.id, Movimento.stato == stato, Ddt.annullato_at.is_(None))
+        # comprese le lavorazioni senza DDT (auto messa dal fornitore dall'amministratore)
+        return (Movimento.query.outerjoin(Ddt, Movimento.ddt_id == Ddt.id).filter(
+            Movimento.veicolo_id == self.id, Movimento.stato == stato,
+            or_(Movimento.ddt_id.is_(None), Ddt.annullato_at.is_(None)))
             .order_by(Movimento.id.desc()).first())
 
     @property
@@ -486,6 +488,11 @@ class Movimento(PerOrganizzazione, db.Model):
     @property
     def sede_arrivo_effettiva(self):
         return self.arrivo_sede or self.a_sede
+
+    @property
+    def senza_ddt(self):
+        """Lavorazione aperta dall'amministratore con "Modifica dati" (auto già dal fornitore): niente DDT."""
+        return self.ddt_id is None and self.ddt is None
 
     @property
     def con_lavorazione(self):
@@ -846,4 +853,5 @@ class Evento(PerOrganizzazione, db.Model):
             return f"{'arrivo' if self.tipo == 'arrivo' else 'partenza'} con DDT {self.ddt.sigla}"
         return {"riposizionamento": "a mano (“Parcheggiata qui”)", "abbinamento": "all'abbinamento dell'adesivo",
                 "inserimento": "all'inserimento in stock",
-                "tocco": "toccando l'adesivo"}.get(self.tipo, "a mano")
+                "tocco": "toccando l'adesivo",
+                "fine_lavorazione": "alla fine della lavorazione"}.get(self.tipo, "a mano")

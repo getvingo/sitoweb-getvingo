@@ -477,6 +477,8 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
     """Chi ritira l'auto conferma il DDT già creato dall'ufficio, firma e parte."""
     if not puo_prendere_in_carico(mov, utente):
         raise Vietato("Non puoi prendere in carico questo DDT.")
+    if lat is None or lon is None:
+        raise Vietato(SERVE_POSIZIONE)
     if mov.scaduto:
         raise Vietato("Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.")
     if not conducente:
@@ -504,6 +506,9 @@ def rinnova_ritiro(mov, ore=24):
 
 
 RAGGIO_ARRIVO_M = 200
+# ogni passo confermato (presa in carico, arrivo, fine lavori, consegna) registra la posizione del telefono
+SERVE_POSIZIONE = ("Serve la posizione del telefono: consenti l'accesso alla posizione e riprova. "
+                   "Ogni passo si conferma con la posizione.")
 
 NOMI_TOCCO = {"partenza": "Partenza", "tocco": "Tocco dell'adesivo", "arrivo": "Arrivo"}
 
@@ -570,7 +575,10 @@ def _per_conto(mov, utente, lat, lon):
 
 
 def indica_lavorazione(ddt, utente, lavorazione, note):
-    """Lavorazione aggiunta durante il viaggio (revisione tracciata del DDT)."""
+    """Lavorazione aggiunta durante il viaggio (revisione tracciata del DDT): la indica solo
+    la concessionaria, mai il fornitore che riceve l'auto."""
+    if not utente.interno:
+        raise Vietato("La lavorazione la indica la concessionaria.")
     note = (note or "").strip()[:300]
     if lavorazione not in Movimento.LAVORAZIONI:
         raise Vietato("Scegli la lavorazione da fare.")
@@ -654,6 +662,8 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
         raise Vietato("Questo DDT non è in viaggio.")
     if not mov.lavorazione:
         raise Vietato("Prima di chiudere il DDT indica la lavorazione da fare.")
+    if lat is None or lon is None:
+        raise Vietato(SERVE_POSIZIONE)
     # l'auto arriva solo nella destinazione indicata nel DDT: per un altro luogo serve un nuovo DDT
     if altrove_id and altrove_id != mov.a_sede_id:
         raise Vietato(f"L'arrivo si conferma solo a {mov.a_sede.nome}, la destinazione indicata nel DDT.")
@@ -681,8 +691,11 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
     else:
         v.stato, v.sede = "in_sede", sede_finale
 
-    # posizione: GPS del telefono se disponibile, altrimenti le coordinate della sede
-    if lat is None and sede_finale.lat is not None:
+    # posizione: GPS del telefono (sempre registrato sul movimento); il fornitore destinatario conferma
+    # anche da lontano, e in quel caso l'auto prende le coordinate della sede
+    lontano = (lat is not None and sede_finale.lat is not None
+               and distanza_m(lat, lon, sede_finale.lat, sede_finale.lon) > RAGGIO_ARRIVO_M)
+    if (lat is None or lontano) and sede_finale.lat is not None:
         lat, lon = sede_finale.lat, sede_finale.lon
     registra_evento(v, "arrivo", utente, lat, lon, mov.ddt)
 
@@ -738,8 +751,11 @@ def controlla_targa_consegna(v):
         raise Vietato(f"{v.descrizione} ({v.vin[-8:]}) non ha la targa: inseriscila prima della consegna al cliente.")
 
 
-def consegna_al_cliente(v, utente):
-    """Il cliente ritira l'auto in concessionaria (nessun trasporto, nessun DDT)."""
+def consegna_al_cliente(v, utente, lat=None, lon=None):
+    """Il cliente ritira l'auto in concessionaria (nessun trasporto, nessun DDT): la posizione del
+    telefono si registra come per ogni passo confermato."""
+    if lat is None or lon is None:
+        raise Vietato(SERVE_POSIZIONE)
     controlla_targa_consegna(v)
     if v.danni_aperti:
         raise Vietato("L'auto ha un danno da verificare: risolvilo prima della consegna.")
@@ -752,7 +768,7 @@ def consegna_al_cliente(v, utente):
     tag_id = v.tag.id if v.tag else None
     prep = v.preparazione_attiva
     _segna_consegnato(v)
-    registra_evento(v, "consegna", utente, None, None)
+    registra_evento(v, "consegna", utente, lat, lon)
     registra_azione("consegna", utente, v, tag_id=tag_id, prep_chiusa=prep.id if prep else None)
 
 
@@ -769,31 +785,65 @@ def puo_completare_lavorazione(mov, utente):
 ORE_RITIRO_RIENTRO = 72
 
 
-def completa_lavorazione(mov, utente, note="", prepara_rientro=True):
+def completa_lavorazione(mov, utente, note="", prepara_rientro=True, lat=None, lon=None, chi_riporta=""):
     """Il fornitore chiude la lavorazione e, di norma, prepara già il DDT di rientro
-    (lui è il mittente): la concessionaria deve solo andare a prendere l'auto."""
+    (lui è il mittente): la concessionaria deve solo andare a prendere l'auto.
+    Solo sul posto: il telefono deve essere entro RAGGIO_ARRIVO_M dal fornitore, e la posizione
+    dell'auto si aggiorna subito con quella confermata."""
     if not puo_completare_lavorazione(mov, utente):
         raise Vietato("La fine lavorazione la conferma il fornitore che ha l'auto.")
+    sede = mov.sede_arrivo_effettiva
+    if lat is None or lon is None:
+        raise Vietato(SERVE_POSIZIONE)
+    if sede.lat is not None and sede.lon is not None:
+        metri = distanza_m(lat, lon, sede.lat, sede.lon)
+        if metri > RAGGIO_ARRIVO_M:
+            raise Vietato(f"Sei a {_distanza_leggibile(metri)} da {sede.nome}: la fine dei lavori si conferma "
+                          f"solo entro {RAGGIO_ARRIVO_M} m, vicino all'auto.")
+    registra_evento(mov.veicolo, "fine_lavorazione", utente, lat, lon)
     mov.lavorazione_completata_at = adesso()
     mov.lavorazione_completata_da_id = utente.id
     mov.lavorazione_note_fine = (note or "").strip()[:300]
     if not prepara_rientro or mov.veicolo.movimento_predisposto:
-        registra_azione("lavorazione_completata", utente, mov.veicolo, mov.ddt)
+        registra_azione("lavorazione_completata", utente, mov.veicolo, mov.ddt, movimento_id=mov.id)
         return None
-    ritorno = mov.da_sede if mov.da_sede is not None and mov.da_sede.tipo == "propria" else \
-        Sede.query.filter_by(tipo="propria", attiva=True).order_by(Sede.id).first()
-    if ritorno is None:
+    rientro = predisponi_rientro(mov, utente, chi_riporta)
+    if rientro is None:
         return None
-    dati = dict(a_sede_id=ritorno.id, causale="Reso lavorazione", vettore_id=mov.vettore_id,
-                conducente="", lavorazione=Movimento.NESSUNA, lavorazione_note="")
-    rientro = crea_movimento(mov.veicolo, dati, utente, predisponi_ore=ORE_RITIRO_RIENTRO)
     db.session.flush()
     # la predisposizione automatica fa parte di questa azione: si ripristinano insieme
     ultima = Azione.query.filter_by(veicolo_id=mov.veicolo_id).order_by(Azione.id.desc()).first()
     if ultima is not None and ultima.tipo == "predisposizione":
         db.session.delete(ultima)
-    registra_azione("lavorazione_completata", utente, mov.veicolo, mov.ddt, rientro_ddt_id=rientro.id)
+    registra_azione("lavorazione_completata", utente, mov.veicolo, mov.ddt, rientro_ddt_id=rientro.id,
+                    movimento_id=mov.id)
     return rientro
+
+
+def predisponi_rientro(mov, utente, chi_riporta=""):
+    """DDT di rientro da ritirare, preparato dal fornitore (mittente) verso la sede da cui l'auto era partita.
+    chi_riporta: "noi" = il fornitore stesso (suo vettore, conducente chi lo prepara); l'id di un dipendente
+    della concessionaria (vettore della concessionaria, conducente lui); vuoto = chi verrà dalla concessionaria."""
+    v = mov.veicolo
+    if v.movimento_predisposto:
+        raise Vietato("Per quest'auto c'è già un DDT di rientro pronto.")
+    ritorno = mov.da_sede if mov.da_sede is not None and mov.da_sede.tipo == "propria" else \
+        Sede.query.filter_by(tipo="propria", attiva=True).order_by(Sede.id).first()
+    if ritorno is None:
+        return None
+    vettore, conducente, mezzo = vettore_proprio(), "", ""
+    if chi_riporta == "noi":
+        vettore = vettore_predefinito(utente)
+        conducente, mezzo = utente.nome, utente.mezzo or ""
+    elif chi_riporta:
+        dip = db.session.get(Utente, int(chi_riporta)) if str(chi_riporta).isdigit() else None
+        if dip is None or not dip.interno or not dip.attivo:
+            raise Vietato("Scegli chi riporta l'auto.")
+        vettore = dip.vettore if dip.vettore is not None and dip.vettore.attivo else vettore_proprio()
+        conducente, mezzo = dip.nome, dip.mezzo or ""
+    dati = dict(a_sede_id=ritorno.id, causale="Reso lavorazione", vettore_id=vettore.id, conducente=conducente,
+                lavorazione=Movimento.NESSUNA, lavorazione_note="", mezzo=mezzo if mezzo in Movimento.MEZZI else "")
+    return crea_movimento(v, dati, utente, predisponi_ore=ORE_RITIRO_RIENTRO)
 
 
 def annulla_ddt(ddt, utente, motivo):
@@ -851,13 +901,31 @@ def luogo_ammesso(sede):
     return sede is not None and sede.attiva and (sede.tipo == "propria" or sede.esterna)
 
 
-def correggi_posizione(v, utente, sede, lat=None, lon=None):
+def correggi_posizione(v, utente, sede, lat=None, lon=None, lavorazione=None, lavorazione_note=""):
     """L'amministratore sposta l'auto (sede e/o punto sulla mappa) senza DDT e senza lasciare traccia:
-    niente evento, niente azione, l'orario dell'ultimo aggiornamento resta quello di prima."""
+    niente evento, niente azione, l'orario dell'ultimo aggiornamento resta quello di prima.
+    Verso un fornitore la lavorazione è obbligatoria (la indica la concessionaria): nasce una
+    lavorazione senza DDT, che il fornitore chiude come le altre."""
     if not puo_correggere_posizione(v, utente):
         raise Vietato("Solo un amministratore può correggere la posizione di un'auto ferma in stock.")
     if not luogo_ammesso(sede):
         raise Vietato("Scegli una sede della concessionaria o un fornitore esterno.")
+    if sede.esterna:
+        qui = v.arrivo_qui if sede.id == v.sede_id else None
+        if qui is None or (qui.senza_ddt and not qui.lavorazione_completata_at):
+            lavorazione_note = (lavorazione_note or "").strip()[:300]
+            if lavorazione not in Movimento.LAVORAZIONI or lavorazione == Movimento.NESSUNA:
+                raise Vietato(f"Indica la lavorazione che {sede.nome} deve fare.")
+            if not lavorazione_note:
+                raise Vietato("Scrivi i dettagli della lavorazione da fare.")
+            if qui is None:
+                qui = Movimento(veicolo=v, da_sede=v.sede, a_sede=sede, causale="Invio lavorazione",
+                                vettore_id=vettore_proprio().id, conducente="", mezzo="", stato="chiuso",
+                                arrivo_at=adesso(), arrivo_utente_id=utente.id)
+                db.session.add(qui)
+            qui.lavorazione, qui.lavorazione_note = lavorazione, lavorazione_note
+            if qui.lavorazione_stima_iniziale is None:
+                qui.lavorazione_stima_iniziale = qui.stima_giorni
     if lat is None or lon is None:
         lat, lon = (sede.lat, sede.lon) if sede.id != v.sede_id or v.lat is None else (v.lat, v.lon)
     v.sede_id = sede.id
@@ -1243,7 +1311,7 @@ def ripristina(azione, utente):
 
 def _ripristina_su_veicolo(azione, utente, motivo):
     v, d, dati = azione.veicolo, azione.ddt, azione.dati or {}
-    m = _movimento_di(d, v.id)
+    m = db.session.get(Movimento, dati["movimento_id"]) if dati.get("movimento_id") else _movimento_di(d, v.id)
 
     if azione.tipo == "presa_in_carico":
         m.stato, m.partenza_at, m.partenza_utente_id = "predisposto", None, None

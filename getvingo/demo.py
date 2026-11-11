@@ -127,9 +127,10 @@ def carica():
     def rientro_in_sede(v, fornitore, chi, giorni_fa, giorni_lav, ore_attesa, mezzo=MEZZO[0]):
         """Andata, lavorazione, DDT di rientro preparato dal fornitore, ritiro e arrivo: l'auto va in preparazione."""
         m = in_lavorazione(v, fornitore, chi, "Carrozzeria", "Ritocchi carrozzeria", giorni_fa)
-        rientro = servizi.completa_lavorazione(m, chi).movimento
+        rientro = servizi.completa_lavorazione(m, chi, lat=fornitore.lat, lon=fornitore.lon).movimento
         m.lavorazione_completata_at = _indietro(days=giorni_fa - giorni_lav)
-        servizi.prendi_in_carico(rientro, utenti["autista"], "Mario Consegne", firma_autista, mezzo=mezzo)
+        servizi.prendi_in_carico(rientro, utenti["autista"], "Mario Consegne", firma_autista,
+                                 fornitore.lat, fornitore.lon, mezzo=mezzo)
         rientro.partenza_at = m.lavorazione_completata_at + timedelta(hours=ore_attesa)
         rientro.ddt.emesso_at = m.lavorazione_completata_at
         arriva(rientro, utenti["autista"], rientro.partenza_at + timedelta(minutes=35))
@@ -157,7 +158,7 @@ def carica():
         servizi.imposta_consegna(v, utenti["ufficio"], sede)
         if not v.targa:  # senza targa non si consegna: la si mette all'immatricolazione
             v.targa = "GV" + v.vin[-3:] + "EM"
-        servizi.consegna_al_cliente(v, utenti["ufficio"])
+        servizi.consegna_al_cliente(v, utenti["ufficio"], v.sede.lat, v.sede.lon)
         v.consegnato_at = quando
 
     # orari della demo sempre negli slot di 30 minuti (lun–ven 8:30–12:30 e 14:30–18:30)
@@ -261,11 +262,13 @@ def carica():
                    MEZZO[3])
     in_lavorazione(ducato2, carrozzeria, utenti["carrozzeria"], "Nessuna (solo trasferimento)", "", 4)  # non in Lavorazioni
     m = in_lavorazione(cx30, carrozzeria, utenti["carrozzeria"], "Pellicole / oscuramento vetri", "Vetri posteriori 20%", 5)
-    servizi.completa_lavorazione(m, utenti["carrozzeria"], "Pellicole montate", prepara_rientro=False)  # attesa DDT
+    servizi.completa_lavorazione(m, utenti["carrozzeria"], "Pellicole montate", prepara_rientro=False,
+                                 lat=carrozzeria.lat, lon=carrozzeria.lon)  # attesa DDT
 
     # ------------------------------------------------------------- DA RITIRARE
     m = in_lavorazione(clio_rientro, officina, utenti["officina"], "Meccanica / tagliando", "Tagliando pre-consegna", 3)
-    servizi.completa_lavorazione(m, utenti["officina"], "Tagliando fatto, filtri sostituiti")  # rientro pronto
+    servizi.completa_lavorazione(m, utenti["officina"], "Tagliando fatto, filtri sostituiti",
+                                 lat=officina.lat, lon=officina.lon)  # rientro pronto
     m.lavorazione_completata_at = _indietro(days=1)
     servizi.crea_movimento(fiat600, dict(a_sede_id=detailing.id, causale="Invio lavorazione", vettore_id=proprio.id,
                                          conducente="", lavorazione="Lavaggio / detailing",

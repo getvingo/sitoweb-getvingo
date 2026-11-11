@@ -103,7 +103,7 @@
 
 {# ---------------- Azioni principali, una alla volta ---------------- #}
 {% if puo_presa %}
-<form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=d.id) }}" id="presa" data-una-volta style="margin-top:18px">
+<form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=d.id) }}" id="presa" data-una-volta data-gps-obbligatorio style="margin-top:18px">
   {{ csrf_input() }}{{ gps() }}
   <div class="scheda">
     <h3 style="margin-bottom:12px">{{ i('camion', 's') }} Presa in carico</h3>
@@ -111,8 +111,9 @@
     {% if not m.mezzo %}<label class="campo"><span>Modalità di trasporto</span><select name="mezzo" required><option value="">Come viaggia l'auto…</option>{% for m in MEZZI_TRASPORTO %}<option>{{ m }}</option>{% endfor %}</select></label>{% endif %}
     {{ firma_pad("Firma del conducente", obbligatoria=True) }}
   </div>
+  <p class="avviso errore" data-gps-errore hidden></p>
   <div class="barra-azione">
-    <p class="riepilogo">verso {{ m.a_sede.nome }}</p>
+    <p class="riepilogo">verso {{ m.a_sede.nome }} · si conferma con la posizione del telefono</p>
     <button type="submit" class="btn primario pieno" {{ 'disabled' if m.scaduto }}>{{ i('check') }} Prendo in carico e parto</button>
   </div>
 </form>
@@ -124,13 +125,14 @@
 {% endif %}
 
 {% if puo_lavorazione %}
-<form method="post" action="{{ url_for('main.ddt_lavorazione_completata', ddt_id=d.id) }}" data-una-volta style="margin-top:18px">
-  {{ csrf_input() }}
+<form method="post" action="{{ url_for('main.ddt_lavorazione_completata', ddt_id=d.id) }}" data-una-volta data-gps-obbligatorio style="margin-top:18px">
+  {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
   <label class="campo"><span>Note di fine lavorazione <span class="tenue">(facoltative)</span></span><input name="note" maxlength="300" placeholder="Es. sostituito paraurti, pronta al ritiro"></label>
   <label class="spunta"><input type="checkbox" name="rientro" value="1" checked>
     <span>Prepara subito il DDT di rientro verso <b>{{ m.da_sede.nome if m.da_sede else 'la concessionaria' }}</b> (siete voi il mittente): chi viene a ritirare dovrà solo toccare l'adesivo, firmare e partire.</span></label>
+  <p class="avviso errore" data-gps-errore hidden></p>
   <div class="barra-azione">
-    <p class="riepilogo">{{ m.lavorazione }} · da {{ m.giorni_lavorazione }} giorni</p>
+    <p class="riepilogo">{{ m.lavorazione }} · da {{ m.giorni_lavorazione }} giorni · si conferma vicino all'auto (entro 200 m)</p>
     <button type="submit" class="btn primario pieno">{{ i('check') }} Lavorazione completata</button>
   </div>
 </form>

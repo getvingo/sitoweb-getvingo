@@ -2012,29 +2012,30 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 /* "Modifica dati" a destra del telaio nella carta dell'auto (tutto il personale interno) */
 .carta-auto-vin .modifica-auto { background: #fff; color: var(--marchio-viola); border-color: #fff; }
 
-/* Home del fornitore (11/11/2026): chi esegue le lavorazioni esterne. Filtri In arrivo · Nei tempi · In ritardo ·
-   Da ritirare, carte per auto con le azioni del fornitore (conferma arrivo, fine prevista, lavorazione completata). */
-.stato-filtri .arrivo { --c: var(--st-viaggio); --c-tenue: var(--st-viaggio-tenue); --c-testo: var(--st-viaggio-testo); }
+/* Home del fornitore (11/11/2026): chi esegue le lavorazioni esterne. In cima le auto in arrivo, poi i filtri
+   Nei tempi · In ritardo · Completate e un solo elenco di carte con tipo di lavorazione e conferma della fine. */
 .pagina-fornitore h2 { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; }
 .pagina-fornitore .carta-lavoro { display: flex; grid-row: auto; }
-.pagina-fornitore .carta-lavoro.lavoro-arrivo { border-left-color: var(--st-viaggio); }
 .pagina-fornitore .carta-lavoro.lavoro-corso { border-left-color: var(--in-tempo); }
 .pagina-fornitore .carta-lavoro.lavoro-ritardo { border-left-color: var(--in-ritardo); }
-.pagina-fornitore .carta-lavoro .btn.pieno { margin-top: auto; }
-.pagina-fornitore .lavoro-dettaglio { margin: 0; }
-.completa-lavoro { margin-top: auto; }
+.pagina-fornitore .carta-lavoro > .btn.pieno, .completa-lavoro { margin-top: auto; }
+.in-arrivo-fornitore { margin: 0 0 14px; padding: 12px; border: 1.5px solid var(--st-viaggio); border-radius: var(--r);
+  background: var(--st-viaggio-tenue); display: grid; gap: 8px; }
+.in-arrivo-fornitore .voce { margin: 0; }
+.etichetta-arrivo { margin: 0; display: flex; align-items: center; gap: 6px; font-size: var(--fs-13); font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--st-viaggio-testo); }
+.lavoro-tipo { padding: 10px 12px; border-radius: var(--r-m); background: var(--superficie); }
+.lavoro-tipo small { display: block; font-size: var(--fs-12); color: var(--testo-2); text-transform: uppercase; letter-spacing: .04em; }
+.lavoro-tipo b { display: flex; align-items: center; gap: 6px; font-size: var(--fs-17); }
+.lavoro-tipo p { margin: 4px 0 0; font-size: var(--fs-14); }
+.lavoro-esito { margin: 0; display: flex; gap: 6px; align-items: flex-start; color: var(--ok); font-size: var(--fs-14); }
+.lavoro-esito span { color: var(--testo); }
 .completa-lavoro > summary { list-style: none; }
 .completa-lavoro > summary::-webkit-details-marker { display: none; }
 .completa-lavoro[open] > summary { margin-bottom: 8px; }
 .completa-lavoro .scheda { margin: 0; }
 .testo-ritardo { color: var(--in-ritardo-testo); font-weight: 600; }
+.pagina-fornitore .richiesta-fornitore { margin-bottom: 12px; }
 .pagina-fornitore .rientrate { margin-top: 22px; }
 .pagina-fornitore .rientrate > summary { list-style: none; cursor: pointer; }
 .pagina-fornitore .rientrate > summary::-webkit-details-marker { display: none; }
-.flusso-fornitore { display: grid; gap: 0 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-.flusso-fornitore .griglia-lavori { grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1024px) {
-  .flusso-fornitore { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
-  /* una sola colonna (filtro attivo): le carte tornano a due per riga */
-  .flusso-fornitore > .colonna-flusso:only-child .griglia-lavori { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}

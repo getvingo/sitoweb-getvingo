@@ -99,6 +99,28 @@ def create_app(config=None):
     app.register_blueprint(auth.bp)
     app.register_blueprint(routes.bp)
     app.register_blueprint(admin.bp)
+
+    # pagine d'errore in italiano: chi non può aprire una pagina capisce perché e torna alla sua home
+    from werkzeug.exceptions import Forbidden, NotFound
+    from flask import render_template as _pagina
+
+    def _errore(e, codice, titolo, spiegazione, predefinita):
+        dettaglio = e.description if e.description and e.description != predefinita else ""
+        return _pagina("errore.html", codice=codice, titolo=titolo, spiegazione=spiegazione,
+                       dettaglio=dettaglio), codice
+
+    @app.errorhandler(403)
+    def _vietato(e):
+        return _errore(e, 403, "Pagina non disponibile per il tuo account",
+                       "Con l'account con cui sei entrato non puoi aprire questa pagina: per esempio un'auto che non è "
+                       "da voi, un DDT che non vi riguarda o una pagina riservata alla concessionaria.",
+                       Forbidden.description)
+
+    @app.errorhandler(404)
+    def _non_trovata(e):
+        return _errore(e, 404, "Pagina non trovata",
+                       "Il link non porta a nessuna pagina: forse l'auto o il DDT sono stati eliminati.",
+                       NotFound.description)
     app.register_blueprint(piattaforma.bp)
     auth.init_app(app)
     archivio.init_app(app)

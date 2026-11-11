@@ -116,11 +116,17 @@
   // (il server chiude il DDT solo entro il raggio della destinazione)
   document.querySelectorAll('form[data-gps-obbligatorio]').forEach(function (f) {
     var errore = f.querySelector('[data-gps-errore]');
-    var MOTIVI = { 1: 'Hai negato l’accesso alla posizione: senza non si può chiudere il DDT.',
+    var MOTIVI = { 1: 'Hai negato l’accesso alla posizione: senza non si può confermare. Consentila nelle impostazioni del browser e riprova.',
                    2: 'Posizione non disponibile: attiva il GPS / la localizzazione del telefono.',
                    3: 'Il GPS non ha risposto in tempo: riprova.' };
     f.addEventListener('submit', function (e) {
-      if (f.dataset.posizione || !navigator.geolocation || demo) return;
+      if (e.defaultPrevented) return;  // conferma annullata (es. "Consegnata al cliente")
+      if (f.dataset.posizione || demo) return;
+      if (!navigator.geolocation) {  // telefono senza posizione: non si conferma
+        e.preventDefault();
+        if (errore) { errore.textContent = MOTIVI[2]; errore.hidden = false; }
+        return;
+      }
       e.preventDefault();
       e.stopImmediatePropagation();
       var bottone = e.submitter;
@@ -131,11 +137,6 @@
         f.dataset.posizione = '1';
         if (f.requestSubmit) f.requestSubmit(bottone); else f.submit();
       }, function (err) {
-        if (f.hasAttribute('data-senza-gps-ok')) {  // il fornitore destinatario conferma anche da lontano
-          f.dataset.posizione = '1';
-          if (f.requestSubmit) f.requestSubmit(bottone); else f.submit();
-          return;
-        }
         if (bottone) bottone.classList.remove('in-corso');
         if (errore) { errore.textContent = MOTIVI[err.code] || MOTIVI[2]; errore.hidden = false; }
       }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });

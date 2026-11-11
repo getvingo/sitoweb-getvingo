@@ -2,35 +2,43 @@
 {% block classe_pagina %}pagina-fornitore{% endblock %}
 {% from "_macro.html" import i, marchio, targa, badge_condizione, filtri_stato %}
 {% from "_auto.html" import avanzamento_lavoro, cambia_stima, stima %}
-{% block titolo %}Le auto da voi · Getvingo{% endblock %}
+{% block titolo %}Lavorazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
-{# Home di chi esegue le lavorazioni esterne (carrozzeria, officina, allestitore…): cosa arriva, cosa è in
-   lavoro, cosa è finito e aspetta il ritiro. Le azioni del fornitore stanno sulla carta dell'auto. #}
+{# Home di chi esegue le lavorazioni esterne (carrozzeria, officina, allestitore…). In cima le auto in arrivo,
+   poi un solo elenco di lavorazioni filtrato per stato: Nei tempi · In ritardo · Completate. #}
 {% set qui = url_for('main.home', stato=stato or none) %}
 <div class="titolo-pagina"><div>
-  <div class="sopratitolo">{{ sede.nome }}</div><h1>Le auto da voi</h1>
-  <p class="descrizione-pagina">Le auto che {{ g.utente.organizzazione.nome }} vi affida: cosa sta arrivando, cosa avete in lavoro e cosa è pronto per il ritiro.</p>
+  <div class="sopratitolo">{{ sede.nome }} · per {{ g.utente.organizzazione.nome }}</div><h1>Lavorazioni</h1>
 </div></div>
 
 {% if not sede.firma %}
 <a class="avviso errore" href="{{ url_for('main.mia_firma') }}">{{ i('matita') }}<span>Imposta la firma di {{ sede.nome }}: verrà apposta in automatico su ogni ricezione e rientro. Tocca qui.</span></a>
 {% endif %}
 
+{# ---- In arrivo: DDT in viaggio verso di voi (non è un filtro: si conferma all'arrivo) ---- #}
+{% if in_arrivo %}
+<section class="in-arrivo-fornitore">
+  <p class="etichetta-arrivo">{{ i('camion', 's') }} In arrivo da voi · {{ in_arrivo|length }}</p>
+  {% for m in in_arrivo %}{% set v = m.veicolo %}
+  <a class="voce" href="{{ url_for('main.arrivo_da_tap', ddt_id=m.ddt.id) }}">{{ marchio(v) }}
+    <div class="corpo"><h3>{{ v.descrizione }}</h3>
+      <div class="tenue piccolo">{{ v.vin|vin }} · {% if m.con_lavorazione %}{{ m.lavorazione }}{% else %}lavorazione da indicare (concessionaria){% endif %} · partita {{ m.partenza_at|da_quanto }}</div></div>
+    <span class="badge in_viaggio">Conferma l'arrivo</span></a>
+  {% endfor %}
+</section>
+{% endif %}
+
 {{ filtri_stato([
-  ('arrivo', conteggi.arrivo, 'In arrivo', 'camion', url_for('main.home', stato=none if stato == 'arrivo' else 'arrivo'), False),
   ('corso', conteggi.corso, 'Nei tempi', 'orologio', url_for('main.home', stato=none if stato == 'corso' else 'corso'), True),
   ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', url_for('main.home', stato=none if stato == 'ritardo' else 'ritardo'), True),
-  ('finita', conteggi.finita, 'Da ritirare', 'ritiro', url_for('main.home', stato=none if stato == 'finita' else 'finita'), True),
-], stato, 'Le vostre auto per stato') }}
+  ('finita', conteggi.finita, 'Completate', 'check', url_for('main.home', stato=none if stato == 'finita' else 'finita'), True),
+], stato, 'Le vostre lavorazioni per stato') }}
 
-{# ---- Richieste della concessionaria: sempre in cima finché non si risponde ---- #}
-{% if solleciti and stato in ('', 'ritardo') %}
-<h2>{{ i('chat') }} Richieste dalla concessionaria <span class="conteggio">{{ solleciti|length }}</span></h2>
-<div class="griglia-lavori">
-{% for s in solleciti %}{% set m = s.movimento %}
+{# ---- Richieste della concessionaria: in cima finché non si risponde ---- #}
+{% for s in solleciti if stato in ('', 'ritardo') %}{% set m = s.movimento %}
 <section class="scheda richiesta-fornitore">
-  <div class="carta-lavoro-testa">{{ marchio(m.veicolo) }}<div class="carta-lavoro-nome"><b>{{ m.veicolo.descrizione }}</b><span class="tenue piccolo">{{ m.veicolo.vin|vin }} · {{ m.lavorazione }}</span></div></div>
+  <div class="carta-lavoro-testa">{{ marchio(m.veicolo) }}<div class="carta-lavoro-nome"><b>{{ i('chat', 's') }} La concessionaria chiede notizie · {{ m.veicolo.descrizione }}</b><span class="tenue piccolo">{{ m.veicolo.vin|vin }} · {{ m.lavorazione }}</span></div></div>
   <p class="richiesta-testo">“{{ s.messaggio }}”<br><small class="tenue">{{ s.utente.nome }}, {{ s.at|data('%d/%m alle %H:%M') }}</small></p>
   <form method="post" action="{{ url_for('main.risposta_sollecito', sollecito_id=s.id) }}" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -40,103 +48,85 @@
   </form>
 </section>
 {% endfor %}
-</div>
-{% endif %}
 
-{# Lavagna: In arrivo → In lavorazione → Da ritirare (tre colonne da 1024 px, una sotto l'altra sul telefono) #}
-<div class="flusso-fornitore">
-{# ---- In arrivo: DDT in viaggio verso di voi ---- #}
-{% if stato in ('', 'arrivo') %}<section class="colonna-flusso">
-<h2>{{ i('camion') }} In arrivo <span class="conteggio">{{ in_arrivo|length }}</span></h2>
-{% if in_arrivo %}
+{# ---- Le lavorazioni: prima i ritardi, poi nei tempi, poi le completate ---- #}
+{% if lavori %}
 <div class="griglia-lavori">
-{% for m in in_arrivo %}{% set v = m.veicolo %}
-  <article class="carta-lavoro lavoro-arrivo">
-    <div class="carta-lavoro-testa">{{ marchio(v) }}
-      <div class="carta-lavoro-nome"><b>{{ v.descrizione }}</b><span class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }}</span></div>
-      {{ badge_condizione(v) }}</div>
-    <div class="carta-lavoro-tipo">{% if m.con_lavorazione %}<span class="chip-lavoro">{{ i('chiave', 's') }} {{ m.lavorazione }}</span>{% else %}<span class="chip-lavoro">Lavorazione da indicare</span>{% endif %}</div>
-    {% if m.lavorazione_note %}<p class="lavoro-dettaglio">{{ m.lavorazione_note }}</p>{% endif %}
-    <div class="tenue piccolo">{{ i('utente', 's') }} {{ m.conducente or '—' }} · partita da {{ m.da_sede.nome if m.da_sede else '—' }} {{ m.partenza_at|da_quanto }} · DDT {{ m.ddt.sigla }}</div>
-    {{ stima(m) }}
-    <a class="btn primario pieno" href="{{ url_for('main.arrivo_da_tap', ddt_id=m.ddt.id) }}">{{ i('check') }} Conferma l'arrivo</a>
-  </article>
-{% endfor %}
-</div>
-{% else %}<div class="vuoto">{{ i('camion') }}Nessuna auto in viaggio verso di voi.</div>{% endif %}
-</section>{% endif %}
-
-{# ---- In lavoro: prima i ritardi ---- #}
-{% if stato in ('', 'corso', 'ritardo') %}<section class="colonna-flusso">
-<h2>{{ i('chiave') }} In lavorazione <span class="conteggio">{{ in_corso|length }}</span></h2>
-{% if in_corso %}
-<div class="griglia-lavori">
-{% for v, m in in_corso %}{% set rit = m.giorni_ritardo %}
-  <article class="carta-lavoro lavoro-{{ 'ritardo' if rit else 'corso' }}">
+{% for v, m in lavori %}{% set st = 'finita' if m.lavorazione_completata_at else ('ritardo' if m.giorni_ritardo else 'corso') %}
+  <article class="carta-lavoro lavoro-{{ st }}">
     <a class="carta-lavoro-testa" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ marchio(v) }}
       <div class="carta-lavoro-nome"><b>{{ v.descrizione }}</b><span class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }}</span></div>
       {{ badge_condizione(v) }}</a>
-    <div class="carta-lavoro-tipo"><span class="chip-lavoro">{{ i('chiave', 's') }} {{ m.lavorazione }}</span>{% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}</div>
-    {% if m.lavorazione_note %}<p class="lavoro-dettaglio"><b>Da fare:</b> {{ m.lavorazione_note }}</p>{% endif %}
-    <div class="carta-lavoro-avanzamento">{{ avanzamento_lavoro(m) }}
-      <div class="tenue piccolo">Arrivata il {{ m.arrivo_at|data('%d/%m') }} con DDT {{ m.ddt.sigla }}{% if m.sollecito_aperto %} · <span class="testo-ritardo">la concessionaria chiede notizie</span>{% endif %}</div></div>
-    {{ cambia_stima(m, qui) }}
-    <details class="completa-lavoro">
-      <summary class="btn primario pieno">{{ i('check') }} Lavorazione completata</summary>
-      <form method="post" action="{{ url_for('main.ddt_lavorazione_completata', ddt_id=m.ddt.id) }}" class="scheda" data-una-volta>
-        <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="movimento_id" value="{{ m.id }}">
-        <input type="hidden" name="torna" value="{{ url_for('main.home') }}">
-        <label class="campo"><span>Note per la concessionaria <span class="tenue">(facoltative)</span></span><input name="note" maxlength="300" placeholder="Es. sostituito paraurti, verniciato"></label>
-        <label class="spunta"><input type="checkbox" name="rientro" value="1" checked>
-          <span>Prepara subito il DDT di rientro verso <b>{{ m.da_sede.nome if m.da_sede else 'la concessionaria' }}</b>: chi viene a ritirarla tocca l'adesivo, firma e parte.</span></label>
-        <button class="btn primario pieno">{{ i('check') }} Conferma: lavorazione finita</button>
-      </form>
-    </details>
-  </article>
-{% endfor %}
-</div>
-{% else %}<div class="vuoto">{{ i('chiave') }}{% if stato == 'ritardo' %}Nessuna auto in ritardo.{% elif stato == 'corso' %}Nessuna auto nei tempi.{% else %}Nessuna auto in lavorazione.{% endif %}</div>{% endif %}
-</section>{% endif %}
-
-{# ---- Finite: aspettano il ritiro della concessionaria ---- #}
-{% if stato in ('', 'finita') %}<section class="colonna-flusso">
-<h2>{{ i('ritiro') }} Finite · da ritirare <span class="conteggio">{{ finite|length }}</span></h2>
-{% if finite %}
-<div class="griglia-lavori">
-{% for v, m in finite %}{% set rientro = da_ritirare.get(v.id) %}
-  <article class="carta-lavoro lavoro-finita">
-    <a class="carta-lavoro-testa" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ marchio(v) }}
-      <div class="carta-lavoro-nome"><b>{{ v.descrizione }}</b><span class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }}</span></div>
-      {{ badge_condizione(v) }}</a>
-    <div class="carta-lavoro-tipo"><span class="chip-lavoro">{{ i('chiave', 's') }} {{ m.lavorazione }}</span></div>
-    <div class="tenue piccolo">{{ i('check', 's') }} Finita {{ m.lavorazione_completata_at|da_quanto }}{% if m.giorni_lavorazione is not none %} · {{ m.giorni_lavorazione }} {{ 'giorno' if m.giorni_lavorazione == 1 else 'giorni' }} di lavoro{% endif %}{% if m.lavorazione_note_fine %} · {{ m.lavorazione_note_fine }}{% endif %}</div>
-    {% if rientro %}
-    <a class="rientro-stato pronto" href="{{ url_for('main.ddt_dettaglio', ddt_id=rientro.ddt.id) }}">{{ i('ritiro', 's') }} <span><b>DDT di rientro {{ rientro.ddt.sigla }} pronto</b> · verso {{ rientro.a_sede.nome }}, {{ 'ritiro scaduto il' if rientro.scaduto else 'da ritirare entro' }} {{ rientro.ritiro_entro_at|data('%d/%m %H:%M') }}</span></a>
+    <div class="lavoro-tipo">
+      <small>Lavorazione</small>
+      <b>{{ i('chiave', 's') }} {{ m.lavorazione }}</b>
+      {% if m.lavorazione_note %}<p>{{ m.lavorazione_note }}</p>{% endif %}
+    </div>
+    {% if st == 'finita' %}{% set rientro = da_ritirare.get(v.id) %}
+      <p class="lavoro-esito">{{ i('check', 's') }} <span><b>Lavori conclusi {{ m.lavorazione_completata_at|da_quanto }}</b>{% if m.giorni_lavorazione is not none %} · {{ m.giorni_lavorazione }} {{ 'giorno' if m.giorni_lavorazione == 1 else 'giorni' }} di lavoro{% endif %}{% if m.lavorazione_note_fine %} · {{ m.lavorazione_note_fine }}{% endif %}</span></p>
+      {% if rientro %}
+      <a class="rientro-stato pronto" href="{{ url_for('main.ddt_dettaglio', ddt_id=rientro.ddt.id) }}">{{ i('ritiro', 's') }} <span><b>DDT di rientro {{ rientro.ddt.sigla }} pronto</b> · verso {{ rientro.a_sede.nome }}, {{ 'ritiro scaduto il' if rientro.scaduto else 'da ritirare entro' }} {{ rientro.ritiro_entro_at|data('%d/%m %H:%M') }}</span></a>
+      {% else %}
+      <details class="completa-lavoro">
+        <summary class="btn pieno">{{ i('doc') }} Prepara il DDT di rientro</summary>
+        <form method="post" action="{{ url_for('main.prepara_rientro', mov_id=m.id) }}" class="scheda" data-una-volta>
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="torna" value="{{ url_for('main.home', stato=stato or none) }}">
+          <label class="campo"><span>Chi riporta l'auto?</span>
+            <select name="chi_riporta">
+              <option value="">Chi viene a ritirarla dalla concessionaria</option>
+              <option value="noi">Noi: {{ sede.nome }} (vettore e conducente nostri)</option>
+              {% if dipendenti %}<optgroup label="Un dipendente della concessionaria">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+            </select></label>
+          <button class="btn primario pieno">{{ i('doc') }} Prepara il DDT di rientro</button>
+          <p class="tenue piccolo" style="margin:8px 0 0">Il DDT nasce subito con vettore e conducente scelti; chi la riporta tocca l'adesivo, firma e parte.</p>
+        </form>
+      </details>
+      {% endif %}
     {% else %}
-    <p class="rientro-stato bloccato">{{ i('ritiro', 's') }} <span><b>DDT di rientro non ancora preparato</b> · preparalo dalla scheda dell'auto, così chi viene a ritirarla deve solo firmare e partire</span></p>
-    <a class="btn pieno" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ i('doc') }} Prepara il DDT di rientro</a>
+      <div class="carta-lavoro-avanzamento">{{ avanzamento_lavoro(m) }}
+        <div class="tenue piccolo">{% if m.ddt %}Arrivata il {{ m.arrivo_at|data('%d/%m') }} con DDT {{ m.ddt.sigla }}{% else %}Da voi dal {{ m.arrivo_at|data('%d/%m') }}{% endif %}{% if m.sollecito_aperto %} · <span class="testo-ritardo">la concessionaria chiede notizie</span>{% endif %}</div></div>
+      {{ cambia_stima(m, qui) }}
+      <details class="completa-lavoro">
+        <summary class="btn primario pieno">{{ i('check') }} Conferma la conclusione dei lavori</summary>
+        <form method="post" action="{{ url_for('main.lavorazione_completata', mov_id=m.id) }}" class="scheda" data-una-volta data-gps-obbligatorio>
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="lat"><input type="hidden" name="lon">
+          <input type="hidden" name="torna" value="{{ url_for('main.home') }}">
+          <label class="campo"><span>Note per la concessionaria <span class="tenue">(facoltative)</span></span><input name="note" maxlength="300" placeholder="Es. sostituito paraurti, verniciato"></label>
+          <label class="spunta"><input type="checkbox" name="rientro" value="1" checked>
+            <span>Prepara subito il DDT di rientro: chi la riporta tocca l'adesivo, firma e parte.</span></label>
+          <label class="campo"><span>Chi riporta l'auto?</span>
+            <select name="chi_riporta">
+              <option value="">Chi viene a ritirarla dalla concessionaria</option>
+              <option value="noi">Noi: {{ sede.nome }} (vettore e conducente nostri)</option>
+              {% if dipendenti %}<optgroup label="Un dipendente della concessionaria">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+            </select></label>
+          <p class="avviso errore" data-gps-errore hidden></p>
+          <button class="btn primario pieno">{{ i('pin') }} Conferma: lavori conclusi</button>
+          <p class="tenue piccolo" style="margin:8px 0 0">Si conferma vicino all'auto: il telefono controlla la posizione (entro 200 m da {{ sede.nome }}) e la aggiorna.</p>
+        </form>
+      </details>
     {% endif %}
   </article>
 {% endfor %}
 </div>
-{% else %}<div class="vuoto">{{ i('ritiro') }}Nessuna auto finita in attesa di ritiro.</div>{% endif %}
-</section>{% endif %}
-</div>
+{% else %}
+<div class="vuoto">{{ i('chiave') }}{% if stato == 'ritardo' %}Nessuna lavorazione in ritardo.{% elif stato == 'corso' %}Nessuna lavorazione nei tempi.{% elif stato == 'finita' %}Nessuna lavorazione completata in attesa di ritiro.{% else %}Nessuna lavorazione in corso.{% endif %}</div>
+{% endif %}
 
 {% if not stato %}
-{# ---- Auto da voi senza una lavorazione (solo parcheggio o trasferimento) ---- #}
+{# ---- Auto da voi senza lavorazione (solo trasferimento) ---- #}
 {% if senza_lavoro %}
 <h2>{{ i('sede') }} Da voi senza lavorazione <span class="conteggio">{{ senza_lavoro|length }}</span></h2>
 <div class="lista">
 {% for v in senza_lavoro %}
   <a class="voce" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ marchio(v) }}
-    <div class="corpo"><h3>{{ v.descrizione }}</h3><div class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }}</div></div>
+    <div class="corpo"><h3>{{ v.descrizione }}</h3><div class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }} · solo trasferimento</div></div>
     {{ i('chevron') }}</a>
 {% endfor %}
 </div>
 {% endif %}
 
-{# ---- Rientrate di recente ---- #}
+{# ---- Uscite di recente ---- #}
 {% if rientrate %}
 <details class="ripiega rientrate">
   <summary><h2 style="margin:0">{{ i('archivio') }} Uscite da voi negli ultimi 30 giorni <span class="conteggio">{{ rientrate|length }}</span></h2></summary>

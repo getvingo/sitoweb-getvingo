@@ -45,7 +45,7 @@
   <div class="info-tile">
     <span class="tondo-piccolo">{{ i('bandiera', 's') }}</span>
     <div>{% if v.stato == 'in_sede' and arrivo and arrivo.arrivo_at and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}
-      <small>Arrivata qui</small><b>{{ arrivo.arrivo_at|data('%d/%m/%Y alle %H:%M') }}</b><span>con DDT {{ arrivo.ddt.sigla }} da {{ arrivo.da_sede.nome if arrivo.da_sede else '—' }}</span>
+      <small>Arrivata qui</small><b>{{ arrivo.arrivo_at|data('%d/%m/%Y alle %H:%M') }}</b><span>{% if arrivo.ddt %}con DDT {{ arrivo.ddt.sigla }}{% else %}senza DDT{% endif %} da {{ arrivo.da_sede.nome if arrivo.da_sede else '—' }}</span>
       {% else %}<small>In stock dal</small><b>{{ v.creato_at|data('%d/%m/%Y') }}</b>
 {% endif %}</div>
   </div>
@@ -126,7 +126,7 @@
 <a class="dettaglio-stato" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione">
   <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</a>
 {% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}
-<a class="dettaglio-stato" href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}">{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</a>
+<a class="dettaglio-stato" href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}">{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</a>
 {% elif f == 'in_viaggio' and v.movimento_aperto %}
 <a class="dettaglio-stato" href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}">{{ i('camion', 's') }} da {{ in_viaggio_da(v.movimento_aperto) }}</a>
 {% elif f == 'pronta' %}

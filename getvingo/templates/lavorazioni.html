@@ -54,12 +54,12 @@
       {% set qui = url_for('main.lavorazioni', lavorazione=tp, tipologia=tl, stato=st) %}
       <div class="carta-lavoro-tipo"><span class="chip-lavoro">{{ i('chiave', 's') }} {{ m.lavorazione }}</span>{% if m.lavorazione_note %}<span class="tenue piccolo">{{ m.lavorazione_note }}</span>{% endif %}</div>
       <div class="carta-lavoro-avanzamento">{{ avanzamento_lavoro(m) }}
-        <div class="tenue piccolo">Arrivata il {{ m.arrivo_at|data('%d/%m') }} con DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}">{{ m.ddt.sigla }}</a>{% if m.lavorazione_note_fine %} · {{ m.lavorazione_note_fine }}{% endif %}</div></div>
+        <div class="tenue piccolo">{% if m.ddt %}Arrivata il {{ m.arrivo_at|data('%d/%m') }} con DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}">{{ m.ddt.sigla }}</a>{% else %}Dal fornitore dal {{ m.arrivo_at|data('%d/%m') }} (senza DDT){% endif %}{% if m.lavorazione_note_fine %} · {{ m.lavorazione_note_fine }}{% endif %}</div></div>
       <div class="carta-lavoro-rientro">{{ rientro_lavoro(v, m) }}</div>
       <div class="carta-lavoro-azioni">
         {{ sollecito_lavoro(m, qui) }}
         {% if not m.lavorazione_completata_at %}{{ cambia_stima(m, qui) }}{% endif %}
-        {% if m.lavorazione_completata_at %}{{ annulla(annullabile(v.id, 'lavorazione_completata', m.ddt.id), 'Annulla completamento', qui) }}{% endif %}
+        {% if m.lavorazione_completata_at %}{{ annulla(annullabile(v.id, 'lavorazione_completata', m.ddt_id), 'Annulla completamento', qui) }}{% endif %}
       </div>
     </article>
   {% endfor %}

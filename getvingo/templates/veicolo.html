@@ -30,7 +30,8 @@
 
 {# ---- Presso un fornitore ---- #}
 {% if v.stato == 'in_sede' and v.sede and v.sede.esterna and ultimo %}
-<a class="voce" href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}" style="margin-bottom:12px">
+{% set tag_voce = 'a' if ultimo.ddt else 'div' %}
+<{{ tag_voce }} class="voce" {% if ultimo.ddt %}href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}"{% endif %} style="margin-bottom:12px">
   <span class="tondo {{ 'da_ritirare' if ultimo.lavorazione_completata_at else 'lavorazione' }}">{{ i('chiave') }}</span>
   <div class="corpo">
     {% if ultimo.con_lavorazione %}
@@ -44,11 +45,11 @@
     {% if ultimo.lavorazione_completata_at %}
       <div class="tratta" style="color:var(--ok);font-weight:650">{{ i('check', 's') }} Completata {{ ultimo.lavorazione_completata_at|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}</div>
     {% else %}
-      <div class="tratta">arrivata il {{ ultimo.arrivo_at|data('%d/%m/%Y') }}{% if ultimo.con_lavorazione %} · la fine lavorazione la segna {{ v.sede.nome }}{% endif %}</div>
+      <div class="tratta">{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m/%Y') }}{% if ultimo.senza_ddt %} (senza DDT){% endif %}{% if ultimo.con_lavorazione %} · la fine lavorazione la segna {{ v.sede.nome }}{% endif %}</div>
     {% endif %}
   </div>
   {{ giorni(ultimo.giorni_lavorazione) }}
-</a>
+</{{ tag_voce }}>
 {% if ultimo.con_lavorazione %}
 <section class="scheda tocco-prep tocco-lavoro" style="margin:-4px 0 12px">
   {{ avanzamento_lavoro(ultimo, anello=True) }}
@@ -57,16 +58,18 @@
   {% if not ultimo.lavorazione_completata_at %}{{ cambia_stima(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
 </section>
 {% endif %}
-{% if ultimo.lavorazione_completata_at %}{{ annulla(annullabile(v.id, 'lavorazione_completata', ultimo.ddt.id), 'Annulla completamento', url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
+{% if ultimo.lavorazione_completata_at %}{{ annulla(annullabile(v.id, 'lavorazione_completata', ultimo.ddt_id), 'Annulla completamento', url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
 {% endif %}
 
 {% if puo_lavorazione %}
-<form method="post" action="{{ url_for('main.ddt_lavorazione_completata', ddt_id=ultimo.ddt.id) }}" data-una-volta class="scheda" style="margin-bottom:12px">
-  {{ csrf_input() }}<input type="hidden" name="movimento_id" value="{{ ultimo.id }}">
+<form method="post" action="{{ url_for('main.lavorazione_completata', mov_id=ultimo.id) }}" data-una-volta data-gps-obbligatorio class="scheda" style="margin-bottom:12px">
+  {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon"><input type="hidden" name="torna" value="{{ url_for('main.veicolo', veicolo_id=v.id) }}">
   <label class="campo"><span>Note di fine lavorazione <span class="tenue">(facoltative)</span></span><input name="note" maxlength="300"></label>
   <label class="spunta"><input type="checkbox" name="rientro" value="1" checked>
     <span>Prepara subito il DDT di rientro verso <b>{{ ultimo.da_sede.nome if ultimo.da_sede else 'la concessionaria' }}</b>: chi viene a ritirare dovrà solo toccare l'adesivo, firmare e partire.</span></label>
+  <p class="avviso errore" data-gps-errore hidden></p>
   <button class="btn primario pieno">{{ i('check') }} Lavorazione completata</button>
+  <p class="tenue piccolo" style="margin:8px 0 0">Si conferma vicino all'auto: il telefono controlla la posizione (entro 200 m) e la aggiorna.</p>
 </form>
 {% endif %}
 
@@ -148,9 +151,10 @@
     </div>
   </form>
   {% elif puo_consegnare %}
-  <form method="post" action="{{ url_for('main.consegna', veicolo_id=v.id) }}" data-una-volta style="margin-top:14px"
-        onsubmit="return confirm('Confermi che {{ v.descrizione }} è stata consegnata al cliente? Passerà in archivio “Consegnate”.')">
-    {{ csrf_input() }}
+  <form method="post" action="{{ url_for('main.consegna', veicolo_id=v.id) }}" data-una-volta data-gps-obbligatorio style="margin-top:14px"
+        onsubmit="return !!this.dataset.posizione || confirm('Confermi che {{ v.descrizione }} è stata consegnata al cliente? Passerà in archivio “Consegnate”.')">
+    {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+    <p class="avviso errore" data-gps-errore hidden></p>
     <button class="btn primario pieno">{{ i('archivio') }} Consegnata al cliente</button>
   </form>
   {% elif v.danni_aperti %}

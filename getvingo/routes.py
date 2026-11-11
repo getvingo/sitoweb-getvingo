@@ -254,7 +254,8 @@ def home():
             if giorni >= 7:
                 aggiungi("lavorazioni", 1 if giorni >= 14 else 2, "Urgente" if giorni >= 14 else "Da sollecitare", v,
                          f"Ferma presso {v.sede.nome} da {giorni} giorni",
-                         url_for("main.ddt_dettaglio", ddt_id=m.ddt.id))
+                         url_for("main.ddt_dettaglio", ddt_id=m.ddt.id) if m.ddt
+                         else url_for("main.veicolo", veicolo_id=v.id))
     for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
         url = url_for("main.veicolo", veicolo_id=prep.veicolo_id)
         if servizi.bloccata_da_danni(prep):
@@ -343,12 +344,12 @@ def api_trova():
             "adesivi": [voce_adesivo(t) for t in adesivi]}
 
 
-STATI_FORNITORE = ("arrivo", "corso", "ritardo", "finita")
+STATI_FORNITORE = ("corso", "ritardo", "finita")
 
 
 def _home_fornitore():
-    """Home di chi esegue le lavorazioni esterne: cosa arriva, cosa è in lavoro (prima i ritardi),
-    cosa è finito e aspetta il ritiro, le richieste della concessionaria e le auto rientrate da poco."""
+    """Home di chi esegue le lavorazioni esterne. In cima le auto in arrivo (da confermare), poi un solo
+    elenco di lavorazioni filtrabile per stato: Nei tempi · In ritardo · Completate (prima i ritardi)."""
     sede = g.utente.sede
     if sede is None:
         abort(403, "Il tuo account non è collegato a nessuna sede: contatta la concessionaria.")
@@ -358,24 +359,23 @@ def _home_fornitore():
     presenti = servizi.presso_fornitori(solo_sede_id=sede.id)
     presenti = presenti[0][1] if presenti else []
     lavori = [(v, m) for v, m in presenti if m and m.con_lavorazione]
-    # in lavoro: prima i ritardi (dal più grave), poi per fine prevista
-    in_corso = sorted(((v, m) for v, m in lavori if not m.lavorazione_completata_at),
-                      key=lambda x: (-(x[1].giorni_ritardo or 0), x[1].lavorazione_prevista_at or adesso()))
-    finite = sorted(((v, m) for v, m in lavori if m.lavorazione_completata_at),
-                    key=lambda x: x[1].lavorazione_completata_at)
+    ordine = {"ritardo": 0, "corso": 1, "finita": 2}
+    lavori.sort(key=lambda x: (ordine[stato_lavorazione(x[1])], -(x[1].giorni_ritardo or 0),
+                               x[1].lavorazione_prevista_at or adesso()))
+    conteggi = {k: sum(1 for _, m in lavori if stato_lavorazione(m) == k) for k in STATI_FORNITORE}
+    visibili = [(v, m) for v, m in lavori if not stato or stato_lavorazione(m) == stato]
     senza_lavoro = [v for v, m in presenti if not (m and m.con_lavorazione)]
     solleciti = [m.sollecito_aperto for _, m in lavori if m.sollecito_aperto]
-    conteggi = {"arrivo": len(in_arrivo), "corso": sum(1 for _, m in in_corso if not m.giorni_ritardo),
-                "ritardo": sum(1 for _, m in in_corso if m.giorni_ritardo), "finita": len(finite)}
-    if stato in ("corso", "ritardo"):
-        in_corso = [(v, m) for v, m in in_corso if bool(m.giorni_ritardo) == (stato == "ritardo")]
     rientrate = (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id)
                  .filter(Movimento.stato.in_(("aperto", "chiuso")), Ddt.annullato_at.is_(None),
                          Movimento.da_sede_id == sede.id, Movimento.partenza_at >= adesso() - timedelta(days=30))
                  .order_by(Movimento.partenza_at.desc()).limit(20).all())
+    # chi può riportare l'auto: il fornitore stesso o un dipendente della concessionaria
+    dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno),
+                        key=lambda u: u.nome)
     return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo,
-                           in_corso=in_corso, finite=finite, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
-                           solleciti=solleciti, rientrate=rientrate)
+                           lavori=visibili, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
+                           solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti)
 
 
 @bp.route("/lavorazioni")
@@ -434,6 +434,60 @@ def stato_lavorazione(m):
 def _torna(predefinito):
     torna = request.form.get("torna", "")
     return redirect(torna if torna.startswith("/") and not torna.startswith("//") else predefinito)
+
+
+def _posizione_fine_lavoro(mov):
+    """Posizione del telefono per la fine dei lavori (GPS al clic o tocco recente); in demo il fornitore."""
+    lat, lon = _coord()
+    if lat is None and current_app.config["DEMO"]:
+        sede = mov.sede_arrivo_effettiva
+        lat, lon = (sede.lat, sede.lon) if sede.lat is not None else _posizione_simulata(mov.veicolo)
+    return lat, lon
+
+
+def _completa(mov):
+    rientro = servizi.completa_lavorazione(mov, g.utente, request.form.get("note", ""),
+                                           request.form.get("rientro") == "1", *_posizione_fine_lavoro(mov),
+                                           chi_riporta=request.form.get("chi_riporta", ""))
+    if rientro:
+        flash(f"DDT di rientro n. {rientro.sigla} pronto: la concessionaria deve solo venire a ritirare.", "ok")
+
+
+@bp.route("/movimento/<int:mov_id>/lavorazione-completata", methods=["POST"])
+@login_richiesto
+def lavorazione_completata(mov_id):
+    """Il fornitore conferma la fine dei lavori, sul posto (anche per le lavorazioni senza DDT)."""
+    mov = db.get_or_404(Movimento, mov_id)
+    try:
+        _completa(mov)
+        db.session.commit()
+        flash("Lavorazione completata: la concessionaria la vede “da ritirare” e la posizione dell'auto è "
+              "aggiornata.", "ok")
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+    return _torna(url_for("main.veicolo", veicolo_id=mov.veicolo_id))
+
+
+@bp.route("/movimento/<int:mov_id>/rientro", methods=["POST"])
+@login_richiesto
+def prepara_rientro(mov_id):
+    """Lavori conclusi: il fornitore prepara il DDT di rientro da ritirare (per sé o per la concessionaria)."""
+    mov = db.get_or_404(Movimento, mov_id)
+    try:
+        if not mov.lavorazione_completata_at or not servizi.account_del_luogo(mov.veicolo.sede, g.utente) \
+                or g.utente.interno:
+            raise servizi.Vietato("Il DDT di rientro da qui lo prepara il fornitore, a lavori conclusi.")
+        rientro = servizi.predisponi_rientro(mov, g.utente, request.form.get("chi_riporta", ""))
+        if rientro is None:
+            raise servizi.Vietato("Manca una sede della concessionaria verso cui riportarla.")
+        db.session.commit()
+        flash(f"DDT di rientro n. {rientro.sigla} pronto: va ritirato entro le "
+              f"{rientro.movimento.ritiro_entro_at:%H:%M del %d/%m}.", "ok")
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+    return _torna(url_for("main.home"))
 
 
 @bp.route("/movimento/<int:mov_id>/stima", methods=["POST"])
@@ -737,8 +791,11 @@ def sede_consegna(veicolo_id):
 @solo_interni
 def consegna(veicolo_id):
     v = db.get_or_404(Veicolo, veicolo_id)
+    lat, lon = _coord()
+    if lat is None and current_app.config["DEMO"] and v.sede is not None:
+        lat, lon = v.sede.lat, v.sede.lon
     try:
-        servizi.consegna_al_cliente(v, g.utente)
+        servizi.consegna_al_cliente(v, g.utente, lat, lon)
         db.session.commit()
         flash(f"{v.descrizione} consegnata: la trovi nell'archivio “Consegnate”.", "ok")
     except Vietato as e:
@@ -800,7 +857,7 @@ def tap(codice):
     if servizi.puo_vedere_veicolo(v, g.utente):
         return redirect(url_for("main.tocco_scelta", veicolo_id=v.id))
     for m in (v.movimento_predisposto, v.ultimo_arrivo):
-        if m and servizi.puo_vedere(m.ddt, g.utente):
+        if m and m.ddt and servizi.puo_vedere(m.ddt, g.utente):
             return _torna_al_ddt(m.ddt)
     abort(403, "Questa auto non è in carico alla tua sede.")
 
@@ -1110,14 +1167,22 @@ def modifica_auto(veicolo_id):
     sedi = (Sede.query.filter(Sede.attiva.is_(True), Sede.tipo.in_(("propria",) + Sede.FORNITORI))
             .order_by(Sede.tipo != "propria", Sede.nome).all() if puo_posizione else [])
 
+    qui = v.arrivo_qui if v.sede is not None and v.sede.esterna else None
+    # arrivata dal fornitore con un DDT: la lavorazione è quella del DDT (se resta lì non si chiede)
+    con_ddt_id = v.sede_id if qui is not None and not qui.senza_ddt else None
+
     def pagina(form):
-        return render_template("veicolo_modifica.html", v=v, form=form, puo_posizione=puo_posizione, sedi=sedi)
+        return render_template("veicolo_modifica.html", v=v, form=form, puo_posizione=puo_posizione, sedi=sedi,
+                               con_ddt_id=con_ddt_id,
+                               lavorazioni=[l for l in Movimento.LAVORAZIONI if l != Movimento.NESSUNA])
 
     if request.method == "GET":
         form = {"sede_id": v.sede_id, "lat": v.lat if v.lat is not None else "",
                 "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
                 "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
-                "colore": v.colore or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else ""}
+                "colore": v.colore or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
+                "lavorazione": qui.lavorazione if qui and qui.senza_ddt else "",
+                "lavorazione_note": qui.lavorazione_note if qui and qui.senza_ddt else ""}
         return pagina(form)
     f = request.form
     vin = vin_mod.normalizza(f.get("vin"))
@@ -1152,7 +1217,13 @@ def modifica_auto(veicolo_id):
         lat, lon = f.get("lat", type=float), f.get("lon", type=float)
         if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
             lat = lon = None
-        servizi.correggi_posizione(v, g.utente, sede, lat, lon)
+        try:
+            servizi.correggi_posizione(v, g.utente, sede, lat, lon, lavorazione=f.get("lavorazione"),
+                                       lavorazione_note=f.get("lavorazione_note", ""))
+        except Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
+            return pagina(f)
     v.vin, v.condizione, v.targa = vin, f["condizione"], _targa()
     if f.get("tipologia") in Veicolo.TIPOLOGIE:
         v.tipologia = f["tipologia"]
@@ -1581,10 +1652,15 @@ def _azione_ddt(ddt_id, funzione, messaggio):
 @bp.route("/ddt/<int:ddt_id>/presa-in-carico", methods=["POST"])
 @login_richiesto
 def ddt_presa_in_carico(ddt_id):
-    return _azione_ddt(ddt_id, lambda d: servizi.prendi_in_carico(
-        d.movimento, g.utente, request.form.get("conducente", "").strip()[:120],
-        servizi.firma_valida(request.form.get("firma")), *_coord(), mezzo=request.form.get("mezzo", "")),
-        "Presa in carico confermata. Buon viaggio.")
+    def presa(d):
+        lat, lon = _coord()
+        if lat is None and current_app.config["DEMO"]:  # demo senza GPS: come se fosse sul posto
+            da = d.movimento.da_sede
+            lat, lon = (da.lat, da.lon) if da is not None and da.lat is not None else _posizione_simulata(d.movimento.veicolo)
+        servizi.prendi_in_carico(d.movimento, g.utente, request.form.get("conducente", "").strip()[:120],
+                                 servizi.firma_valida(request.form.get("firma")), lat, lon,
+                                 mezzo=request.form.get("mezzo", ""))
+    return _azione_ddt(ddt_id, presa, "Presa in carico confermata. Buon viaggio.")
 
 
 @bp.route("/ddt/<int:ddt_id>/rinnova", methods=["POST"])
@@ -1654,12 +1730,7 @@ def ddt_lavorazione_completata(ddt_id):
     def completa(d):
         # DDT multiplo: la lavorazione si chiude auto per auto
         scelto = request.form.get("movimento_id", type=int)
-        mov = next((m for m in d.movimenti if m.id == scelto), d.movimento)
-        rientro = servizi.completa_lavorazione(mov, g.utente, request.form.get("note", ""),
-                                               prepara_rientro=request.form.get("rientro") == "1")
-        if rientro:
-            flash(f"DDT di rientro n. {rientro.sigla} pronto: la concessionaria deve solo venire a ritirare.",
-                  "ok")
+        _completa(next((m for m in d.movimenti if m.id == scelto), d.movimento))
     risposta = _azione_ddt(ddt_id, completa, "Lavorazione completata: la concessionaria la vede “da ritirare”.")
     return _torna(risposta.location) if request.form.get("torna") else risposta
 

@@ -25,7 +25,7 @@
   <span class="tondo-piccolo">{{ i('sede', 's') }}</span>
   <div><small>Partenza · non modificabile</small>
     <b>{{ v.sede.nome if v.sede else '—' }}</b>
-    <span>{% if arrivo and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}destinazione del DDT {{ arrivo.ddt.sigla }}, arrivata il {{ arrivo.arrivo_at|data('%d/%m alle %H:%M') }}{% else %}luogo in cui l'auto è entrata in stock{% endif %}</span>
+    <span>{% if arrivo and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}{% if arrivo.ddt %}destinazione del DDT {{ arrivo.ddt.sigla }}, arrivata il{% else %}messa qui senza DDT il{% endif %} {{ arrivo.arrivo_at|data('%d/%m alle %H:%M') }}{% else %}luogo in cui l'auto è entrata in stock{% endif %}</span>
     {% if distanza is not none %}<span class="{{ 'ok-testo' if distanza <= raggio else 'attenzione-testo' }}">{{ i('pin', 's') }} {% if distanza <= raggio %}Confermata dalla posizione del tocco{% else %}Il tocco risulta a {{ '%.0f m'|format(distanza) if distanza < 1000 else ('%.1f km'|format(distanza / 1000))|replace('.', ',') }} da qui: il mittente resta {{ v.sede.nome }}{% endif %}</span>{% endif %}
   </div>
 </section>
