@@ -3058,3 +3058,40 @@ class TestModificaDatiAuto(Base):
         vid = self.abbina()
         self.entra("carr")
         self.assertEqual(self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto()).status_code, 403)
+
+
+class TestHomeFornitore(Base):
+    """Home di chi esegue le lavorazioni esterne: In arrivo · Nei tempi · In ritardo · Da ritirare."""
+    in_carrozzeria = TestLavorazioniStimaESolleciti.in_carrozzeria
+    def test_lavagna_filtri_e_lavorazione_completata(self):
+        in_ritardo, _ = self.in_carrozzeria(9)  # carrozzeria: stima 5 giorni
+        self.entra("admin")
+        self.parti(self.abbina_altra(), "Carrozzeria B")  # in viaggio verso la carrozzeria
+        self.entra("carr")
+        pagina = self.c.get("/").get_data(as_text=True)
+        for testo in ("Le auto da voi", "In arrivo", "In lavorazione", "Finite · da ritirare", "Conferma l'arrivo",
+                      "Lavorazione completata", "In ritardo di"):
+            self.assertIn(testo, pagina)
+        self.assertNotIn("None", pagina)
+        self.assertNotIn("Conferma l'arrivo", self.c.get("/?stato=ritardo").get_data(as_text=True))
+        self.assertNotIn("Lavorazione completata", self.c.get("/?stato=arrivo").get_data(as_text=True))
+        # la fine lavorazione dalla home riporta alla home, con il rientro già pronto
+        with self.app.app_context():
+            m = db.session.get(Veicolo, in_ritardo).ultimo_arrivo
+            ddt_id, mid = m.ddt_id, m.id
+        r = self.c.post(f"/ddt/{ddt_id}/lavorazione-completata",
+                        data={"movimento_id": mid, "note": "fatto", "rientro": "1", "torna": "/"})
+        self.assertEqual(r.headers["Location"], "/")
+        pagina = self.c.get("/?stato=finita").get_data(as_text=True)
+        self.assertIn("DDT di rientro", pagina)
+        self.assertIn("pronto", pagina)
+
+    def abbina_altra(self):
+        with self.app.app_context():
+            db.session.add(Tag(codice="ALTRA234"))
+            db.session.commit()
+        r = self.c.post("/abbina/ALTRA234", data={
+            "vin": "WVWZZZ1KZAW000999", "marca": "VW", "modello": "Polo", "colore": "Nero", "condizione": "nuovo",
+            "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"})
+        self.assertEqual(r.status_code, 302)
+        return self._id(Veicolo, vin="WVWZZZ1KZAW000999")

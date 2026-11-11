@@ -343,17 +343,39 @@ def api_trova():
             "adesivi": [voce_adesivo(t) for t in adesivi]}
 
 
+STATI_FORNITORE = ("arrivo", "corso", "ritardo", "finita")
+
+
 def _home_fornitore():
+    """Home di chi esegue le lavorazioni esterne: cosa arriva, cosa è in lavoro (prima i ritardi),
+    cosa è finito e aspetta il ritiro, le richieste della concessionaria e le auto rientrate da poco."""
     sede = g.utente.sede
     if sede is None:
         abort(403, "Il tuo account non è collegato a nessuna sede: contatta la concessionaria.")
-    in_arrivo = _movimenti("aperto").filter(Movimento.a_sede_id == sede.id).all()
-    da_consegnare = _movimenti("predisposto").filter(Movimento.da_sede_id == sede.id).all()
+    stato = request.args.get("stato", "") if request.args.get("stato") in STATI_FORNITORE else ""
+    in_arrivo = _movimenti("aperto").filter(Movimento.a_sede_id == sede.id).order_by(Movimento.partenza_at).all()
+    da_ritirare = {m.veicolo_id: m for m in _movimenti("predisposto").filter(Movimento.da_sede_id == sede.id)}
     presenti = servizi.presso_fornitori(solo_sede_id=sede.id)
     presenti = presenti[0][1] if presenti else []
-    solleciti = [m.sollecito_aperto for _, m in presenti if m and m.sollecito_aperto]
-    return render_template("home_fornitore.html", sede=sede, in_arrivo=in_arrivo, solleciti=solleciti,
-                           da_consegnare=da_consegnare, presenti=presenti)
+    lavori = [(v, m) for v, m in presenti if m and m.con_lavorazione]
+    # in lavoro: prima i ritardi (dal più grave), poi per fine prevista
+    in_corso = sorted(((v, m) for v, m in lavori if not m.lavorazione_completata_at),
+                      key=lambda x: (-(x[1].giorni_ritardo or 0), x[1].lavorazione_prevista_at or adesso()))
+    finite = sorted(((v, m) for v, m in lavori if m.lavorazione_completata_at),
+                    key=lambda x: x[1].lavorazione_completata_at)
+    senza_lavoro = [v for v, m in presenti if not (m and m.con_lavorazione)]
+    solleciti = [m.sollecito_aperto for _, m in lavori if m.sollecito_aperto]
+    conteggi = {"arrivo": len(in_arrivo), "corso": sum(1 for _, m in in_corso if not m.giorni_ritardo),
+                "ritardo": sum(1 for _, m in in_corso if m.giorni_ritardo), "finita": len(finite)}
+    if stato in ("corso", "ritardo"):
+        in_corso = [(v, m) for v, m in in_corso if bool(m.giorni_ritardo) == (stato == "ritardo")]
+    rientrate = (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id)
+                 .filter(Movimento.stato.in_(("aperto", "chiuso")), Ddt.annullato_at.is_(None),
+                         Movimento.da_sede_id == sede.id, Movimento.partenza_at >= adesso() - timedelta(days=30))
+                 .order_by(Movimento.partenza_at.desc()).limit(20).all())
+    return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo,
+                           in_corso=in_corso, finite=finite, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
+                           solleciti=solleciti, rientrate=rientrate)
 
 
 @bp.route("/lavorazioni")
@@ -1638,7 +1660,8 @@ def ddt_lavorazione_completata(ddt_id):
         if rientro:
             flash(f"DDT di rientro n. {rientro.sigla} pronto: la concessionaria deve solo venire a ritirare.",
                   "ok")
-    return _azione_ddt(ddt_id, completa, "Lavorazione completata: la concessionaria la vede “da ritirare”.")
+    risposta = _azione_ddt(ddt_id, completa, "Lavorazione completata: la concessionaria la vede “da ritirare”.")
+    return _torna(risposta.location) if request.form.get("torna") else risposta
 
 
 @bp.route("/ddt/<int:ddt_id>/annulla", methods=["POST"])
