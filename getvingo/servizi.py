@@ -1104,7 +1104,7 @@ def presso_fornitori(solo_sede_id=None, lavorazione=None):
     veicoli = sorted(query.all(), key=lambda v: (v.sede.nome, v.id))
     risultato = []
     for sede, gruppo in groupby(veicoli, key=lambda v: v.sede):
-        voci = [(v, v.ultimo_arrivo) for v in gruppo]
+        voci = [(v, v.arrivo_qui) for v in gruppo]
         if lavorazione:
             voci = [x for x in voci if x[1] and x[1].lavorazione == lavorazione]
         if not voci:

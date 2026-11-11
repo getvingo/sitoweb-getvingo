@@ -40,7 +40,7 @@
 </section>
 {% endif %}
 
-{% set lavoro = v.ultimo_arrivo if v.fase in ('lavorazione', 'da_ritirare') else none %}
+{% set lavoro = v.arrivo_qui if v.fase in ('lavorazione', 'da_ritirare') else none %}
 {% if lavoro and lavoro.con_lavorazione %}
 <section class="scheda tocco-prep tocco-lavoro">
   {{ avanzamento_lavoro(lavoro, anello=True) }}

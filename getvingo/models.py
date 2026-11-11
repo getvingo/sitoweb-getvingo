@@ -301,6 +301,13 @@ class Veicolo(PerOrganizzazione, db.Model):
         return self._movimento("chiuso")
 
     @property
+    def arrivo_qui(self):
+        """L'ultimo arrivo, solo se l'ha portata dove si trova adesso. None se l'amministratore
+        l'ha spostata dopo con "Modifica dati" (senza DDT): niente lavorazione né giorni da mostrare."""
+        m = self.ultimo_arrivo
+        return m if m is not None and self.sede_id is not None and m.sede_arrivo_effettiva.id == self.sede_id else None
+
+    @property
     def preparazione_attiva(self):
         return Preparazione.query.filter_by(veicolo_id=self.id, completata_at=None).first()
 
@@ -326,7 +333,7 @@ class Veicolo(PerOrganizzazione, db.Model):
         if self.stato in ("consegnato", "in_viaggio"):
             return self.stato
         if self.sede and self.sede.esterna:
-            m = self.ultimo_arrivo
+            m = self.arrivo_qui
             return "da_ritirare" if m and m.lavorazione_completata_at else "lavorazione"
         if self.preparazione_attiva:
             return "preparazione"

@@ -64,7 +64,7 @@
         <div class="barra-avanzamento"><span style="width:{{ prep.avanzamento }}%"></span></div>
         <div class="piccolo"><b>Passo {{ prep.fasi|length + 1 }} di {{ prep.FASI|length }} · {{ prep.prossima_fase }}</b> · {{ prep.avanzamento }}% · {{ v.sede.nome if v.sede else '' }}{% if prep.pronta_entro_at %} · {{ prep.pronta_entro_at|slot }}{% endif %}</div>
       </div>
-      {% elif gr.chiave == 'esterne' %}{% set m = v.ultimo_arrivo %}
+      {% elif gr.chiave == 'esterne' %}{% set m = v.arrivo_qui %}
       <div class="stato-zona">
         <div class="piccolo" style="margin-bottom:6px">{{ i('chiave', 's') }} <b>{{ v.sede.nome }}</b>{% if m %} · {{ m.lavorazione }}{% endif %}</div>
         {% if m and m.con_lavorazione %}{{ avanzamento_lavoro(m) }}{% endif %}

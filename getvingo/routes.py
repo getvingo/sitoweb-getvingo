@@ -249,11 +249,12 @@ def home():
             aggiungi("lavorazioni", 3, "Attesa DDT", v, f"Lavorazione finita presso {v.sede.nome}: manca il DDT di rientro",
                      url_for("main.veicolo", veicolo_id=v.id))
         elif v.fase == "lavorazione":
-            giorni = v.ultimo_arrivo.giorni_lavorazione or 0
+            m = v.arrivo_qui
+            giorni = (m.giorni_lavorazione or 0) if m else 0
             if giorni >= 7:
                 aggiungi("lavorazioni", 1 if giorni >= 14 else 2, "Urgente" if giorni >= 14 else "Da sollecitare", v,
                          f"Ferma presso {v.sede.nome} da {giorni} giorni",
-                         url_for("main.ddt_dettaglio", ddt_id=v.ultimo_arrivo.ddt.id))
+                         url_for("main.ddt_dettaglio", ddt_id=m.ddt.id))
     for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
         url = url_for("main.veicolo", veicolo_id=prep.veicolo_id)
         if servizi.bloccata_da_danni(prep):
@@ -1207,7 +1208,7 @@ def note_interne(veicolo_id):
 def veicolo(veicolo_id):
     v = _veicolo_visibile(veicolo_id)
     mov = v.movimento_aperto
-    ultimo = v.ultimo_arrivo
+    ultimo = v.arrivo_qui
     valori = {"conducente": g.utente.nome if g.utente.ruolo != "admin" else "",
               "vettore_id": servizi.ultimo_vettore_id(g.utente)}
     if v.sede and v.sede.esterna and ultimo:

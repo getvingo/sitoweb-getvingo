@@ -2965,6 +2965,9 @@ class TestCorreggiPosizione(Base):
         self.manda(sede_id=self._id(Sede, nome="Carrozzeria B"))  # un fornitore sì, e si può riportarla indietro
         with self.app.app_context():
             self.assertEqual(db.session.get(Veicolo, self.vid).sede.nome, "Carrozzeria B")
+        # senza DDT d'arrivo le pagine si aprono lo stesso (prima la Panoramica andava in errore)
+        for p in ("/", "/stock", "/lavorazioni", f"/veicolo/{self.vid}", f"/veicolo/{self.vid}/tocco", "/analisi"):
+            self.assertEqual(self.c.get(p).status_code, 200, p)
         self.manda(sede_id=self._id(Sede, nome="Sede A"))
         self.entra("ufficio")
         self.assertNotIn("Sede, piazzale o fornitore", self.c.get(f"/veicolo/{self.vid}/modifica").get_data(as_text=True))

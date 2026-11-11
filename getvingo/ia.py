@@ -134,7 +134,7 @@ def _riassunto_veicolo(v, utente):
     voce = {"id": v.id, "descrizione": v.descrizione, "tipologia": Veicolo.TIPOLOGIE[v.tipologia],
             "vin": v.vin, "targa": v.targa or None, "stato": stato,
             "dove": v.sede.nome if v.sede and v.stato != "in_viaggio" else None}
-    ultimo = v.ultimo_arrivo
+    ultimo = v.arrivo_qui
     if ultimo and ultimo.giorni_lavorazione is not None:
         voce["giorni_lavorazione"] = ultimo.giorni_lavorazione
     if v.lat is not None and v.stato != "consegnato":
@@ -186,7 +186,7 @@ def _riepilogo_generale(utente):
         nome = Veicolo.FASI[v.fase]
         per_stato[nome] = per_stato.get(nome, 0) + 1
     ferme = [_riassunto_veicolo(v, utente) for v in attivi
-             if v.fase == "lavorazione" and (v.ultimo_arrivo.giorni_lavorazione or 0) >= 7]
+             if v.fase == "lavorazione" and v.arrivo_qui and (v.arrivo_qui.giorni_lavorazione or 0) >= 7]
     return {"oggi": adesso().strftime("%d/%m/%Y"), "veicoli_per_stato": per_stato,
             "in_lavorazione_da_7_giorni_o_piu": ferme}
 
