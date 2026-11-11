@@ -2969,30 +2969,44 @@ class TestCorreggiPosizione(Base):
             self.assertEqual(db.session.get(Veicolo, self.vid).stato, "in_viaggio")
 
 
-class TestModificaVersione(Base):
-    """La versione dell'auto la cambia tutto il personale interno, non i fornitori."""
-    def test_interni_si_fornitori_no(self):
-        vid = self.abbina()
-        for chi, versione in (("admin", "1.5 TSI Life"), ("autista", "2.0 TDI  Style")):
-            self.entra(chi)
-            self.assertIn("versione", self.c.get(f"/veicolo/{vid}").get_data(as_text=True).lower())
-            self.c.post(f"/veicolo/{vid}/dati", data={"versione": versione})
-        with self.app.app_context():
-            self.assertEqual(db.session.get(Veicolo, vid).versione, "2.0 TDI Style")
-        self.entra("carr")
-        self.assertEqual(self.c.post(f"/veicolo/{vid}/dati", data={"versione": "X"}).status_code, 403)
-        with self.app.app_context():
-            self.assertEqual(db.session.get(Veicolo, vid).versione, "2.0 TDI Style")
 
+class TestModificaDatiAuto(Base):
+    """Un solo "Modifica dati": gli stessi campi dell'ingresso in stock, per tutto il personale interno."""
+    def dati_auto(self, **extra):
+        d = {"vin": VIN, "condizione": "usato", "tipologia": "commerciale", "targa": "GH123AB", "marca": "Volkswagen",
+             "modello": "Polo", "versione": "1.0 TSI  Life", "colore": "Nero", "in_stock_dal": "2026-10-01"}
+        d.update(extra)
+        return d
 
-class TestModificaInStockDal(Base):
-    def test_interni_cambiano_la_data_non_nel_futuro(self):
+    def test_interni_cambiano_tutto(self):
         vid = self.abbina()
         self.entra("autista")
-        self.assertIn("in_stock_dal", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
-        self.c.post(f"/veicolo/{vid}/dati", data={"in_stock_dal": "2026-10-01"})
-        self.c.post(f"/veicolo/{vid}/dati", data={"in_stock_dal": "2999-01-01"})
+        self.assertIn(f"/veicolo/{vid}/modifica", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        self.assertIn('value="Golf"', self.c.get(f"/veicolo/{vid}/modifica").get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto(vin="WVWZZZ1KZAW000999"))
+        self.assertEqual(r.status_code, 302)
         with self.app.app_context():
-            self.assertEqual(db.session.get(Veicolo, vid).creato_at.date().isoformat(), "2026-10-01")
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.vin, v.condizione, v.tipologia, v.targa, v.modello, v.versione, v.colore,
+                              v.creato_at.date().isoformat(), v.sede.nome),
+                             ("WVWZZZ1KZAW000999", "usato", "commerciale", "GH123AB", "Polo", "1.0 TSI Life", "Nero",
+                              "2026-10-01", "Sede A"))
+
+    def test_controlli(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            db.session.add(Veicolo(vin="WVWZZZ1KZAW000777", marca="VW", modello="Up"))
+            db.session.commit()
+        for sbagliato in ({"vin": "WVWZZZ1KZAW000777"}, {"vin": "CORTO"}, {"in_stock_dal": "2999-01-01"},
+                          {"modello": ""}, {"targa": "X1"}):
+            self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto(**sbagliato))
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Veicolo, vid).modello, "Golf")
+        self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto(targa="X1", targa_ok="1"))
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Veicolo, vid).targa, "X1")
+
+    def test_fornitore_no(self):
+        vid = self.abbina()
         self.entra("carr")
-        self.assertEqual(self.c.post(f"/veicolo/{vid}/dati", data={"in_stock_dal": "2026-09-01"}).status_code, 403)
+        self.assertEqual(self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto()).status_code, 403)

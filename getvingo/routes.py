@@ -1076,31 +1076,61 @@ def nuova_auto():
     return render_template("abbina.html", tag=None, sedi=sedi, tag_liberi=liberi, form={})
 
 
+@bp.route("/veicolo/<int:veicolo_id>/modifica", methods=["GET", "POST"])
+@solo_interni
+def modifica_auto(veicolo_id):
+    """Tutti i dati dell'auto, con gli stessi campi dell'ingresso in stock (tranne dove si trova:
+    quello cambia solo con un DDT o con "Correggi la posizione" dell'amministratore)."""
+    v = _veicolo_visibile(veicolo_id)
+    if request.method == "GET":
+        form = {"vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
+                "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
+                "colore": v.colore or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else ""}
+        return render_template("veicolo_modifica.html", v=v, form=form)
+    f = request.form
+    vin = vin_mod.normalizza(f.get("vin"))
+    pulito = {k: " ".join(f.get(k, "").split()) for k in ("marca", "modello", "versione", "colore")}
+    try:
+        giorno = date.fromisoformat(f.get("in_stock_dal", ""))
+    except ValueError:
+        giorno = None
+    errore = None
+    if not vin_mod.valido(vin):
+        errore = "VIN non valido: servono 17 caratteri (lettere I, O, Q non ammesse)."
+    elif Veicolo.query.filter(Veicolo.vin == vin, Veicolo.id != v.id).first():
+        errore = "Questo VIN è già di un'altra auto in Getvingo."
+    elif f.get("condizione") not in Veicolo.CONDIZIONI:
+        errore = "Indica se l'auto è nuova o usata."
+    elif not pulito["marca"] or not pulito["modello"]:
+        errore = "Marca e modello sono obbligatori."
+    elif giorno is None or giorno > adesso().date():
+        errore = "In stock dal: scegli una data valida, non nel futuro."
+    elif _targa_insolita():
+        errore = _targa_insolita()
+    elif not _targa() and v.stato == "consegnato":
+        errore = "L'auto è consegnata: la targa non si può togliere."
+    if errore:
+        flash(errore, "errore")
+        return render_template("veicolo_modifica.html", v=v, form=f)
+    v.vin, v.condizione, v.targa = vin, f["condizione"], _targa()
+    if f.get("tipologia") in Veicolo.TIPOLOGIE:
+        v.tipologia = f["tipologia"]
+    v.marca, v.modello = pulito["marca"], pulito["modello"]
+    v.versione, v.colore = pulito["versione"][:120], pulito["colore"][:80]
+    if v.creato_at is None or giorno != v.creato_at.date():
+        v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
+    db.session.commit()
+    marchi.assicura(v.marca)  # marca nuova: il logo si scarica da solo
+    flash("Dati dell'auto aggiornati.", "ok")
+    return redirect(url_for("main.veicolo", veicolo_id=v.id))
+
+
 @bp.route("/veicolo/<int:veicolo_id>/dati", methods=["POST"])
 @solo_interni
 def modifica_dati_auto(veicolo_id):
-    """I dati dell'auto restano quelli inseriti all'ingresso: dopo si può solo aggiungere la targa, se manca,
-    e cambiare la versione (tutto il personale interno)."""
+    """Scorciatoie sul posto: nuova/usata se manca, targa se manca (sezione Consegna).
+    Tutti i dati insieme si cambiano da "Modifica dati" (modifica_auto)."""
     v = db.get_or_404(Veicolo, veicolo_id)
-    if "in_stock_dal" in request.form:  # data di ingresso in stock: la corregge tutto il personale interno
-        try:
-            giorno = date.fromisoformat(request.form["in_stock_dal"])
-        except ValueError:
-            giorno = None
-        if giorno is None or giorno > adesso().date():
-            flash("Scegli una data valida, non nel futuro.", "errore")
-        elif giorno != (v.creato_at.date() if v.creato_at else None):
-            v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
-            db.session.commit()
-            flash(f"In stock dal {giorno:%d/%m/%Y}.", "ok")
-        return _torna(url_for("main.veicolo", veicolo_id=v.id))
-    if "versione" in request.form:
-        versione = " ".join(request.form["versione"].split())[:120]
-        if versione != (v.versione or ""):
-            v.versione = versione
-            db.session.commit()
-            flash(f"Versione {'aggiornata' if versione else 'tolta'}.", "ok")
-        return _torna(url_for("main.veicolo", veicolo_id=v.id))
     if request.form.get("condizione") in Veicolo.CONDIZIONI:  # nuova o usata: si indica una volta sola
         if not v.condizione:
             v.condizione = request.form["condizione"]

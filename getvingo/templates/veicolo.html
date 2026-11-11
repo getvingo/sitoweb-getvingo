@@ -8,8 +8,8 @@
 {% block contenuto %}
 {{ indietro(url_for('main.piazzale') if g.utente.interno else url_for('main.home')) }}
 <div class="scheda-auto-testa">
-  {{ carta_auto(v, targa_da_aggiungere=g.utente.interno and not v.targa, versione_modificabile=g.utente.interno) }}
-  {{ info_auto(v, data_modificabile=g.utente.interno) }}
+  {{ carta_auto(v, modificabile=g.utente.interno) }}
+  {{ info_auto(v) }}
 </div>
 <div class="azioni" style="margin:0 0 16px;align-items:center">
   {% if g.utente.interno and not v.condizione %}

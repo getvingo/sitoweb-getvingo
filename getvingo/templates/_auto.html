@@ -2,7 +2,7 @@
 
 {# Carta dell'auto: si riconosce a colpo d'occhio (logo, modello, versione, colore, targa, adesivo, telaio).
    Il bordo luminoso in alto ha il colore della fase in cui si trova l'auto. #}
-{% macro carta_auto(v, con_stato=True, targa_da_aggiungere=False, versione_modificabile=False) %}
+{% macro carta_auto(v, con_stato=True, modificabile=False) %}
 <section class="carta-auto {{ v.fase }}">
   <div class="carta-auto-testa">
     {{ marchio(v) }}
@@ -10,16 +10,6 @@
       <small>{{ v.marca or 'Marca non indicata' }} · {{ v.TIPOLOGIE[v.tipologia] }}</small>
       <b>{{ v.modello or '—' }}</b>
       <span>{{ v.versione or 'Versione non indicata' }}</span>
-      {% if versione_modificabile %}
-      <details class="aggiungi-targa modifica-versione">
-        <summary class="btn piccolo">{{ i('matita', 's') }} {{ 'Modifica versione' if v.versione else 'Aggiungi versione' }}</summary>
-        <form method="post" action="{{ url_for('main.modifica_dati_auto', veicolo_id=v.id) }}" data-una-volta>
-          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-          <input name="versione" value="{{ v.versione or '' }}" maxlength="120" placeholder="Es. 1.5 TSI Life" aria-label="Versione">
-          <button class="btn primario piccolo">Salva</button>
-        </form>
-      </details>
-      {% endif %}
     </div>
     {% if con_stato %}<div class="carta-auto-stato">{{ badge_veicolo(v) }}{{ dettaglio_stato(v) }}</div>{% endif %}
   </div>
@@ -31,23 +21,13 @@
   </div>
   <div class="carta-auto-vin">
     <div><small>Telaio</small>{{ v.vin|vin }}</div>
-    {% if targa_da_aggiungere %}
-    <details class="aggiungi-targa">
-      <summary class="btn piccolo">{{ i('matita', 's') }} Aggiungi targa</summary>
-      <form method="post" action="{{ url_for('main.modifica_dati_auto', veicolo_id=v.id) }}" data-una-volta>
-        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <input name="targa" required autocapitalize="characters" class="vin" maxlength="12" placeholder="Es. GH123AB" aria-label="Targa">
-        <button class="btn primario piccolo">Salva</button>
-        <small>Si inserisce una volta sola: poi non si cambia.</small>
-      </form>
-    </details>
-    {% endif %}
+    {% if modificabile %}<a class="btn piccolo modifica-auto" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}
   </div>
 </section>
 {% endmacro %}
 
 {# Dove si trova, quando è stata aggiornata la posizione (e da chi), da quando è lì #}
-{% macro info_auto(v, data_modificabile=False) %}
+{% macro info_auto(v) %}
 {% set pos = v.ultima_posizione %}{% set arrivo = v.ultimo_arrivo %}{% set mov = v.movimento_aperto %}
 <section class="riquadri-info">
   <div class="info-tile">
@@ -67,16 +47,7 @@
     <div>{% if v.stato == 'in_sede' and arrivo and arrivo.arrivo_at and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}
       <small>Arrivata qui</small><b>{{ arrivo.arrivo_at|data('%d/%m/%Y alle %H:%M') }}</b><span>con DDT {{ arrivo.ddt.sigla }} da {{ arrivo.da_sede.nome if arrivo.da_sede else '—' }}</span>
       {% else %}<small>In stock dal</small><b>{{ v.creato_at|data('%d/%m/%Y') }}</b>
-      {% if data_modificabile %}
-      <details class="modifica-data">
-        <summary class="btn-link">{{ i('matita', 's') }} Modifica</summary>
-        <form method="post" action="{{ url_for('main.modifica_dati_auto', veicolo_id=v.id) }}" data-una-volta>
-          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-          <input type="date" name="in_stock_dal" required value="{{ v.creato_at.strftime('%Y-%m-%d') if v.creato_at else '' }}" max="{{ adesso().date().isoformat() }}" aria-label="In stock dal">
-          <button class="btn primario piccolo">Salva</button>
-        </form>
-      </details>
-      {% endif %}{% endif %}</div>
+{% endif %}</div>
   </div>
 </section>
 {% endmacro %}

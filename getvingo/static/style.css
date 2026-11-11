@@ -1414,15 +1414,8 @@ a.dettaglio-stato:hover { background: rgba(255,255,255,.26); text-decoration: no
   -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px); mask: radial-gradient(circle, transparent 5px, #000 6px); }
 @media (max-width: 480px) { .carta-auto-testa { flex-wrap: wrap; } .carta-auto-stato { width: 100%; flex-direction: row; justify-content: flex-start; align-items: center; } }
 
-/* Telaio con il pulsante "Aggiungi targa" a destra */
+/* Telaio con il pulsante "Modifica dati" a destra */
 .carta-auto-vin { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
-.aggiungi-targa > summary { list-style: none; cursor: pointer; background: #fff; color: var(--marchio-viola); border-color: #fff; }
-.aggiungi-targa > summary::-webkit-details-marker { display: none; }
-.aggiungi-targa[open] { flex-basis: 100%; }
-.aggiungi-targa[open] > summary { display: none; }
-.aggiungi-targa form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.aggiungi-targa input { flex: 1; min-width: 140px; min-height: 44px; border-radius: var(--r-m); border: 0; padding: 0 12px; font-size: var(--fs-16); }
-.aggiungi-targa small { flex-basis: 100%; opacity: .75; font-size: var(--fs-12); }
 
 
 /* Barra della lavorazione esterna: senape in corso, arancio in ritardo, verde finita */
@@ -2014,13 +2007,5 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 }
 @media (max-width: 640px) { .fg-tappa { padding-left: 22px; } }
 
-/* "Modifica versione" sotto il modello nella carta dell'auto (tutto il personale interno) */
-.modifica-versione { margin-top: 8px; }
-.modifica-versione > summary { display: inline-flex; width: auto; }
-.modifica-versione form { margin-top: 2px; }
-/* "Modifica" sotto "In stock dal" nei riquadri dell'auto */
-.modifica-data > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
-.modifica-data > summary::-webkit-details-marker { display: none; }
-.modifica-data[open] > summary { display: none; }
-.modifica-data form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
-.modifica-data input[type=date] { min-height: 44px; border-radius: var(--r-m); border: 1px solid var(--bordo, #ccc); padding: 0 10px; font-size: var(--fs-16); }
+/* "Modifica dati" a destra del telaio nella carta dell'auto (tutto il personale interno) */
+.carta-auto-vin .modifica-auto { background: #fff; color: var(--marchio-viola); border-color: #fff; }

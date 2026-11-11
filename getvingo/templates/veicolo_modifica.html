@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, csrf_input, indietro %}
+{% block titolo %}Modifica {{ v.descrizione }} · Getvingo{% endblock %}
+{% block contenuto %}
+{{ indietro(url_for('main.veicolo', veicolo_id=v.id)) }}
+<div class="titolo-pagina"><div><div class="sopratitolo">{{ v.descrizione }}</div><h1>Modifica dati dell'auto</h1></div></div>
+<p class="tenue">Gli stessi dati dell'ingresso in stock. Dove si trova l'auto non si cambia da qui: si sposta con un DDT.</p>
+
+<form method="post" data-una-volta>
+  {{ csrf_input() }}
+  <div class="scheda">
+    <label class="foto-vin">
+      {{ i('foto') }} Fotografa etichetta VIN
+      <input type="file" id="foto-vin" accept="image/*" capture="environment" hidden>
+    </label>
+    <p id="stato-lettura" class="tenue piccolo" role="status"></p>
+
+    <label class="campo"><span>VIN · controlla carattere per carattere</span>
+      <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
+             autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
+      <small id="conta-vin" class="contatore"></small>
+    </label>
+    <span class="etichetta-campo">Nuova o usata</span>
+    <div class="scelta-tipo" role="radiogroup" aria-label="Nuova o usata">
+      <label><input type="radio" name="condizione" value="nuovo" required {{ 'checked' if form.get('condizione') == 'nuovo' }}> {{ i('brilla', 's') }} Nuova</label>
+      <label><input type="radio" name="condizione" value="usato" {{ 'checked' if form.get('condizione') == 'usato' }}> {{ i('orologio', 's') }} Usata</label>
+    </div>
+    <span class="etichetta-campo">Tipo di veicolo</span>
+    <div class="scelta-tipo" role="radiogroup" aria-label="Tipologia">
+      <label><input type="radio" name="tipologia" value="vettura" {{ 'checked' if form.get('tipologia', 'vettura') == 'vettura' }}> Vettura</label>
+      <label><input type="radio" name="tipologia" value="commerciale" {{ 'checked' if form.get('tipologia') == 'commerciale' }}> Veicolo commerciale</label>
+    </div>
+    <label class="campo"><span>Targa <span class="tenue">(facoltativa)</span></span>
+      <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
+    <div class="griglia-2">
+      <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required data-formato="nome" autocapitalize="words"></label>
+      <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required data-formato="nome" autocapitalize="words"></label>
+    </div>
+    <label class="campo"><span>Versione <span class="tenue">(facoltativa)</span></span><input name="versione" value="{{ form.get('versione', '') }}" maxlength="120" placeholder="Es. 1.5 eTSI Life"></label>
+    <div class="griglia-2">
+      <label class="campo"><span>Colore</span><input name="colore" value="{{ form.get('colore', '') }}" maxlength="80"></label>
+      <label class="campo"><span>In stock dal</span><input type="date" name="in_stock_dal" value="{{ form.get('in_stock_dal', '') }}" max="{{ adesso().date().isoformat() }}" required></label>
+    </div>
+  </div>
+  <div class="barra-azione">
+    <button type="submit" class="btn primario pieno">{{ i('check') }} Salva le modifiche</button>
+  </div>
+</form>
+{% endblock %}
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="{{ url_for('static', filename='vin.js', v=versione_statici) }}"></script>
+{% endblock %}
