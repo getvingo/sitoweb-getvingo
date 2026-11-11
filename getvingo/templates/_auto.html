@@ -32,10 +32,11 @@
 <section class="riquadri-info">
   <div class="info-tile">
     <span class="tondo-piccolo">{{ i('pin', 's') }}</span>
-    <div><small>Dove si trova</small>
+    <div>{% if stai_qui(v) %}<small>Posizione</small><b>Qui</b><span>{{ 'da voi' if not g.utente.interno else 'vicino a te' }} · {{ v.sede.nome }}</span>
+      {% else %}<small>Dove si trova</small>
       {% if v.stato == 'in_viaggio' and mov %}<b>In viaggio verso {{ mov.a_sede.nome }}</b><span>da {{ in_viaggio_da(mov) }}</span>
       {% elif v.stato == 'consegnato' %}<b>Consegnata</b><span>{{ v.consegnato_at|data('%d/%m/%Y') }}{{ ' · ' ~ v.sede.nome if v.sede }}</span>
-      {% else %}<b>{{ v.sede.nome if v.sede else '—' }}</b>{% if v.sede %}<span>{{ v.sede.dove }}</span>{% endif %}{% endif %}</div>
+      {% else %}<b>{{ v.sede.nome if v.sede else '—' }}</b>{% if v.sede %}<span>{{ v.sede.dove }}</span>{% endif %}{% endif %}{% endif %}</div>
   </div>
   <div class="info-tile">
     <span class="tondo-piccolo">{{ i('orologio', 's') }}</span>

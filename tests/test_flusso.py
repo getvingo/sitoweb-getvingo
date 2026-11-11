@@ -77,7 +77,7 @@ class Base(unittest.TestCase):
         d = {"a_sede_id": self._id(Sede, nome=sede), "causale": causale,
              "vettore_id": self._id(Vettore, nome="Vettore X"), "conducente": "Mario Rossi",
              "lavorazione": lavorazione, "lavorazione_note": "paraurti", "firma": FIRMA,
-             "mezzo": "Su strada (guidata)"}
+             "mezzo": "Su strada (guidata)", "assegnato_id": str(self._id(Utente, email="autista@t.it"))}
         d.update(extra)
         return d
 
@@ -89,11 +89,20 @@ class Base(unittest.TestCase):
         return self.c.post(f"/ddt/{ddt_id}/arrivo", data=data)
 
     def fine_lavori(self, ddt_id, data=None, **kw):
-        """Il fornitore conferma la fine dei lavori dal posto (il telefono manda la posizione del fornitore)."""
+        """Il fornitore conferma la fine dei lavori dal posto (il telefono manda la posizione del fornitore);
+        il rientro, se preparato, è assegnato all'autista della concessionaria."""
         with self.app.app_context():
             sede = db.session.get(Ddt, ddt_id).movimento.sede_arrivo_effettiva
             dove = {"lat": str(sede.lat), "lon": str(sede.lon)}
+        dove["chi_riporta"] = str(self._id(Utente, email="autista@t.it"))
         return self.c.post(f"/ddt/{ddt_id}/lavorazione-completata", data={**dove, **(data or {})}, **kw)
+
+    def presa(self, ddt_id, data=None, **kw):
+        """Presa in carico vicino all'auto (il telefono manda la posizione del punto di partenza)."""
+        with self.app.app_context():
+            da = db.session.get(Ddt, ddt_id).movimento.da_sede
+            dove = {"lat": str(da.lat), "lon": str(da.lon)}
+        return self.c.post(f"/ddt/{ddt_id}/presa-in-carico", data={**dove, **(data or {})}, **kw)
 
     def parti(self, vid, sede, **kw):
         return self.c.post(f"/veicolo/{vid}/partenza", data=self.dati(sede, **kw))
@@ -281,7 +290,7 @@ class TestSpostamentoColTocco(Base):
         self.entra("carr")
         self.fine_lavori(self.ddt(), data={"rientro": "1"})
         self.entra("autista")
-        self.c.post(f"/ddt/{self.ddt()}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Mario", "firma": FIRMA,
+        self.presa(self.ddt(), data={"conducente": "Mario", "firma": FIRMA,
                                                                  "mezzo": "Bisarca"})
         self.arrivo(self.ddt())  # rientro in Sede A: parte da sola la preparazione
         with self.app.app_context():
@@ -445,10 +454,20 @@ class TestSpostamentoColTocco(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
+        andata = self.ddt()
         self.entra("autista")  # lontano dal fornitore, senza tocco
-        self.c.post(f"/veicolo/{vid}/partenza", data={**self.dati("Sede A", causale="Reso lavorazione",
-                                                                  lavorazione="Nessuna (solo trasferimento)"),
-                                                      "azione": "predisponi", "ore_ritiro": "24"})
+        rientro = {**self.dati("Sede A", causale="Reso lavorazione", lavorazione="Nessuna (solo trasferimento)"),
+                   "azione": "predisponi", "ore_ritiro": "24"}
+        self.c.post(f"/veicolo/{vid}/partenza", data=rientro)  # lavori non ancora conclusi: no
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 1)
+        self.entra("carr")
+        self.fine_lavori(andata)  # senza preparare il rientro
+        self.entra("autista")
+        self.c.post(f"/veicolo/{vid}/partenza", data={**rientro, "assegnato_id": ""})  # senza incaricato: no
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 1)
+        self.c.post(f"/veicolo/{vid}/partenza", data=rientro)
         with self.app.app_context():
             m = self.mov(self.ddt())
             self.assertEqual((m.da_sede.nome, m.a_sede.nome, m.stato), ("Carrozzeria B", "Sede A", "predisposto"))
@@ -502,13 +521,14 @@ class TestPredisposto(Base):
             self.assertEqual(m.veicolo.stato, "in_sede")
 
         self.entra("autista")
-        self.c.post(f"/ddt/{d}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Luca", "firma": ""})
+        self.presa(d, data={"conducente": "Luca", "firma": ""})
         with self.app.app_context():
             self.assertEqual(self.mov(d).stato, "predisposto")  # senza firma non parte
-        self.c.post(f"/ddt/{d}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Luca", "firma": FIRMA})
+        self.presa(d, data={"conducente": "Luca", "firma": FIRMA})
         with self.app.app_context():
             m = self.mov(d)
-            self.assertEqual((m.stato, m.conducente, m.veicolo.stato), ("aperto", "Luca", "in_viaggio"))
+            # il conducente è la persona incaricata del ritiro
+            self.assertEqual((m.stato, m.conducente, m.veicolo.stato), ("aperto", m.assegnato_a.nome, "in_viaggio"))
             self.assertEqual(m.partenza_utente.email, "autista@t.it")
             self.assertEqual(db.session.get(Ddt, d).creato_da.email, "ufficio@t.it")
 
@@ -520,13 +540,13 @@ class TestPredisposto(Base):
             self.mov(d).ritiro_entro_at -= timedelta(days=2)
             db.session.commit()
         self.entra("autista")
-        self.c.post(f"/ddt/{d}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Luca", "firma": FIRMA})
+        self.presa(d, data={"conducente": "Luca", "firma": FIRMA})
         with self.app.app_context():
             self.assertEqual(self.mov(d).stato, "predisposto")
         self.entra("ufficio")
         self.c.post(f"/ddt/{d}/rinnova", data={"ore": "24"})
         self.entra("autista")
-        self.c.post(f"/ddt/{d}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Luca", "firma": FIRMA})
+        self.presa(d, data={"conducente": "Luca", "firma": FIRMA})
         with self.app.app_context():
             self.assertEqual(self.mov(d).stato, "aperto")
 
@@ -570,10 +590,10 @@ class TestLavorazioniEPreparazione(Base):
 
         # l'autista ritira: tocca, firma, parte; all'arrivo il DDT si chiude e l'auto va in preparazione
         self.entra("autista")
-        self.c.post(f"/ddt/{rientro_id}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Mario", "firma": FIRMA})  # manca la modalità
+        self.presa(rientro_id, data={"conducente": "Mario", "firma": FIRMA})  # manca la modalità
         with self.app.app_context():
             self.assertEqual(self.mov(rientro_id).stato, "predisposto")
-        self.c.post(f"/ddt/{rientro_id}/presa-in-carico", data={"lat": "45.0", "lon": "12.0", "conducente": "Mario", "firma": FIRMA,
+        self.presa(rientro_id, data={"conducente": "Mario", "firma": FIRMA,
                                                                  "mezzo": "Carro attrezzi"})
         self.assertIn(f"/arrivo/{rientro_id}", self.c.post("/t/ABCD2345", data=POS).headers["Location"])
         r = self.arrivo(rientro_id)
@@ -3093,7 +3113,8 @@ class TestHomeFornitore(Base):
                 self.assertIsNone(db.session.get(Movimento, mid).lavorazione_completata_at)
         # sul posto: chiusa, posizione dell'auto aggiornata subito, rientro pronto, si torna alla home
         r = self.c.post(f"/movimento/{mid}/lavorazione-completata",
-                        data={"lat": "45.1003", "lon": "12.1", "note": "fatto", "rientro": "1", "torna": "/"})
+                        data={"lat": "45.1003", "lon": "12.1", "note": "fatto", "rientro": "1", "torna": "/",
+                              "chi_riporta": str(self._id(Utente, email="autista@t.it"))})
         self.assertEqual(r.headers["Location"], "/")
         with self.app.app_context():
             v = db.session.get(Veicolo, vid)
@@ -3133,7 +3154,8 @@ class TestHomeFornitore(Base):
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Graffio portiera", pagina)
         self.assertIn("Conferma la conclusione dei lavori", pagina)
-        self.c.post(f"/movimento/{mid}/lavorazione-completata", data={"lat": "45.1", "lon": "12.1", "rientro": "1"})
+        self.c.post(f"/movimento/{mid}/lavorazione-completata", data={"lat": "45.1", "lon": "12.1", "rientro": "1",
+                                                                     "chi_riporta": str(self._id(Utente, email="autista@t.it"))})
         with self.app.app_context():
             v = db.session.get(Veicolo, vid)
             self.assertEqual(v.fase, "da_ritirare")
@@ -3179,7 +3201,7 @@ class TestHomeFornitore(Base):
         vid, mid = self._finita_senza_rientro()
         pagina = self.c.get("/?stato=finita").get_data(as_text=True)
         self.assertIn("Chi riporta l'auto?", pagina)
-        self.c.post(f"/movimento/{mid}/rientro", data={"chi_riporta": "noi"})
+        self.c.post(f"/movimento/{mid}/rientro", data={"chi_riporta": str(self._id(Utente, email="carr@t.it"))})
         with self.app.app_context():
             r = db.session.get(Veicolo, vid).movimento_predisposto
             self.assertEqual((r.da_sede.nome, r.a_sede.nome, r.conducente), ("Carrozzeria B", "Sede A", "Carr"))
@@ -3240,3 +3262,75 @@ class TestPagineErrore(Base):
         r = self.c.get("/non-esiste")
         self.assertEqual(r.status_code, 404)
         self.assertIn("Pagina non trovata", r.get_data(as_text=True))
+
+
+class TestRitiroAssegnato(Base):
+    """DDT da ritirare: si predispone da ovunque, assegnato a una persona; solo lei lo prende in carico,
+    entro 200 m dal punto di partenza."""
+    def test_solo_l_incaricato_e_solo_sul_posto(self):
+        vid = self.abbina()
+        self.entra("ufficio")
+        self.assertIn("Assegna il ritiro a", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
+        d = self.ddt()
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).assegnato_a.email, "autista@t.it")
+        # un altro dipendente (anche l'admin) non lo prende in carico
+        self.entra("admin")
+        self.presa(d, data={"conducente": "Admin", "firma": FIRMA})
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "predisposto")
+        self.assertIn("Ritiro assegnato a", self.c.get(f"/ddt/{d}").get_data(as_text=True))
+        # l'incaricato lontano dalla partenza (Sede A: 45.0, 12.0) no, sul posto sì
+        self.entra("autista")
+        self.c.post(f"/ddt/{d}/presa-in-carico", data={"conducente": "X", "firma": FIRMA, "lat": "45.66", "lon": "12.24"})
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "predisposto")
+        self.presa(d, data={"conducente": "X", "firma": FIRMA})
+        with self.app.app_context():
+            m = self.mov(d)
+            self.assertEqual((m.stato, m.conducente), ("aperto", m.assegnato_a.nome))
+
+    def test_admin_elimina_destinazione_senza_ddt(self):
+        officina = self._id(Sede, nome="Officina D")
+        carrozzeria = self._id(Sede, nome="Carrozzeria B")
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")  # la carrozzeria ha un DDT collegato
+        self.assertIn("non si può eliminare", self.c.get(f"/admin/sedi/{carrozzeria}").get_data(as_text=True))
+        self.c.post(f"/admin/sedi/{carrozzeria}/elimina")
+        self.assertIn("Elimina Officina D", self.c.get(f"/admin/sedi/{officina}").get_data(as_text=True))
+        self.c.post(f"/admin/sedi/{officina}/elimina")
+        with self.app.app_context():
+            self.assertIsNotNone(db.session.get(Sede, carrozzeria))
+            self.assertIsNone(db.session.get(Sede, officina))
+
+
+class TestQui(Base):
+    """Chi è già dove si trova l'auto vede "Qui" e non "Portami qui"."""
+    def test_fornitore_vede_qui_la_concessionaria_portami_qui(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        self.entra("ufficio")  # in ufficio: la carrozzeria è altrove
+        pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertIn("Portami qui", pagina)
+        self.assertIn("Dove si trova", pagina)
+        self.entra("carr")  # l'auto è da loro
+        pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertNotIn("Portami qui", pagina)
+        self.assertNotIn("Dove si trova", pagina)
+        self.assertIn("<b>Qui</b>", pagina)
+        # la concessionaria dopo un tocco sul posto vede "Qui"
+        self.entra("ufficio")
+        self.c.post("/t/ABCD2345", data={"lat": "45.1", "lon": "12.1"})
+        pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertNotIn("Portami qui", pagina)
+        self.assertIn("vicino a te", pagina)
+
+    def test_sezioni_del_fornitore(self):
+        self.entra("carr")
+        pagina = self.c.get("/").get_data(as_text=True)
+        for testo in ("In arrivo da voi · 0", "Nessuna auto in viaggio verso di voi", "In lavorazione",
+                      "Completate · da ritirare"):
+            self.assertIn(testo, pagina)
+        self.assertNotIn("Completate · da ritirare", self.c.get("/?stato=ritardo").get_data(as_text=True))

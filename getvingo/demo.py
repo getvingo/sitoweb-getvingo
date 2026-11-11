@@ -127,7 +127,8 @@ def carica():
     def rientro_in_sede(v, fornitore, chi, giorni_fa, giorni_lav, ore_attesa, mezzo=MEZZO[0]):
         """Andata, lavorazione, DDT di rientro preparato dal fornitore, ritiro e arrivo: l'auto va in preparazione."""
         m = in_lavorazione(v, fornitore, chi, "Carrozzeria", "Ritocchi carrozzeria", giorni_fa)
-        rientro = servizi.completa_lavorazione(m, chi, lat=fornitore.lat, lon=fornitore.lon).movimento
+        rientro = servizi.completa_lavorazione(m, chi, lat=fornitore.lat, lon=fornitore.lon,
+                                               chi_riporta=utenti["autista"].id).movimento
         m.lavorazione_completata_at = _indietro(days=giorni_fa - giorni_lav)
         servizi.prendi_in_carico(rientro, utenti["autista"], "Mario Consegne", firma_autista,
                                  fornitore.lat, fornitore.lon, mezzo=mezzo)
@@ -267,17 +268,17 @@ def carica():
 
     # ------------------------------------------------------------- DA RITIRARE
     m = in_lavorazione(clio_rientro, officina, utenti["officina"], "Meccanica / tagliando", "Tagliando pre-consegna", 3)
-    servizi.completa_lavorazione(m, utenti["officina"], "Tagliando fatto, filtri sostituiti",
+    servizi.completa_lavorazione(m, utenti["officina"], "Tagliando fatto, filtri sostituiti", chi_riporta=utenti["autista"].id,
                                  lat=officina.lat, lon=officina.lon)  # rientro pronto
     m.lavorazione_completata_at = _indietro(days=1)
     servizi.crea_movimento(fiat600, dict(a_sede_id=detailing.id, causale="Invio lavorazione", vettore_id=proprio.id,
                                          conducente="", lavorazione="Lavaggio / detailing",
                                          lavorazione_note="Trattamento ceramico", mezzo=MEZZO[0]),
-                           utenti["ufficio"], predisponi_ore=4)                                  # entro oggi
+                           utenti["ufficio"], predisponi_ore=4, assegnato=utenti["autista"])                                  # entro oggi
     scaduto = servizi.crea_movimento(corsa, dict(a_sede_id=carrozzeria.id, causale="Invio lavorazione",
                                                  vettore_id=esterno.id, conducente="", lavorazione="Carrozzeria",
                                                  lavorazione_note="Specchietto destro", mezzo=MEZZO[2]),
-                                     utenti["ufficio"], predisponi_ore=24)
+                                     utenti["ufficio"], predisponi_ore=24, assegnato=utenti["autista"])
     scaduto.movimento.ritiro_entro_at = _indietro(hours=5)                                      # ritiro scaduto
 
     # ------------------------------------------------------------- IN VIAGGIO

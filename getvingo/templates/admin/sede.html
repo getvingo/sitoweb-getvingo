@@ -37,4 +37,21 @@
   <button class="btn piccolo">{{ 'Disattiva questo luogo' if s.attiva else 'Riattiva questo luogo' }}</button>
 </form>
 {% endif %}
+{% if ddt_collegati is not none %}
+<div class="zona-pericolo">
+  {% if ddt_collegati %}
+  <p class="tenue piccolo">{{ s.nome }} ha {{ ddt_collegati }} {{ 'DDT collegato' if ddt_collegati == 1 else 'DDT collegati' }}: non si può eliminare, solo disattivare.</p>
+  {% else %}
+  <details class="ripiega">
+    <summary>Elimina {{ s.nome }}</summary>
+    <form method="post" action="{{ url_for('admin.elimina_sede', sede_id=s.id) }}" class="scheda" data-una-volta
+          onsubmit="return confirm('Eliminare {{ s.nome }} e i suoi account? Non si può annullare.')">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <p class="tenue piccolo" style="margin-top:0">Nessun DDT collegato: {{ s.nome }} sparisce dalle scelte insieme ai suoi account. Non si può annullare.</p>
+      <button class="btn pericolo">Elimina {{ s.nome }}</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

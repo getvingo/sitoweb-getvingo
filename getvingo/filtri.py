@@ -102,6 +102,23 @@ def init_app(app):
     app.jinja_env.globals["bloccata_da_danni"] = bloccata_da_danni
 
 
+    def stai_qui(v):
+        """True se chi guarda è dove si trova l'auto: il fornitore che l'ha da sé, oppure chi ha appena
+        toccato un adesivo (posizione del tocco, 15 minuti) entro 200 m dall'auto."""
+        import time
+        from flask import session
+        from .servizi import RAGGIO_ARRIVO_M, distanza_m
+        u = getattr(g, "utente", None)
+        if u is None or v.stato != "in_sede" or v.sede is None:
+            return False
+        if not u.interno and u.sede_id is not None and u.sede_id == v.sede_id:
+            return True
+        t = session.get("posizione_tocco") or {}
+        if t and time.time() - t.get("at", 0) <= 15 * 60 and v.lat is not None:
+            return distanza_m(t["lat"], t["lon"], v.lat, v.lon) <= RAGGIO_ARRIVO_M
+        return False
+    app.jinja_env.globals["stai_qui"] = stai_qui
+
     def puo_emettere(v):
         from .servizi import puo_emettere
         return puo_emettere(v, g.utente)

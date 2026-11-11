@@ -442,8 +442,9 @@ class Movimento(PerOrganizzazione, db.Model):
     # DDT che accompagna il movimento: uno per auto, oppure uno solo per più auto (DDT multiplo)
     ddt_id = db.Column(db.Integer, db.ForeignKey("ddt.id", use_alter=True, name="fk_movimento_ddt"), index=True)
 
-    # DDT predisposto: entro quando va preso in carico
+    # DDT predisposto: entro quando va preso in carico e da chi (solo lui lo prende in carico, sul posto)
     ritiro_entro_at = db.Column(db.DateTime)
+    assegnato_a_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
 
     partenza_at = db.Column(db.DateTime)
     partenza_utente_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
@@ -481,6 +482,7 @@ class Movimento(PerOrganizzazione, db.Model):
     arrivo_sede = db.relationship("Sede", foreign_keys=[arrivo_sede_id])
     vettore = db.relationship("Vettore")
     partenza_utente = db.relationship("Utente", foreign_keys=[partenza_utente_id])
+    assegnato_a = db.relationship("Utente", foreign_keys=[assegnato_a_id])
     arrivo_utente = db.relationship("Utente", foreign_keys=[arrivo_utente_id])
     lavorazione_completata_da = db.relationship("Utente", foreign_keys=[lavorazione_completata_da_id])
     ddt = db.relationship("Ddt", foreign_keys=[ddt_id], back_populates="movimenti", post_update=True)

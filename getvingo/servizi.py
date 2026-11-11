@@ -120,8 +120,16 @@ def puo_emettere_ultimo_ddt(veicolo, utente):
             and account_del_luogo(veicolo.sede, utente))
 
 
+def lavorazione_in_corso(veicolo):
+    """L'auto è da un fornitore per una lavorazione non ancora conclusa dal fornitore."""
+    m = veicolo.arrivo_qui if veicolo.sede is not None and veicolo.sede.esterna else None
+    return m is not None and m.con_lavorazione and not m.lavorazione_completata_at
+
+
 def puo_predisporre(veicolo, utente):
-    return puo_emettere(veicolo, utente) and (utente.gestione or not utente.interno)
+    """Il DDT da ritirare si predispone da ovunque; dal fornitore solo dopo che ha concluso i lavori."""
+    return (puo_emettere(veicolo, utente) and (utente.gestione or not utente.interno)
+            and not lavorazione_in_corso(veicolo))
 
 
 def _emetti_ddt(movimento, utente):
@@ -159,7 +167,7 @@ def dati_ddt(ddt):
 
 
 def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=None,
-                   predisponi_ore=None, partenza_at=None, posizione=None):
+                   predisponi_ore=None, partenza_at=None, posizione=None, assegnato=None):
     """Parte subito (serve la firma del conducente) oppure, se predisponi_ore,
     crea un DDT da ritirare entro quel numero di ore."""
     if veicolo.stato != "in_sede":
@@ -183,9 +191,21 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
         raise Vietato("La destinazione è il luogo in cui l'auto si trova già.")
     if verso_il_cliente(dati["a_sede_id"], dati.get("causale")):
         controlla_targa_consegna(veicolo)
+    if predisponi_ore and lavorazione_in_corso(veicolo):
+        raise Vietato(f"Il DDT da ritirare si predispone quando {veicolo.sede.nome} conferma la fine dei lavori.")
     if predisponi_ore and not puo_predisporre(veicolo, utente):
         raise Vietato("Solo l'ufficio può predisporre un DDT.")
+    if predisponi_ore:
+        # assegnato a una persona: solo lei lo prenderà in carico; conducente e vettore seguono lei
+        if assegnato is None or assegnato.id not in {u.id for u in assegnabili(veicolo)}:
+            raise Vietato("Scegli a chi assegnare il ritiro: solo quella persona potrà prenderlo in carico.")
+        dati = dict(dati, conducente=assegnato.nome)
+        if not assegnato.interno:
+            dati["vettore_id"] = vettore_predefinito(assegnato).id
+            dati["mezzo"] = dati.get("mezzo") or assegnato.mezzo or ""
     mov = Movimento(veicolo=veicolo, da_sede=veicolo.sede, **dati)
+    if predisponi_ore:
+        mov.assegnato_a = assegnato
     if predisponi_ore:
         mov.stato = "predisposto"
         mov.ritiro_entro_at = adesso() + timedelta(hours=predisponi_ore)
@@ -464,10 +484,23 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, p
     return ddt
 
 
+def assegnabili(veicolo):
+    """Chi può essere incaricato di ritirare un DDT predisposto: i dipendenti della concessionaria e,
+    se l'auto è da un fornitore, le persone di quel fornitore."""
+    persone = [u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno and not u.eliminato]
+    if veicolo.sede is not None and veicolo.sede.esterna:
+        persone += [u for u in Utente.query.filter_by(attivo=True, sede_id=veicolo.sede_id) if not u.eliminato]
+    return sorted(persone, key=lambda u: (not u.interno, u.nome))
+
+
 def puo_prendere_in_carico(mov, utente):
-    """Ritira chi guida: personale interno, oppure il fornitore di partenza o di arrivo."""
+    """Il DDT predisposto lo prende in carico solo la persona a cui è assegnato (sul posto, vedi
+    prendi_in_carico). Per i DDT predisposti prima dell'assegnazione: personale interno o il fornitore
+    di partenza o di arrivo."""
     if mov.stato != "predisposto":
         return False
+    if mov.assegnato_a_id is not None:
+        return utente.id == mov.assegnato_a_id
     if utente.interno:
         return True
     return utente.sede_id is not None and utente.sede_id in (mov.da_sede_id, mov.a_sede_id)
@@ -479,6 +512,14 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
         raise Vietato("Non puoi prendere in carico questo DDT.")
     if lat is None or lon is None:
         raise Vietato(SERVE_POSIZIONE)
+    da = mov.da_sede
+    if da is not None and da.lat is not None:
+        metri = distanza_m(lat, lon, da.lat, da.lon)
+        if metri > RAGGIO_ARRIVO_M:
+            raise Vietato(f"Sei a {_distanza_leggibile(metri)} da {da.nome}: il DDT si prende in carico solo "
+                          f"entro {RAGGIO_ARRIVO_M} m dal punto di partenza, vicino all'auto.")
+    if mov.assegnato_a is not None:
+        conducente = mov.assegnato_a.nome
     if mov.scaduto:
         raise Vietato("Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.")
     if not conducente:
@@ -821,9 +862,9 @@ def completa_lavorazione(mov, utente, note="", prepara_rientro=True, lat=None, l
 
 
 def predisponi_rientro(mov, utente, chi_riporta=""):
-    """DDT di rientro da ritirare, preparato dal fornitore (mittente) verso la sede da cui l'auto era partita.
-    chi_riporta: "noi" = il fornitore stesso (suo vettore, conducente chi lo prepara); l'id di un dipendente
-    della concessionaria (vettore della concessionaria, conducente lui); vuoto = chi verrà dalla concessionaria."""
+    """DDT di rientro da ritirare, preparato dal fornitore (mittente) verso la sede da cui l'auto era partita,
+    assegnato a una persona (chi_riporta = id: una persona del fornitore o un dipendente della
+    concessionaria). Vettore e conducente seguono la persona scelta; solo lei lo prende in carico."""
     v = mov.veicolo
     if v.movimento_predisposto:
         raise Vietato("Per quest'auto c'è già un DDT di rientro pronto.")
@@ -831,19 +872,15 @@ def predisponi_rientro(mov, utente, chi_riporta=""):
         Sede.query.filter_by(tipo="propria", attiva=True).order_by(Sede.id).first()
     if ritorno is None:
         return None
-    vettore, conducente, mezzo = vettore_proprio(), "", ""
-    if chi_riporta == "noi":
-        vettore = vettore_predefinito(utente)
-        conducente, mezzo = utente.nome, utente.mezzo or ""
-    elif chi_riporta:
-        dip = db.session.get(Utente, int(chi_riporta)) if str(chi_riporta).isdigit() else None
-        if dip is None or not dip.interno or not dip.attivo:
-            raise Vietato("Scegli chi riporta l'auto.")
-        vettore = dip.vettore if dip.vettore is not None and dip.vettore.attivo else vettore_proprio()
-        conducente, mezzo = dip.nome, dip.mezzo or ""
-    dati = dict(a_sede_id=ritorno.id, causale="Reso lavorazione", vettore_id=vettore.id, conducente=conducente,
-                lavorazione=Movimento.NESSUNA, lavorazione_note="", mezzo=mezzo if mezzo in Movimento.MEZZI else "")
-    return crea_movimento(v, dati, utente, predisponi_ore=ORE_RITIRO_RIENTRO)
+    chi = db.session.get(Utente, int(chi_riporta)) if str(chi_riporta).isdigit() else None
+    if chi is None:
+        raise Vietato("Scegli chi riporta l'auto: solo quella persona potrà prenderla in carico.")
+    vettore = vettore_predefinito(chi) if not chi.interno else (
+        chi.vettore if chi.vettore is not None and chi.vettore.attivo else vettore_proprio())
+    mezzo = chi.mezzo if chi.mezzo in Movimento.MEZZI else ""
+    dati = dict(a_sede_id=ritorno.id, causale="Reso lavorazione", vettore_id=vettore.id, conducente=chi.nome,
+                lavorazione=Movimento.NESSUNA, lavorazione_note="", mezzo=mezzo)
+    return crea_movimento(v, dati, utente, predisponi_ore=ORE_RITIRO_RIENTRO, assegnato=chi)
 
 
 def annulla_ddt(ddt, utente, motivo):
@@ -1498,6 +1535,14 @@ def elimina_utente(u, admin):
     u.eliminato, u.attivo, u.invito_in_attesa = True, False, False
     u.email = f"eliminato-{u.id}-{u.email}"[:200]
     return False
+
+
+def ddt_collegati(sede):
+    """Quanti DDT (non eliminati) partono, arrivano o sono arrivati in questo luogo."""
+    from sqlalchemy import or_ as o
+    return (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id)
+            .filter(o(Movimento.da_sede_id == sede.id, Movimento.a_sede_id == sede.id,
+                      Movimento.arrivo_sede_id == sede.id)).count())
 
 
 def elimina_fornitore(sede, admin):

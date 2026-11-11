@@ -370,12 +370,14 @@ def _home_fornitore():
                  .filter(Movimento.stato.in_(("aperto", "chiuso")), Ddt.annullato_at.is_(None),
                          Movimento.da_sede_id == sede.id, Movimento.partenza_at >= adesso() - timedelta(days=30))
                  .order_by(Movimento.partenza_at.desc()).limit(20).all())
-    # chi può riportare l'auto: il fornitore stesso o un dipendente della concessionaria
-    dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno),
+    # chi può riportare l'auto (una persona precisa): del fornitore o un dipendente della concessionaria
+    noi = sorted((u for u in Utente.query.filter_by(attivo=True, sede_id=sede.id) if not u.eliminato),
+                 key=lambda u: (u.id != g.utente.id, u.nome))
+    dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno and not u.eliminato),
                         key=lambda u: u.nome)
     return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo,
                            lavori=visibili, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
-                           solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti)
+                           solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti, noi=noi)
 
 
 @bp.route("/lavorazioni")
@@ -1316,6 +1318,7 @@ def veicolo(veicolo_id):
         "veicolo.html", v=v, mov=mov, predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
         preparazione=v.preparazione_attiva, ultima_prep=v.ultima_preparazione, simili=simili,
         puo_emettere=servizi.puo_emettere(v, g.utente),
+        assegnabili=servizi.assegnabili(v), lavorazione_in_corso=servizi.lavorazione_in_corso(v),
         puo_ultimo_ddt=servizi.puo_emettere_ultimo_ddt(v, g.utente),
         sedi_consegna=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
         puo_predisporre=servizi.puo_predisporre(v, g.utente),
@@ -1341,10 +1344,11 @@ def partenza(veicolo_id):
         flash(errore, "errore")
         return redirect(url_for("main.veicolo", veicolo_id=v.id))
     try:
+        assegnato = db.session.get(Utente, request.form.get("assegnato_id", type=int) or 0) if predisponi else None
         documento = servizi.crea_movimento(
             v, dati, g.utente, firma_conducente=servizi.firma_valida(request.form.get("firma")),
             predisponi_ore=request.form.get("ore_ritiro", 24, type=int) if predisponi else None,
-            **dict(zip(("lat", "lon"), _coord())))
+            assegnato=assegnato, **dict(zip(("lat", "lon"), _coord())))
     except Vietato as e:
         db.session.rollback()
         flash(str(e), "errore")

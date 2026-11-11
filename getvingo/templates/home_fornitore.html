@@ -16,8 +16,7 @@
 <a class="avviso errore" href="{{ url_for('main.mia_firma') }}">{{ i('matita') }}<span>Imposta la firma di {{ sede.nome }}: verrà apposta in automatico su ogni ricezione e rientro. Tocca qui.</span></a>
 {% endif %}
 
-{# ---- In arrivo: DDT in viaggio verso di voi (non è un filtro: si conferma all'arrivo) ---- #}
-{% if in_arrivo %}
+{# ---- In arrivo: sempre visibile (anche vuota), si conferma all'arrivo ---- #}
 <section class="in-arrivo-fornitore">
   <p class="etichetta-arrivo">{{ i('camion', 's') }} In arrivo da voi · {{ in_arrivo|length }}</p>
   {% for m in in_arrivo %}{% set v = m.veicolo %}
@@ -25,9 +24,10 @@
     <div class="corpo"><h3>{{ v.descrizione }}</h3>
       <div class="tenue piccolo">{{ v.vin|vin }} · {% if m.con_lavorazione %}{{ m.lavorazione }}{% else %}lavorazione da indicare (concessionaria){% endif %} · partita {{ m.partenza_at|da_quanto }}</div></div>
     <span class="badge in_viaggio">Conferma l'arrivo</span></a>
+  {% else %}
+  <p class="tenue piccolo" style="margin:0">Nessuna auto in viaggio verso di voi.</p>
   {% endfor %}
 </section>
-{% endif %}
 
 {{ filtri_stato([
   ('corso', conteggi.corso, 'Nei tempi', 'orologio', url_for('main.home', stato=none if stato == 'corso' else 'corso'), True),
@@ -49,10 +49,16 @@
 </section>
 {% endfor %}
 
-{# ---- Le lavorazioni: prima i ritardi, poi nei tempi, poi le completate ---- #}
-{% if lavori %}
+{# ---- Le lavorazioni in due sezioni: In lavorazione (prima i ritardi) · Completate, da ritirare ---- #}
+{% set in_corso = lavori|rejectattr('1.lavorazione_completata_at')|list %}
+{% set completate = lavori|selectattr('1.lavorazione_completata_at')|list %}
+{% for titolo, icona, elenco, vuoto, mostra in [
+     ('In lavorazione', 'chiave', in_corso, 'Nessuna lavorazione ' ~ ({'corso': 'nei tempi', 'ritardo': 'in ritardo'}[stato] if stato in ('corso', 'ritardo') else 'in corso') ~ '.', stato in ('', 'corso', 'ritardo')),
+     ('Completate · da ritirare', 'ritiro', completate, 'Nessuna lavorazione completata in attesa di ritiro.', stato in ('', 'finita'))] if mostra %}
+<h2>{{ i(icona) }} {{ titolo }} <span class="conteggio">{{ elenco|length }}</span></h2>
+{% if elenco %}
 <div class="griglia-lavori">
-{% for v, m in lavori %}{% set st = 'finita' if m.lavorazione_completata_at else ('ritardo' if m.giorni_ritardo else 'corso') %}
+{% for v, m in elenco %}{% set st = 'finita' if m.lavorazione_completata_at else ('ritardo' if m.giorni_ritardo else 'corso') %}
   <article class="carta-lavoro lavoro-{{ st }}">
     <a class="carta-lavoro-testa" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ marchio(v) }}
       <div class="carta-lavoro-nome"><b>{{ v.descrizione }}</b><span class="tenue piccolo">{{ v.vin|vin }}{{ targa(v) }}</span></div>
@@ -73,10 +79,11 @@
           <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="torna" value="{{ url_for('main.home', stato=stato or none) }}">
           <label class="campo"><span>Chi riporta l'auto?</span>
             <select name="chi_riporta">
-              <option value="">Chi viene a ritirarla dalla concessionaria</option>
-              <option value="noi">Noi: {{ sede.nome }} (vettore e conducente nostri)</option>
-              {% if dipendenti %}<optgroup label="Un dipendente della concessionaria">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
-            </select></label>
+              <option value="">Scegli la persona…</option>
+              <optgroup label="{{ sede.nome }} (vettore e conducente vostri)">{% for u in noi %}<option value="{{ u.id }}">{{ u.nome }}{{ ' (tu)' if u.id == g.utente.id }}</option>{% endfor %}</optgroup>
+              {% if dipendenti %}<optgroup label="{{ g.utente.organizzazione.nome }}">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+            </select>
+            <small>Solo questa persona potrà prenderla in carico, qui da voi (entro 200 m)</small></label>
           <button class="btn primario pieno">{{ i('doc') }} Prepara il DDT di rientro</button>
           <p class="tenue piccolo" style="margin:8px 0 0">Il DDT nasce subito con vettore e conducente scelti; chi la riporta tocca l'adesivo, firma e parte.</p>
         </form>
@@ -95,11 +102,12 @@
           <label class="spunta"><input type="checkbox" name="rientro" value="1" checked>
             <span>Prepara subito il DDT di rientro: chi la riporta tocca l'adesivo, firma e parte.</span></label>
           <label class="campo"><span>Chi riporta l'auto?</span>
-            <select name="chi_riporta">
-              <option value="">Chi viene a ritirarla dalla concessionaria</option>
-              <option value="noi">Noi: {{ sede.nome }} (vettore e conducente nostri)</option>
-              {% if dipendenti %}<optgroup label="Un dipendente della concessionaria">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
-            </select></label>
+            <select name="chi_riporta" required>
+              <option value="">Scegli la persona…</option>
+              <optgroup label="{{ sede.nome }} (vettore e conducente vostri)">{% for u in noi %}<option value="{{ u.id }}">{{ u.nome }}{{ ' (tu)' if u.id == g.utente.id }}</option>{% endfor %}</optgroup>
+              {% if dipendenti %}<optgroup label="{{ g.utente.organizzazione.nome }}">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+            </select>
+            <small>Solo questa persona potrà prenderla in carico, qui da voi (entro 200 m)</small></label>
           <p class="avviso errore" data-gps-errore hidden></p>
           <button class="btn primario pieno">{{ i('pin') }} Conferma: lavori conclusi</button>
           <p class="tenue piccolo" style="margin:8px 0 0">Si conferma vicino all'auto: il telefono controlla la posizione (entro 200 m da {{ sede.nome }}) e la aggiorna.</p>
@@ -109,9 +117,8 @@
   </article>
 {% endfor %}
 </div>
-{% else %}
-<div class="vuoto">{{ i('chiave') }}{% if stato == 'ritardo' %}Nessuna lavorazione in ritardo.{% elif stato == 'corso' %}Nessuna lavorazione nei tempi.{% elif stato == 'finita' %}Nessuna lavorazione completata in attesa di ritiro.{% else %}Nessuna lavorazione in corso.{% endif %}</div>
-{% endif %}
+{% else %}<div class="vuoto">{{ i(icona) }}{{ vuoto }}</div>{% endif %}
+{% endfor %}
 
 {% if not stato %}
 {# ---- Auto da voi senza lavorazione (solo trasferimento) ---- #}

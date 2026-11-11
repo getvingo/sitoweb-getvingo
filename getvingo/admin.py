@@ -236,7 +236,29 @@ def sede(sede_id):
         flash("Luogo aggiornato. I DDT già emessi restano con i dati di quando sono stati emessi.", "ok")
         return redirect(url_for("admin.sedi", gruppo="proprie" if s.tipo == "propria" else "esterne"))
     tipi = {k: Sede.TIPI[k] for k in GRUPPI_LUOGHI[gruppo][2]}
-    return render_template("admin/sede.html", s=s, tipi=tipi, gruppo=gruppo)
+    return render_template("admin/sede.html", s=s, tipi=tipi, gruppo=gruppo,
+                           ddt_collegati=servizi.ddt_collegati(s) if s.tipo != "propria" else None)
+
+
+@bp.route("/sedi/<int:sede_id>/elimina", methods=["POST"])
+@ruolo_richiesto("admin")
+def elimina_sede(sede_id):
+    """Destinazione esterna (fornitore, cliente…) senza DDT collegati: l'amministratore la elimina."""
+    s = db.get_or_404(Sede, sede_id)
+    try:
+        if s.tipo == "propria":
+            raise servizi.Vietato("Le sedi della concessionaria non si eliminano: si disattivano.")
+        if servizi.ddt_collegati(s):
+            raise servizi.Vietato(f"{s.nome} ha DDT collegati: non si può eliminare, solo disattivare.")
+        nome = s.nome
+        servizi.elimina_fornitore(s, g.utente)
+        db.session.commit()
+    except servizi.Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+        return redirect(url_for("admin.sede", sede_id=sede_id))
+    flash(f"{nome} eliminato, con i suoi account.", "ok")
+    return redirect(url_for("admin.sedi", gruppo="esterne"))
 
 
 def _email_ddt():

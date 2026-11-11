@@ -1324,7 +1324,8 @@ a.destinazione-btn { text-decoration: none; }
 .col-sotto #mappa { height: 260px; }
 @media (min-width: 1024px) {
   .azioni-auto { grid-template-columns: 1fr 1fr; }
-  .azioni-auto .predisponi { grid-column: 1 / -1; }
+  /* "Predisponi DDT da ritirare" accanto a "Inizia spostamento"; aperto, il modulo prende tutta la riga */
+  .azioni-auto .predisponi[open] { grid-column: 1 / -1; }
   .col-sotto #mappa { height: 340px; }
   .col-sotto .ddt-mini { display: inline-block; vertical-align: top; width: calc(50% - 6px); margin-right: 8px; }
   .col-sotto .ddt-mini:nth-of-type(2n) { margin-right: 0; }

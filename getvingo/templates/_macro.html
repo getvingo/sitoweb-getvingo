@@ -26,7 +26,7 @@
 {% macro gps() %}<input type="hidden" name="lat"><input type="hidden" name="lon">{% endmacro %}
 
 {# Campi del movimento: usati in partenza e in modifica DDT #}
-{% macro campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti, etichetta_conducente='Chi sposta il mezzo') %}
+{% macro campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti, etichetta_conducente='Chi sposta il mezzo', assegnabili=none) %}
 <label class="campo"><span>Destinazione</span>
   <select name="a_sede_id" id="destinazione" required>
     <option value="">Scegli dove va l'auto…</option>
@@ -60,10 +60,23 @@
   </select>
 </label>
 <div class="griglia-2">
+  {% if assegnabili is not none %}
+  {# DDT da ritirare: assegnato a una persona, solo lei lo prende in carico (entro 200 m dalla partenza) #}
+  <label class="campo"><span>Assegna il ritiro a</span>
+    <select name="assegnato_id" required>
+      <option value="">Chi va a prenderla…</option>
+      {% set interni = assegnabili|selectattr('interno')|list %}{% set esterni = assegnabili|rejectattr('interno')|list %}
+      {% if interni %}<optgroup label="Concessionaria">{% for u in interni %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+      {% if esterni %}<optgroup label="{{ esterni[0].sede.nome if esterni[0].sede else 'Fornitore' }}">{% for u in esterni %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</optgroup>{% endif %}
+    </select>
+    <small>Solo questa persona potrà prenderlo in carico, sul posto (entro 200 m dalla partenza)</small>
+  </label>
+  {% else %}
   <label class="campo"><span>{{ etichetta_conducente }}</span>
     <input name="conducente" list="nomi-utenti" maxlength="120" value="{{ valori.conducente or '' }}" placeholder="Nome e cognome" autocomplete="off" required>
     <datalist id="nomi-utenti">{% for n in nomi_utenti %}<option value="{{ n }}">{% endfor %}</datalist>
   </label>
+  {% endif %}
   <label class="campo"><span>Vettore</span>
     <select name="vettore_id" required>
       {% for vt in vettori %}<option value="{{ vt.id }}" {{ 'selected' if valori.vettore_id == vt.id }}>{{ vt.nome }}</option>{% endfor %}
