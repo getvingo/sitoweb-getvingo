@@ -8,8 +8,8 @@
 {% block contenuto %}
 {{ indietro(url_for('main.piazzale') if g.utente.interno else url_for('main.home')) }}
 <div class="scheda-auto-testa">
-  {{ carta_auto(v, targa_da_aggiungere=g.utente.interno and not v.targa) }}
-  {{ info_auto(v) }}
+  {{ carta_auto(v, targa_da_aggiungere=g.utente.interno and not v.targa, versione_modificabile=g.utente.interno) }}
+  {{ info_auto(v, data_modificabile=g.utente.interno) }}
 </div>
 <div class="azioni" style="margin:0 0 16px;align-items:center">
   {% if g.utente.interno and not v.condizione %}
@@ -242,6 +242,23 @@
 {% if v.sede and v.sede.esterna and v.stato == 'in_sede' %}<a class="btn pieno portami" href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}" target="_blank" rel="noopener">{{ i('pin') }} <span>Portami qui <span class="tenue piccolo portami-dove">Navigazione verso {{ v.sede.nome }}</span></span></a>{% endif %}
 {% endif %}
 
+{# Correzione dell'amministratore: niente DDT, niente traccia (né evento né azione) #}
+{% if puo_correggere_posizione %}
+<details class="ripiega correggi-posizione" style="margin-top:12px">
+  <summary>{{ i('pin', 's') }} Correggi la posizione <span class="tenue piccolo">senza DDT e senza lasciare traccia</span></summary>
+  <form method="post" action="{{ url_for('main.correggi_posizione', veicolo_id=v.id) }}" data-una-volta>
+    {{ csrf_input() }}
+    <input type="hidden" name="lat" value="{{ v.lat if v.lat is not none else '' }}">
+    <input type="hidden" name="lon" value="{{ v.lon if v.lon is not none else '' }}">
+    <label class="campo" style="max-width:420px"><span>Sede o piazzale</span>
+      <select name="sede_id" required>{% for s in sedi_consegna %}<option value="{{ s.id }}" data-lat="{{ s.lat if s.lat is not none else '' }}" data-lon="{{ s.lon if s.lon is not none else '' }}" {{ 'selected' if s.id == v.sede_id }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select></label>
+    <div class="correggi-mappa" style="height:280px;border-radius:var(--r-s);overflow:hidden;margin-bottom:8px"></div>
+    <p class="tenue piccolo" style="margin-top:0">Trascina il segnaposto o tocca la mappa sul punto esatto. Cambiando sede il punto va sulla sede scelta. Non si emette nessun DDT, nello storico non resta nulla e “Posizione aggiornata” non cambia.</p>
+    <button class="btn">{{ i('check', 's') }} Salva la posizione</button>
+  </form>
+</details>
+{% endif %}
+
 {% if v.stato not in ('consegnato', 'in_viaggio') %}
 <a class="btn pieno btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}" style="margin-top:14px">{{ i('attenzione') }} Segnala danno</a>
 {% endif %}
@@ -269,9 +286,45 @@
 {% endif %}{% endif %}
 {% endblock %}
 {% block script %}
-{% if v.lat is not none and v.stato != 'consegnato' %}
+{% if (v.lat is not none and v.stato != 'consegnato') or puo_correggere_posizione %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
+{% endif %}
+{% if puo_correggere_posizione %}
+<script>
+  (function () {
+    var box = document.querySelector('.correggi-posizione');
+    if (!box) return;
+    var f = box.querySelector('form'), sel = f.sede_id, el = box.querySelector('.correggi-mappa');
+    var mappa = null, punto = null;
+    function puntoSede() {
+      var o = sel.options[sel.selectedIndex];
+      return o.dataset.lat ? [parseFloat(o.dataset.lat), parseFloat(o.dataset.lon)] : null;
+    }
+    function metti(p) {
+      f.lat.value = p[0].toFixed(7); f.lon.value = p[1].toFixed(7);
+      if (punto) punto.setLatLng(p);
+    }
+    function apri() {
+      if (mappa) { mappa.invalidateSize(); return; }
+      var p = f.lat.value ? [parseFloat(f.lat.value), parseFloat(f.lon.value)] : (puntoSede() || [45.67, 12.24]);
+      mappa = L.map(el, { zoomControl: true }).setView(p, 19);
+      GetvingoMappa.sfondo(mappa);
+      punto = L.marker(p, { draggable: true }).addTo(mappa);
+      punto.on('dragend', function () { var q = punto.getLatLng(); metti([q.lat, q.lng]); });
+      mappa.on('click', function (e) { metti([e.latlng.lat, e.latlng.lng]); });
+      if (!f.lat.value) metti(p);
+    }
+    box.addEventListener('toggle', function () { if (box.open) setTimeout(apri, 0); });
+    sel.addEventListener('change', function () {
+      var p = puntoSede();
+      if (!p) { f.lat.value = ''; f.lon.value = ''; return; }  // sede senza posizione: decide il server
+      metti(p); if (mappa) mappa.setView(p, 19);
+    });
+  })();
+</script>
+{% endif %}
+{% if v.lat is not none and v.stato != 'consegnato' %}
 <script>
   (function () {
     var el = document.getElementById('mappa');

@@ -1079,8 +1079,28 @@ def nuova_auto():
 @bp.route("/veicolo/<int:veicolo_id>/dati", methods=["POST"])
 @solo_interni
 def modifica_dati_auto(veicolo_id):
-    """I dati dell'auto restano quelli inseriti all'ingresso: dopo si può solo aggiungere la targa, se manca."""
+    """I dati dell'auto restano quelli inseriti all'ingresso: dopo si può solo aggiungere la targa, se manca,
+    e cambiare la versione (tutto il personale interno)."""
     v = db.get_or_404(Veicolo, veicolo_id)
+    if "in_stock_dal" in request.form:  # data di ingresso in stock: la corregge tutto il personale interno
+        try:
+            giorno = date.fromisoformat(request.form["in_stock_dal"])
+        except ValueError:
+            giorno = None
+        if giorno is None or giorno > adesso().date():
+            flash("Scegli una data valida, non nel futuro.", "errore")
+        elif giorno != (v.creato_at.date() if v.creato_at else None):
+            v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
+            db.session.commit()
+            flash(f"In stock dal {giorno:%d/%m/%Y}.", "ok")
+        return _torna(url_for("main.veicolo", veicolo_id=v.id))
+    if "versione" in request.form:
+        versione = " ".join(request.form["versione"].split())[:120]
+        if versione != (v.versione or ""):
+            v.versione = versione
+            db.session.commit()
+            flash(f"Versione {'aggiornata' if versione else 'tolta'}.", "ok")
+        return _torna(url_for("main.veicolo", veicolo_id=v.id))
     if request.form.get("condizione") in Veicolo.CONDIZIONI:  # nuova o usata: si indica una volta sola
         if not v.condizione:
             v.condizione = request.form["condizione"]
@@ -1158,6 +1178,7 @@ def veicolo(veicolo_id):
         sedi_consegna=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
         puo_predisporre=servizi.puo_predisporre(v, g.utente),
         puo_consegnare=servizi.puo_consegnare(v, g.utente),
+        puo_correggere_posizione=servizi.puo_correggere_posizione(v, g.utente),
         puo_lavorazione=ultimo is not None and servizi.puo_completare_lavorazione(ultimo, g.utente),
         puo_presa=v.movimento_predisposto is not None
         and servizi.puo_prendere_in_carico(v.movimento_predisposto, g.utente),
@@ -1194,6 +1215,25 @@ def partenza(veicolo_id):
     else:
         flash(f"DDT n. {documento.sigla} emesso. Buon viaggio.", "ok")
     return _torna_al_ddt(documento)
+
+
+@bp.route("/veicolo/<int:veicolo_id>/correggi-posizione", methods=["POST"])
+@solo_interni
+def correggi_posizione(veicolo_id):
+    v = db.get_or_404(Veicolo, veicolo_id)
+    lat, lon = request.form.get("lat", type=float), request.form.get("lon", type=float)
+    if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        lat = lon = None  # nessun punto valido sulla mappa: vale quello della sede
+    sede = Sede.query.filter_by(id=request.form.get("sede_id", type=int)).first()
+    try:
+        servizi.correggi_posizione(v, g.utente, sede, lat, lon)
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+    else:
+        db.session.commit()
+        flash("Posizione corretta.", "ok")
+    return redirect(url_for("main.veicolo", veicolo_id=v.id))
 
 
 @bp.route("/veicolo/<int:veicolo_id>/riposiziona", methods=["POST"])

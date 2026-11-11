@@ -2013,3 +2013,14 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   .fg-firma-spazio img { max-height: 40px; }
 }
 @media (max-width: 640px) { .fg-tappa { padding-left: 22px; } }
+
+/* "Modifica versione" sotto il modello nella carta dell'auto (tutto il personale interno) */
+.modifica-versione { margin-top: 8px; }
+.modifica-versione > summary { display: inline-flex; width: auto; }
+.modifica-versione form { margin-top: 2px; }
+/* "Modifica" sotto "In stock dal" nei riquadri dell'auto */
+.modifica-data > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+.modifica-data > summary::-webkit-details-marker { display: none; }
+.modifica-data[open] > summary { display: none; }
+.modifica-data form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.modifica-data input[type=date] { min-height: 44px; border-radius: var(--r-m); border: 1px solid var(--bordo, #ccc); padding: 0 10px; font-size: var(--fs-16); }

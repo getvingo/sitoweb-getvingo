@@ -823,6 +823,27 @@ def elimina_ddt(ddt, utente):
         db.session.delete(m)
 
 
+def puo_correggere_posizione(v, utente):
+    """L'amministratore corregge dove si trova un'auto ferma in stock (in una sede propria)."""
+    return (utente.ruolo == "admin" and v.stato == "in_sede" and (v.sede is None or not v.sede.esterna)
+            and v.movimento_aperto is None and v.movimento_predisposto is None)
+
+
+def correggi_posizione(v, utente, sede, lat=None, lon=None):
+    """L'amministratore sposta l'auto (sede e/o punto sulla mappa) senza DDT e senza lasciare traccia:
+    niente evento, niente azione, l'orario dell'ultimo aggiornamento resta quello di prima."""
+    if not puo_correggere_posizione(v, utente):
+        raise Vietato("Solo un amministratore può correggere la posizione di un'auto ferma in stock.")
+    if sede is None or not sede.attiva or sede.esterna:
+        raise Vietato("Scegli una sede della concessionaria.")
+    if lat is None or lon is None:
+        lat, lon = (sede.lat, sede.lon) if sede.id != v.sede_id or v.lat is None else (v.lat, v.lon)
+    v.sede_id = sede.id
+    v.sede = sede
+    if lat is not None and lon is not None:
+        v.lat, v.lon = lat, lon
+
+
 def elimina_veicolo(v, utente, demo=False):
     """Elimina l'auto e tutto ciò che la riguarda; l'adesivo torna libero.
     Con DDT emessi solo in modalità demo: in produzione la numerazione fiscale non può avere buchi.
