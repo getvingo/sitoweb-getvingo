@@ -79,23 +79,34 @@ def mittente(mov):
     return (a.ragione_sociale, a.indirizzo_completo, a.piva, a.firma) if a else ("", "", "", None)
 
 
-def rientro_libero(veicolo):
-    """Il fornitore ha confermato la lavorazione completata: il DDT di rientro lo può emettere
-    chiunque (il mittente sul documento resta il fornitore, luogo da cui l'auto parte)."""
-    if veicolo.sede is None or not veicolo.sede.esterna:
-        return False
-    m = veicolo.ultimo_arrivo
-    return (m is not None and m.lavorazione_completata_at is not None
-            and m.sede_arrivo_effettiva.id == veicolo.sede.id)
+def rientro_sul_posto(veicolo, utente):
+    """Auto da un fornitore esterno: il DDT di rientro lo crea anche il personale della concessionaria,
+    ma solo dal posto (entro RAGGIO_ARRIVO_M dal fornitore, vedi controlla_sul_posto). Il mittente sul
+    documento resta il fornitore, luogo da cui l'auto parte."""
+    return utente.interno and veicolo.sede is not None and veicolo.sede.esterna
+
+
+def controlla_sul_posto(sede, lat, lon):
+    """Il personale della concessionaria crea il rientro solo entro RAGGIO_ARRIVO_M dal fornitore."""
+    if sede.lat is None or sede.lon is None:
+        raise Vietato(f"{sede.nome} non ha la posizione sulla mappa: il DDT di rientro lo crea {sede.nome} "
+                      "con il suo account, oppure un amministratore completa la posizione in Gestione.")
+    if lat is None or lon is None:
+        raise Vietato(f"Tocca l'adesivo NFC dell'auto da {sede.nome}: il DDT di rientro si crea "
+                      f"solo entro {RAGGIO_ARRIVO_M} m dal fornitore.")
+    metri = distanza_m(lat, lon, sede.lat, sede.lon)
+    if metri > RAGGIO_ARRIVO_M:
+        raise Vietato(f"Sei a {_distanza_leggibile(metri)} da {sede.nome}: il DDT di rientro si crea solo "
+                      f"entro {RAGGIO_ARRIVO_M} m, oppure lo crea {sede.nome} con il suo account.")
 
 
 def puo_emettere_dal_luogo(veicolo, utente):
-    return account_del_luogo(veicolo.sede, utente) or rientro_libero(veicolo)
+    return account_del_luogo(veicolo.sede, utente) or rientro_sul_posto(veicolo, utente)
 
 
 def puo_emettere(veicolo, utente):
-    """La bolla di partenza la emette un account del luogo da cui l'auto parte; dal fornitore, a
-    lavorazione completata, chiunque (rientro_libero). Un'auto in preparazione non si sposta; una
+    """La bolla di partenza la emette un account del luogo da cui l'auto parte; dal fornitore anche il
+    personale della concessionaria, ma solo sul posto (rientro_sul_posto, controllato all'emissione). Un'auto in preparazione non si sposta; una
     pronta si sposta solo con l'ultimo DDT verso la sede di consegna (vedi puo_emettere_ultimo_ddt)."""
     return (veicolo.stato == "in_sede" and veicolo.movimento_predisposto is None
             and veicolo.fase not in ("preparazione", "pronta")
@@ -148,7 +159,7 @@ def dati_ddt(ddt):
 
 
 def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=None,
-                   predisponi_ore=None, partenza_at=None):
+                   predisponi_ore=None, partenza_at=None, posizione=None):
     """Parte subito (serve la firma del conducente) oppure, se predisponi_ore,
     crea un DDT da ritirare entro quel numero di ore."""
     if veicolo.stato != "in_sede":
@@ -160,8 +171,10 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
     if veicolo.fase == "pronta" and dati["a_sede_id"] != veicolo.consegna_sede_id:
         raise Vietato("Un'auto pronta si sposta solo con l'ultimo DDT, verso la sede di consegna indicata.")
     if not puo_emettere_dal_luogo(veicolo, utente):
-        raise Vietato(f"La bolla la emette {veicolo.sede.nome} con il suo account finché non conferma "
-                      "la lavorazione completata: dopo, il rientro lo può emettere chiunque.")
+        raise Vietato(f"La bolla la emette {veicolo.sede.nome} con il suo account.")
+    if veicolo.sede is not None and veicolo.sede.esterna and not account_del_luogo(veicolo.sede, utente):
+        # posizione = quella vera del telefono (lat/lon possono essere quelle note dell'auto)
+        controlla_sul_posto(veicolo.sede, *(posizione if posizione is not None else (lat, lon)))
     # si confrontano gli oggetti, non gli id: l'id si aggiorna solo al salvataggio
     if veicolo.sede is not None and dati["a_sede_id"] == veicolo.sede.id:
         raise Vietato("La destinazione è il luogo in cui l'auto si trova già.")
@@ -427,7 +440,7 @@ def destinazione_scritta(nome, tipo="altro"):
     return sede
 
 
-def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None):
+def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, posizione=None):
     """"Inizia spostamento": si sceglie solo la destinazione, il resto viene dal profilo di guida.
     La lavorazione, se la destinazione è esterna, si indica dopo (entro la chiusura del DDT)."""
     mancano = profilo_guida_mancante(utente)
@@ -442,7 +455,8 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None):
             "vettore_id": utente.vettore_id, "conducente": utente.nome,
             "lavorazione": "" if a_sede.esterna else Movimento.NESSUNA, "lavorazione_note": "",
             "mezzo": utente.mezzo}
-    ddt = crea_movimento(veicolo, dati, utente, firma_conducente=utente.firma, lat=lat, lon=lon)
+    ddt = crea_movimento(veicolo, dati, utente, firma_conducente=utente.firma, lat=lat, lon=lon,
+                         posizione=posizione)
     ddt.movimento.firma_salvata = True
     return ddt
 

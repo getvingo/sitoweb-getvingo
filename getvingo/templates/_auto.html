@@ -207,9 +207,9 @@
 <a class="rientro-stato pronto" href="{{ url_for('main.ddt_dettaglio', ddt_id=pronto.ddt.id) }}">{{ i('ritiro', 's') }} <span><b>DDT di rientro {{ pronto.ddt.sigla }} pronto</b> · da ritirare entro {{ pronto.ritiro_entro_at|data('%d/%m %H:%M') }}</span></a>
 {% elif m.lavorazione_completata_at %}
 {% if pulsante and puo_emettere(v) %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>
-{% else %}<p class="rientro-stato libero">{{ i('check', 's') }} <span><b>Fine lavorazione confermata</b> · il DDT di rientro si può creare</span></p>{% endif %}
+{% else %}<p class="rientro-stato libero">{{ i('check', 's') }} <span><b>Fine lavorazione confermata</b> · il DDT di rientro lo crea {{ m.sede_arrivo_effettiva.nome }} o la concessionaria sul posto (entro 200 m)</span></p>{% endif %}
 {% else %}
-<p class="rientro-stato bloccato">{{ i('chiave', 's') }} <span><b>DDT di rientro non ancora disponibile</b> · si crea solo quando {{ m.sede_arrivo_effettiva.nome }} conferma la fine della lavorazione</span></p>
+<p class="rientro-stato bloccato">{{ i('chiave', 's') }} <span><b>Lavorazione in corso</b> · il DDT di rientro lo crea {{ m.sede_arrivo_effettiva.nome }} o la concessionaria sul posto (entro 200 m)</span></p>
 {% endif %}
 {% endmacro %}
 

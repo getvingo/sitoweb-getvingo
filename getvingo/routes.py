@@ -868,6 +868,7 @@ def sposta(veicolo_id):
         nuova = request.form.get("nuova_destinazione") is not None
         # con una destinazione nuova lat/lon del modulo sono quelli del suo indirizzo, non del telefono
         lat, lon = _posizione_tocco() if nuova else _coord()
+        telefono = (lat, lon)  # la posizione vera, per il rientro dal fornitore (entro 200 m)
         if lat is None:  # il telefono non ha ancora risposto: vale la posizione appena rilevata al tocco
             lat, lon = v.lat, v.lon
         try:
@@ -879,7 +880,7 @@ def sposta(veicolo_id):
             if request.form.get("a_sede_causale"):  # concessionario/rivenditore: luogo e causale insieme
                 sid, _, causale = request.form["a_sede_causale"].partition("|")
                 sede = db.session.get(Sede, int(sid) if sid.isdigit() else 0)
-            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale)
+            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale, posizione=telefono)
         except Vietato as e:
             db.session.rollback()
             flash(str(e), "errore")

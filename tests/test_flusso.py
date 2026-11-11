@@ -399,25 +399,48 @@ class TestSpostamentoColTocco(Base):
         with self.app.app_context():
             self.assertEqual(fasi(), ["Controllo rientro", "Preparazione"])
 
-    def test_rientro_lo_emette_chiunque_dopo_il_completamento(self):
+    def test_rientro_dal_fornitore_entro_200_metri(self):
+        """Dal fornitore il rientro lo crea il suo account da ovunque; la concessionaria solo sul posto
+        (entro 200 m), anche se la lavorazione non è ancora segnata come finita."""
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
-        self.entra("autista")
-        self.parti(vid, "Sede A", causale="Rientro da lavorazione", lavorazione="Nessuna (solo trasferimento)")
+        self.profilo()  # autista della concessionaria
+        sede_a = self._id(Sede, nome="Sede A")
+        # lontano dalla carrozzeria (45.1, 12.1): né il modulo completo né "Inizia spostamento"
+        self.parti(vid, "Sede A", causale="Reso lavorazione", lavorazione="Nessuna (solo trasferimento)",
+                   lat="45.66", lon="12.24")
+        self.c.post("/t/ABCD2345", data=POS)
+        self.assertIn("Sei a", self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": sede_a},
+                                           follow_redirects=True).get_data(as_text=True))
         with self.app.app_context():
-            self.assertEqual(Ddt.query.count(), 1)  # lavorazione non ancora confermata: no
-        self.entra("carr")
-        self.c.post(f"/ddt/{self.ddt()}/lavorazione-completata", data={"note": "fatto"})  # senza predisporre il rientro
-        self.profilo()
+            self.assertEqual(Ddt.query.count(), 1)
+        # senza posizione del telefono neppure
+        with self.c.session_transaction() as sessione:
+            sessione.pop("posizione_tocco", None)
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": sede_a})
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 1)
+        # tocco sul posto (circa 50 m): si parte, mittente il fornitore
+        self.c.post("/t/ABCD2345", data={"lat": "45.1004", "lon": "12.1"})
         pagina = self.c.get(f"/veicolo/{vid}/sposta").get_data(as_text=True)
         self.assertIn("Partenza · non modificabile", pagina)
-        self.assertIn("Carrozzeria B", pagina)
-        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Sede A")})
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": sede_a})
         with self.app.app_context():
             m = self.mov(self.ddt())
             self.assertEqual((m.da_sede.nome, m.causale, m.stato), ("Carrozzeria B", "Reso lavorazione", "aperto"))
             self.assertEqual(servizi.mittente(m)[0], "Carrozzeria B")  # il mittente resta il fornitore
+
+    def test_rientro_lo_crea_il_fornitore_da_ovunque(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        self.profilo("carr")
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Sede A"),
+                                                     "lat": "45.66", "lon": "12.24"})
+        with self.app.app_context():
+            self.assertEqual(self.mov(self.ddt()).da_sede.nome, "Carrozzeria B")
+            self.assertEqual(Ddt.query.count(), 2)
 
     def test_anteprima_e_tocchi_del_viaggio(self):
         vid = self.abbina()
