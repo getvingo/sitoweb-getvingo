@@ -281,7 +281,7 @@ class TestSpostamentoColTocco(Base):
         self.assertIn(f"/veicolo/{vid}/tocco", r.headers["Location"])
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
         self.assertIn("Dove la porti?", pagina)  # dal 12/11/2026 le destinazioni stanno già qui
-        self.assertIn('class="carta-auto', pagina)  # dati dell'auto subito in alto
+        self.assertIn('class="auto-breve', pagina)  # carta compatta dell'auto subito in alto
 
     def test_tocco_anteprima_dati_preparazione_e_danno(self):
         vid = self.abbina()
@@ -300,7 +300,7 @@ class TestSpostamentoColTocco(Base):
             db.session.commit()
         self.c.post("/t/ABCD2345", data=POS)
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
-        for testo in ('class="carta-auto', "Segnala danno", "1.5 eTSI Life", "ABCD2345", "Sede A", "toccando l&#39;adesivo",
+        for testo in ('class="auto-breve', "Segnala danno", "Volkswagen Golf", "AW000123", "Sede A",
                       "<span class=\"conta\">2</span>"):
             self.assertIn(testo, pagina)
         self.assertNotIn("Metti in preparazione", pagina)  # già pronta
@@ -3552,7 +3552,7 @@ class TestTelefonoSnello(Base):
         self.c.post("/t/ABCD2345", data={"lat": "45.0", "lon": "12.0"})  # sul posto, in Sede A
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
         self.assertIn("Il ritiro è tuo", pagina)
-        self.assertIn("Sei sul posto", pagina)
+        self.assertIn("Sei a 0 m da Sede A", pagina)
         self.c.post(f"/ddt/{d}/presa-in-carico", data={"firma_salvata": "1", "conducente": "Autista"})
         with self.app.app_context():
             m = self.mov(d)
@@ -3566,7 +3566,8 @@ class TestTelefonoSnello(Base):
         self.arrivo(d)
         self.c.post("/t/ABCD2345", data={"lat": "45.1", "lon": "12.1"})
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
-        self.assertIn("Lavori finiti?", pagina)
+        self.assertIn("Chi la riporta?", pagina)
+        self.assertIn("Lavori finiti", pagina)
         self.c.post(f"/movimento/{self._id(Movimento, ddt_id=d)}/lavorazione-completata",
                     data={"rientro": "1", "chi_riporta": "altro", "chi_riporta_altro": str(self._id(Utente, email="autista@t.it"))})
         with self.app.app_context():

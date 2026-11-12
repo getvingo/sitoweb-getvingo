@@ -2,8 +2,8 @@
 {% from "_macro.html" import i, icona_fase, tocca_adesivo %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
-{# Dal telefono (sotto 1024 px) prima di tutto: tocca un'auto, le tue cose da fare, cerca (12/11/2026).
-   Il quadro di tutta la concessionaria (Panoramica) resta sotto, come su computer. #}
+{# Dal telefono (sotto 1024 px), come nella demo (12/11/2026): tocca un'auto, le tue cose da fare, cerca.
+   Il quadro di tutta la concessionaria (Panoramica) sul telefono non si mostra: resta sul computer. #}
 <section class="home-telefono">
   <div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div>
   <h1>Cosa fai adesso?</h1>
@@ -13,7 +13,7 @@
   <div class="per-te">
     {% for x in per_te %}
     <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
-      <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · …{{ x.v.vin[-8:] }}</small><small>{{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
+      <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · {{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
     {% endfor %}
   </div>
   {% endif %}

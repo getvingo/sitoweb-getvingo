@@ -991,6 +991,7 @@ def tocco_scelta(veicolo_id):
                            da=request.args.get("da", type=int), tocco_valido=_tocco_valido(v),
                            puo_spostare=puo_spostare and not ritiro,
                            proposte=_destinazioni_proposte(v) if puo_spostare and not ritiro else [],
+                           usate=_usate_da_me(),
                            profilo_mancante=servizi.profilo_guida_mancante(g.utente) if puo_spostare else [],
                            lavorazioni=Movimento.LAVORAZIONI[1:],
                            ritiro=ritiro, distanza_ritiro=distanza_ritiro, raggio=servizi.RAGGIO_ARRIVO_M,
@@ -1016,6 +1017,13 @@ def _destinazioni_proposte(v, quante=4):
         elenco.remove(arrivo.da_sede)
         elenco.insert(0, arrivo.da_sede)
     return elenco[:quante]
+
+
+def _usate_da_me():
+    """Id delle destinazioni già usate da chi guarda (etichetta "la usi spesso")."""
+    righe = (db.session.query(Movimento.a_sede_id).filter(Movimento.partenza_utente_id == g.utente.id)
+             .distinct().all())
+    return {r[0] for r in righe}
 
 
 def _chi_riporta(sede):
@@ -1237,7 +1245,7 @@ def abbina(codice):
     vicine = [s for s in sedi if s.lat is not None]
     if lat is not None and vicine:  # il piazzale si propone dalla posizione del tocco
         form["sede_id"] = min(vicine, key=lambda s: servizi.distanza_m(lat, lon, s.lat, s.lon)).id
-    return render_template("abbina.html", tag=tag, sedi=sedi, form=form)
+    return render_template("abbina.html", tag=tag, sedi=sedi, form=form, sede_da_posizione="sede_id" in form)
 
 
 def _targa():

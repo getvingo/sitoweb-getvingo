@@ -1,18 +1,15 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, csrf_input, gps, indietro %}
 {% block contenuto %}
-{{ indietro(url_for('main.piazzale')) }}
-<div class="titolo-pagina">
-  {% if tag %}<div><div class="sopratitolo">{{ i('nfc', 's') }} Adesivo {{ tag.codice }} · nuovo</div><h1>Nuova auto in stock</h1></div>
-  {% else %}<div><h1>Nuova auto in stock</h1></div>{% endif %}
-</div>
-{# Snellito il 12/11/2026: prima la foto del VIN, i dati si compilano da soli (VIN, gestionale, posizione del
-   tocco) e restano ripiegati da controllare; "Nuova" / "Usata" salva. #}
-{% if not tag %}<p class="tenue">Un'auto entra in stock solo con il suo adesivo NFC: scegli il codice dell'adesivo che attacchi sul parabrezza
-  (oppure tocca l'adesivo nuovo con il telefono: si apre questa pagina già collegata).</p>{% endif %}
-
-<form method="post" data-una-volta class="form-abbina">
+{# Come nella demo (12/11/2026), in due tempi: 1) fotografa l'etichetta VIN; 2) i dati letti (VIN, gestionale,
+   posizione del tocco) da controllare, "Correggi" se qualcosa non torna, Nuova / Usata salva. #}
+<form method="post" data-una-volta class="form-abbina tocco {{ 'a-mano' if form.get('vin') }}">
   {{ csrf_input() }}{{ gps() }}
+  <div class="tocco-titolo">
+    <small class="sopra">{% if tag %}{{ i('nfc', 's') }} Adesivo {{ tag.codice }} · nuovo{% else %}Nuova auto in stock{% endif %}</small>
+    <h1 data-titolo>Nuova auto in stock</h1>
+    <div class="abbina-solo-letto" data-vin-testo></div>
+  </div>
   {% if not tag %}
   <label class="campo"><span>{{ i('nfc', 's') }} Adesivo NFC da attaccare</span>
     {% if tag_liberi %}
@@ -23,25 +20,34 @@
     {% endif %}
   </label>
   {% endif %}
-  <label class="foto-vin foto-vin-grande">
-    {{ i('foto') }} <span><b>Fotografa l'etichetta VIN</b><small>parabrezza o montante della porta: il resto si compila da solo</small></span>
-    <input type="file" id="foto-vin" accept="image/*" capture="environment" hidden>
-  </label>
+
+  {# 1) lettura #}
+  <div class="abbina-solo-leggi">
+    <label class="foto-vin foto-vin-grande">
+      {{ i('foto') }} <span><b>Fotografa l'etichetta VIN</b><small>parabrezza o montante della porta: il resto si compila da solo</small></span>
+      <input type="file" id="foto-vin" accept="image/*" capture="environment" hidden>
+    </label>
+    <button type="button" class="btn-link altra-destinazione" data-a-mano>Scrivi il VIN a mano</button>
+  </div>
   <p id="stato-lettura" class="tenue piccolo" role="status"></p>
 
-  <label class="campo"><span>VIN · controlla carattere per carattere</span>
-    <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
-           autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
-    <small id="conta-vin" class="contatore"></small>
-  </label>
+  {# 2) dati letti #}
+  <div class="letti abbina-solo-letto">
+    <div><span>Marca</span><b><span data-letto="marca"></span><em data-fonte="marca"></em></b></div>
+    <div><span>Modello · versione</span><b><span data-letto="modello"></span><em data-fonte="modello"></em></b></div>
+    <div><span>Colore</span><b><span data-letto="colore"></span><em data-fonte="modello"></em></b></div>
+    <div><span>Tipo</span><b><span data-letto="tipologia"></span><em data-fonte="tipologia"></em></b></div>
+    <div><span>Dove</span><b><span data-letto="sede"></span>{% if sede_da_posizione %}<em>POSIZIONE</em>{% endif %}</b></div>
+  </div>
+  <button type="button" class="btn-link altra-destinazione abbina-solo-letto" data-correggi>Qualcosa non torna? Correggi</button>
 
-  <details class="ripiega dati-auto" id="dati-auto" {{ 'open' if form.get('vin') }}>
-    <summary>{{ i('auto', 's') }} <span data-riassunto>Dati dell'auto</span> <span class="tenue">· controlla</span></summary>
-    <span class="etichetta-campo">Tipo di veicolo</span>
-    <div class="scelta-tipo" role="radiogroup" aria-label="Tipologia">
-      <label><input type="radio" name="tipologia" value="vettura" {{ 'checked' if form.get('tipologia', 'vettura') == 'vettura' }}> Vettura</label>
-      <label><input type="radio" name="tipologia" value="commerciale" {{ 'checked' if form.get('tipologia') == 'commerciale' }}> Veicolo commerciale</label>
-    </div>
+  {# campi: si aprono con "Correggi", "Scrivi il VIN a mano" o se manca qualcosa #}
+  <div class="abbina-campi">
+    <label class="campo"><span>VIN · controlla carattere per carattere</span>
+      <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
+             autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
+      <small id="conta-vin" class="contatore"></small>
+    </label>
     <div class="griglia-2">
       <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required data-formato="nome" autocapitalize="words"></label>
       <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required data-formato="nome" autocapitalize="words"></label>
@@ -53,14 +59,21 @@
         <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select>
       </label>
     </div>
+    <span class="etichetta-campo">Tipo di veicolo</span>
+    <div class="scelta-tipo" role="radiogroup" aria-label="Tipologia">
+      <label><input type="radio" name="tipologia" value="vettura" {{ 'checked' if form.get('tipologia', 'vettura') == 'vettura' }}> Vettura</label>
+      <label><input type="radio" name="tipologia" value="commerciale" {{ 'checked' if form.get('tipologia') == 'commerciale' }}> Veicolo commerciale</label>
+    </div>
     <label class="campo"><span>Targa <span class="tenue">(facoltativa, se già presente)</span></span>
       <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
-  </details>
+  </div>
 
-  <span class="etichetta-campo nuova-usata-titolo">Nuova o usata? <span class="tenue">· tocca per salvare</span></span>
-  <div class="nuova-usata">
-    <button type="submit" name="condizione" value="nuovo" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('brilla') }} Nuova</button>
-    <button type="submit" name="condizione" value="usato" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('orologio') }} Usata</button>
+  <div class="abbina-salva">
+    <h2 class="sezione-t">Nuova o usata?</h2>
+    <div class="nuova-usata">
+      <button type="submit" name="condizione" value="nuovo" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('brilla') }} Nuova<small>tocca per salvare</small></button>
+      <button type="submit" name="condizione" value="usato" {{ 'disabled' if not tag and not tag_liberi }}>Usata<small>tocca per salvare</small></button>
+    </div>
   </div>
 </form>
 {% endblock %}
@@ -70,20 +83,37 @@
 <script src="{{ url_for('static', filename='vin.js', v=versione_statici) }}"></script>
 <script>
   (function () {
-    // riassunto dei dati letti nella riga del riquadro ripiegato; se manca marca o modello si apre da solo
-    var form = document.querySelector('.form-abbina'), box = document.getElementById('dati-auto');
-    var riassunto = box.querySelector('[data-riassunto]');
+    var form = document.querySelector('.form-abbina'), titolo = form.querySelector('[data-titolo]');
+    var VALIDO = /^[A-HJ-NPR-Z0-9]{17}$/;
+    function val(n) { var el = form.querySelector('[name=' + n + ']'); return el ? el.value.trim() : ''; }
+    function scrivi(chiave, testo) { var el = form.querySelector('[data-letto=' + chiave + ']'); if (el) el.textContent = testo || '—'; }
+    function fonte(chiave, testo) { form.querySelectorAll('[data-fonte=' + chiave + ']').forEach(function (e) { e.textContent = testo || ''; }); }
     function aggiorna() {
-      var val = function (n) { var el = form.querySelector('[name=' + n + ']'); return el ? el.value.trim() : ''; };
+      var vin = val('vin').toUpperCase(), letto = VALIDO.test(vin);
+      form.classList.toggle('vin-letto', letto);
+      var nome = [val('marca'), val('modello'), val('versione')].join(' ').trim();
+      titolo.textContent = letto && nome ? nome : 'Nuova auto in stock';
+      form.querySelector('[data-vin-testo]').innerHTML = letto ? '<span class="vin">' + vin.slice(0, 9) + '<b>' + vin.slice(9) + '</b></span>' : '';
+      scrivi('marca', val('marca'));
+      scrivi('modello', [val('modello'), val('versione')].filter(Boolean).join(' · '));
+      scrivi('colore', val('colore'));
+      var tipo = form.querySelector('[name=tipologia]:checked');
+      scrivi('tipologia', tipo && tipo.value === 'commerciale' ? 'Veicolo commerciale' : 'Vettura');
       var sede = form.sede_id.options[form.sede_id.selectedIndex];
-      var parti = [[val('marca'), val('modello'), val('versione')].join(' ').trim(), val('colore'), sede && sede.value ? sede.text.split(' · ')[0] : ''];
-      riassunto.textContent = parti.filter(Boolean).join(' · ') || 'Dati dell’auto';
+      scrivi('sede', sede && sede.value ? sede.text.split(' · ')[0] : '');
     }
     form.addEventListener('input', aggiorna); form.addEventListener('change', aggiorna);
-    document.addEventListener('vin-precompilato', function () {
+    form.addEventListener('invalid', function () { form.classList.add('a-mano'); }, true);  // manca un dato: si mostrano i campi
+    document.addEventListener('vin-precompilato', function (e) {
+      var d = e.detail || {};
+      fonte('marca', d.marca ? (d.da_vin ? 'DAL VIN' : 'GESTIONALE') : '');
+      fonte('modello', d.modello ? 'GESTIONALE' : '');
+      fonte('tipologia', d.tipologia ? 'GESTIONALE' : '');
       aggiorna();
-      if (!form.marca.value.trim() || !form.modello.value.trim()) box.open = true;
+      if (!val('marca') || !val('modello')) form.classList.add('a-mano');  // manca qualcosa: si completa a mano
     });
+    form.querySelector('[data-a-mano]').addEventListener('click', function () { form.classList.add('a-mano'); form.vin.focus(); });
+    form.querySelector('[data-correggi]').addEventListener('click', function () { form.classList.add('a-mano'); });
     aggiorna();
   })();
 </script>

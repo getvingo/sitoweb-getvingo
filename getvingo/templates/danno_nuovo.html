@@ -1,21 +1,20 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input, detta %}
+{% from "_macro.html" import i, csrf_input, nota_voce %}
 {% block titolo %}Segnala danno · Getvingo{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div><a class="torna-indietro" href="{{ url_for('main.veicolo', veicolo_id=v.id) if g.utente.interno else url_for('main.home') }}">{{ i('indietro', 's') }} Annulla e torna all'auto</a>
-  <div class="sopratitolo">{{ v.descrizione }}{{ condizione(v) }} · {{ v.vin[-8:] }}</div><h1>Segnala un danno</h1></div></div>
-{% if mov %}<div class="avviso info">{{ i('camion') }}<span>Danno rilevato all'arrivo del DDT {{ mov.ddt.sigla }} ({{ mov.da_sede.nome if mov.da_sede else '—' }} → {{ mov.sede_arrivo_effettiva.nome }}).</span></div>{% endif %}
-<form method="post" enctype="multipart/form-data" id="form-danno" data-foto data-foto-manca="Serve almeno una foto del danno.">
+{# Come nella demo (12/11/2026): prima la foto, poi la zona sulla sagoma, descrizione a voce facoltativa #}
+<form method="post" enctype="multipart/form-data" id="form-danno" class="tocco" data-foto data-foto-manca="Serve almeno una foto del danno.">
   {{ csrf_input() }}{% if mov %}<input type="hidden" name="movimento" value="{{ mov.id }}">{% endif %}
-  <div class="scheda">
-    <label class="foto-vin" style="color:var(--errore)">
-      {{ i('foto') }} Scatta o allega le foto
-      <input type="file" data-foto-input accept="image/*" capture="environment" multiple hidden>
-    </label>
+  <div class="tocco-titolo"><small class="sopra">{{ v.descrizione }} · {{ v.vin[-8:] }}{% if mov %} · all'arrivo del DDT {{ mov.ddt.sigla }}{% endif %}</small>
+    <h1>Segnala un danno</h1></div>
+  <div class="foto-danno">
     <div class="anteprime" data-foto-anteprime></div>
-    <p class="tenue piccolo" data-foto-stato style="margin:6px 0 14px">Almeno una foto. Puoi aggiungerne altre toccando di nuovo.</p>
-    {# Zona: si tocca sulla sagoma (vista dall'alto, davanti in alto) o si sceglie qui sotto (12/11/2026) #}
-    <span class="etichetta">Dove si trova il danno?</span>
+    <label class="foto-aggiungi" aria-label="Scatta o allega una foto">{{ i('foto') }}<span>Foto</span>
+      <input type="file" data-foto-input accept="image/*" capture="environment" multiple hidden></label>
+  </div>
+  <p class="tenue piccolo" data-foto-stato>Almeno una foto: tocca per scattarla.</p>
+  <section class="sagoma-box">
+    <b>Dove?</b><span class="tenue piccolo">tocca la parte sulla sagoma</span>
     <svg class="sagoma-auto" viewBox="0 0 200 300" role="img" aria-label="Sagoma dell'auto vista dall'alto: tocca la zona del danno">
       <text x="100" y="12" text-anchor="middle">davanti</text>
       <path data-zona="Anteriore" d="M50 32 Q100 14 150 32 L150 48 L50 48 Z"><title>Anteriore</title></path>
@@ -27,10 +26,13 @@
       <path data-zona="Lato destro" d="M153 52 H170 Q178 157 170 262 H153 Z"><title>Lato destro</title></path>
       <text x="100" y="298" text-anchor="middle">dietro</text>
     </svg>
-    <div class="zone">{% for z in zone %}<label><input type="radio" name="zona" value="{{ z }}" required> {{ z }}</label>{% endfor %}</div>
-    <div class="campo-con-mic"><label class="campo"><span>Cosa hai visto <span class="tenue">(facoltativo)</span></span><input name="descrizione" id="descrizione-danno" maxlength="500" placeholder="Es. graffio di 10 cm sulla portiera"></label>{{ detta('descrizione-danno') }}</div>
-  </div>
-  <div class="barra-azione"><button class="btn primario pieno" style="background:var(--errore);border-color:var(--errore)">{{ i('attenzione') }} Invia segnalazione</button></div>
+    <b class="zona-scelta" data-zona-scelta>&nbsp;</b>
+    <div class="scelta-chip zone-altre">
+      {% for z in zone %}<label {{ 'hidden' if z in ('Anteriore', 'Cofano', 'Vetri / specchi', 'Tetto', 'Posteriore', 'Lato sinistro', 'Lato destro') }}><input type="radio" name="zona" value="{{ z }}"><span>{{ z }}</span></label>{% endfor %}
+    </div>
+  </section>
+  {{ nota_voce('descrizione', 'descrizione-danno', 'Descrivi a voce', 'facoltativo', 'Es. graffio di 10 cm sulla portiera', 500) }}
+  <button class="btn pieno btn-invia-danno">{{ i('attenzione') }} Invia segnalazione</button>
 </form>
 {% endblock %}
 {% block script %}<script src="{{ url_for('static', filename='foto.js', v=versione_statici) }}"></script>
@@ -40,6 +42,7 @@
     function colora() {
       var scelta = document.querySelector('input[name=zona]:checked');
       parti.forEach(function (p) { p.classList.toggle('scelta', !!scelta && p.dataset.zona === scelta.value); });
+      document.querySelector('[data-zona-scelta]').textContent = scelta ? scelta.value : '\u00a0';
     }
     parti.forEach(function (p) { p.addEventListener('click', function () {
       radio.forEach(function (r) { if (r.value === p.dataset.zona) r.checked = true; }); colora();

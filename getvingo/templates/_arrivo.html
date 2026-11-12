@@ -27,26 +27,23 @@
 {# "Arrivato a destinazione": il telefono manda la posizione, il server chiude se è entro il raggio.
    Snellito il 12/11/2026: Tutto ok / C'è un danno, nota (anche dettata) e "scorri per confermare" #}
 {% macro form_arrivo(d, m, raggio, id='', dopo_tocco=False) %}
-{% from "_macro.html" import scorri, detta %}
+{% from "_macro.html" import scorri, nota_voce %}
 <form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }} class="form-arrivo">
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
   {% if d.multiplo %}
   <p class="tenue piccolo">Chiudi il DDT per tutte le {{ d.movimenti|length }} auto.</p>
   {% else %}
-  <span class="etichetta-campo">Com'è l'auto?</span>
+  <h2 class="sezione-t">Com'è l'auto?</h2>
   <div class="scelta-chip com-e">
     <label class="ok"><input type="radio" name="danno" value="" checked><span>{{ i('check', 's') }} Tutto ok</span></label>
-    <label class="danno"><input type="radio" name="danno" value="1"><span>{{ i('attenzione', 's') }} C'è un danno</span></label>
+    <label class="danno"><input type="radio" name="danno" value="1"><span>C'è un danno</span></label>
   </div>
   {% endif %}
-  <details class="ripiega nota-ricezione">
-    <summary>{{ i('matita', 's') }} Nota di ricezione <span class="tenue">(facoltativa)</span></summary>
-    <div class="campo-con-mic"><label class="campo" style="margin:0"><span>Note di ricezione</span><input name="note" id="note-arrivo-{{ d.id }}" maxlength="300" placeholder="Es. graffio già presente sul cofano"></label>{{ detta('note-arrivo-' ~ d.id) }}</div>
-  </details>
+  {{ nota_voce('note', 'note-arrivo-' ~ d.id, 'Nota di ricezione a voce', 'facoltativa', 'Es. graffio già presente sul cofano') }}
   <p class="avviso errore arrivo-esito" data-gps-errore hidden></p>
-  <p class="riepilogo">{% if destinatario_conferma_ovunque(m, g.utente) %}confermi tu la ricezione per {{ m.a_sede.nome }}, con la posizione del telefono{% else %}si chiude solo entro {{ raggio }} m da {{ m.a_sede.nome }}{% endif %}</p>
+  {% if destinatario_conferma_ovunque(m, g.utente) %}<p class="suggerimento">Confermi tu la ricezione per {{ m.a_sede.nome }}, con la posizione del telefono</p>{% endif %}
   {% if m.lavorazione %}
-  {{ scorri('Scorri: arrivato a destinazione', 'verde', 'Arrivato a destinazione') }}
+  {{ scorri('Scorri per confermare la ricezione', 'verde', 'Arrivato a destinazione') }}
   {% else %}
   <button type="submit" class="btn primario pieno" disabled>{{ i('pin') }} Arrivato a destinazione</button>
   {% endif %}

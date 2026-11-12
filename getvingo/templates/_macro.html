@@ -360,3 +360,13 @@
   <small data-nfc-stato>Avvicina il telefono al parabrezza: ti mostro cosa c'è da fare</small>
 </button>
 {% endmacro %}
+
+{# Nota a voce (come nella demo): un pulsante grande col microfono; toccandolo si detta (o, se il telefono
+   non detta, compare il campo per scrivere). Il testo resta nel campo, modificabile (app.js) #}
+{% macro nota_voce(nome, id, titolo, sotto='facoltativa', segnaposto='', massimo=300) %}
+<div class="nota-voce">
+  <button type="button" class="nota-voce-btn" data-detta-mostra="{{ id }}"><span class="mic">{{ i('mic') }}</span>
+    <span><b>{{ titolo }}</b><small>{{ sotto }}</small></span></button>
+  <input name="{{ nome }}" id="{{ id }}" maxlength="{{ massimo }}" placeholder="{{ segnaposto }}" hidden>
+</div>
+{% endmacro %}

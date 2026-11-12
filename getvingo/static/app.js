@@ -294,6 +294,17 @@
     b.addEventListener('click', function () { DovinVoce.ascolta(b, function (testo) { campo.value = testo; campo.dispatchEvent(new Event('input')); }); });
   });
 
+  // Nota a voce (_macro.nota_voce): si detta; senza dettatura compare il campo per scrivere
+  document.querySelectorAll('[data-detta-mostra]').forEach(function (b) {
+    var campo = document.getElementById(b.dataset.dettaMostra);
+    b.addEventListener('click', function () {
+      campo.hidden = false;
+      if (window.DovinVoce && DovinVoce.supportato()) {
+        DovinVoce.ascolta(b, function (testo) { campo.value = testo; });
+      } else { campo.focus(); }
+    });
+  });
+
   // Campo obbligatorio dentro un riquadro chiuso: il riquadro si apre da solo per mostrarlo
   document.addEventListener('invalid', function (e) {
     var d = e.target.closest && e.target.closest('details');

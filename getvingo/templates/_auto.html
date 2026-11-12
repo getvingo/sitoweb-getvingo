@@ -219,3 +219,31 @@
 <p class="stima-viaggio">{{ i('cronometro', 's') }} <span>Circa <b>{{ st.km }} km</b> · <b>{{ st.minuti // 60 ~ ' h ' if st.minuti >= 60 }}{{ st.minuti % 60 }} min</b>
   ({{ st.traffico }}){% if m.stato == 'aperto' and m.partenza_at %} · arrivo previsto verso le <b>{{ st.arrivo|data('%H:%M') }}</b>{% endif %}</span></p>
 {% endif %}{% endmacro %}
+
+{# Carta compatta dell'auto (telefono snello, come nella demo del 12/11/2026): logo, marca e modello,
+   nuova/usata, telaio; sotto, se serve, stato e luogo con "da quando". Bordo nel colore della fase. #}
+{% macro auto_breve(v, stato=True) %}{% set k, testo = v.stato_per(g.utente) %}
+<section class="auto-breve {{ k }}">
+  {{ marchio(v) }}
+  <div class="auto-breve-dati">
+    <b>{{ v.descrizione }}</b>{{ condizione(v) }}
+    <div class="auto-breve-vin">{{ v.vin|vin }}{% if v.targa %} <span class="targa">{{ v.targa }}</span>{% endif %}</div>
+    {% if stato %}<div class="auto-breve-stato"><i aria-hidden="true"></i>{{ testo }}{% if v.sede and v.stato == 'in_sede' %} · {{ v.sede.nome }}{% endif %}</div>
+    {{ dettaglio_stato(v) }}{% endif %}
+  </div>
+</section>
+{% endmacro %}
+
+{# Lavorazione in breve: tipo e dettagli, barra sul tempo stimato e a che punto è #}
+{% macro lavoro_breve(m, titolo=none) %}
+{% set finita = m.lavorazione_completata_at %}{% set rit = m.giorni_ritardo %}
+{% set giorno = (adesso() - m.arrivo_at).days + 1 if m.arrivo_at else 0 %}
+<div class="lavoro-breve {{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
+  <small>{{ titolo or ('Lavori finiti ' ~ (finita|da_quanto) if finita else 'Lavorazione · ' ~ m.sede_arrivo_effettiva.nome) }}</small>
+  <div><b>{{ m.lavorazione }}</b>{% if m.lavorazione_note %} · {{ m.lavorazione_note }}{% endif %}</div>
+  {% if not finita %}
+  <div class="lavoro-breve-barra"><i style="width:{{ m.avanzamento_lavorazione }}%"></i></div>
+  <div class="tenue piccolo">Giorno {{ giorno }} di {{ m.stima_giorni }} · {% if rit %}in ritardo di {{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}{% else %}nei tempi{% endif %}</div>
+  {% endif %}
+</div>
+{% endmacro %}
