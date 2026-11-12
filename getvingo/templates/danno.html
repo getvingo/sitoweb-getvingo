@@ -15,7 +15,7 @@
 
 <div class="documento">
   <div class="sezioni">
-    <div class="sez larga"><div class="etichetta">Cosa è stato visto</div><div class="valore">{{ d.descrizione }}{{ condizione(d) }}</div></div>
+    <div class="sez larga"><div class="etichetta">Cosa è stato visto</div><div class="valore">{{ d.descrizione or "Nessuna descrizione: vedi le foto" }}{{ condizione(d) }}</div></div>
     <div class="sez"><div class="etichetta">Dove</div><div class="valore">{{ d.CONTESTI[d.contesto] }}</div>
       {% if d.movimento %}<div class="tenue piccolo">DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=d.movimento.ddt.id) }}">{{ d.movimento.ddt.sigla }}</a> · {{ d.movimento.da_sede.nome if d.movimento.da_sede else '—' }} → {{ d.movimento.sede_arrivo_effettiva.nome }}</div>{% endif %}</div>
     <div class="sez"><div class="etichetta">Segnalato da</div><div class="valore">{{ d.segnalato_da.nome }}</div><div class="tenue piccolo">{{ d.segnalato_at|data }}</div></div>

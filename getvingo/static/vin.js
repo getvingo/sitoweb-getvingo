@@ -60,6 +60,7 @@
     fetch('/api/veicolo?vin=' + encodeURIComponent(vin)).then(function (r) {
       return r.ok ? r.json() : null;
     }).then(function (d) {
+      setTimeout(function () { document.dispatchEvent(new CustomEvent('vin-precompilato', { detail: d || {} })); });
       if (!d) return;
       ['marca', 'modello', 'versione', 'colore'].forEach(function (k) {
         var el = document.querySelector('[name=' + k + ']');

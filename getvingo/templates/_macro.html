@@ -334,3 +334,29 @@
     <input name="codice_fiscale" value="{{ o.codice_fiscale if o and o.codice_fiscale else '' }}" maxlength="16" autocapitalize="characters" style="text-transform:uppercase" placeholder="16 caratteri o 11 cifre"></label>
 </div>
 {% endmacro %}
+
+{# "Scorri per confermare" (12/11/2026): sul telefono al posto del pulsante secco, per le azioni che non si
+   tornano indietro da sole (DDT, presa in carico, arrivo, fine lavori, consegna). Niente invii per sbaglio e
+   niente riepiloghi o "Sei sicuro?". È il pulsante di invio del modulo: senza JavaScript funziona come un
+   pulsante normale, con la tastiera Invio conferma. Col mouse (computer) è un pulsante normale con il testo
+   "pulsante" (app.js). #}
+{% macro scorri(testo, colore='', pulsante=none) %}
+<div class="scorri {{ colore }}" data-scorri data-pulsante="{{ pulsante or testo }}">
+  <span class="scorri-riempi" aria-hidden="true"></span>
+  <span class="scorri-testo" aria-hidden="true"><span>{{ testo }}</span></span>
+  <button type="submit" class="scorri-pomo" aria-label="{{ testo }}">{{ i('freccia') }}</button>
+</div>
+{% endmacro %}
+
+{# Microfono accanto a un campo: detta il testo invece di scriverlo (voce.js) #}
+{% macro detta(per) %}<button type="button" class="btn-mic-piccolo" data-detta="{{ per }}" aria-label="Detta">{{ i('mic', 's') }}</button>{% endmacro %}
+
+{# Grande "Tocca l'adesivo" della home sul telefono: su Android legge l'adesivo restando nell'app (Web NFC),
+   su iPhone basta avvicinare il telefono all'adesivo con lo schermo acceso (app.js, data-leggi-nfc) #}
+{% macro tocca_adesivo() %}
+<button type="button" class="tocca-adesivo" data-leggi-nfc>
+  <span class="onde-nfc" aria-hidden="true"><i></i><i></i><i></i>{{ i('nfc') }}</span>
+  <b>Tocca l'adesivo dell'auto</b>
+  <small data-nfc-stato>Avvicina il telefono al parabrezza: ti mostro cosa c'è da fare</small>
+</button>
+{% endmacro %}

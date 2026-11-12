@@ -241,6 +241,86 @@
     }); });
   }
 
+  // "Scorri per confermare" (_macro.scorri): si trascina il pomello fino in fondo; un tocco secco non invia
+  // (il pomello fa vedere che va trascinato). Con la tastiera, Invio sul pomello conferma.
+  document.querySelectorAll('[data-scorri]').forEach(function (box) {
+    var pomo = box.querySelector('.scorri-pomo'), riempi = box.querySelector('.scorri-riempi'), form = pomo.form;
+    var x0 = null, max = 0, fatto = false;
+    // computer col mouse: niente da trascinare, è un pulsante normale
+    var mouse = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (mouse) { box.classList.add('come-pulsante'); box.querySelector('.scorri-testo span').textContent = box.dataset.pulsante; }
+    function posa(dx) { pomo.style.transform = 'translateX(' + dx + 'px)'; riempi.style.width = (dx + pomo.offsetWidth + 8) + 'px'; }
+    function indietro() { box.classList.add('torna'); posa(0); setTimeout(function () { box.classList.remove('torna'); }, 220); }
+    function conferma() {
+      if (fatto || !form) return;
+      if (!form.checkValidity()) { form.reportValidity(); indietro(); return; }  // manca un campo obbligatorio
+      fatto = true; max = box.clientWidth - pomo.offsetWidth - 12; box.classList.add('fatto'); posa(max);
+      if (navigator.vibrate) navigator.vibrate(30);
+      if (form.requestSubmit) form.requestSubmit(pomo); else form.submit();
+      // posizione negata o errore prima dell'invio: il pomello torna indietro e si può riprovare
+      var errore = form.querySelector('[data-gps-errore]');
+      (function controlla() {
+        if (errore && !errore.hidden) { fatto = false; box.classList.remove('fatto'); indietro(); return; }
+        if (fatto) setTimeout(controlla, 400);
+      })();
+    }
+    pomo.addEventListener('pointerdown', function (e) {
+      if (fatto || mouse) return;
+      x0 = e.clientX; max = box.clientWidth - pomo.offsetWidth - 12;
+      pomo.setPointerCapture(e.pointerId); box.classList.add('trascina');
+    });
+    pomo.addEventListener('pointermove', function (e) { if (x0 !== null) posa(Math.max(0, Math.min(max, e.clientX - x0))); });
+    pomo.addEventListener('pointerup', function (e) {
+      if (x0 === null) return;
+      var dx = e.clientX - x0; x0 = null; box.classList.remove('trascina');
+      if (dx >= max * 0.85) conferma(); else indietro();
+    });
+    pomo.addEventListener('pointercancel', function () { x0 = null; box.classList.remove('trascina'); indietro(); });
+    pomo.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (mouse || (e.detail === 0 && document.activeElement === pomo)) { conferma(); return; }  // mouse o tastiera
+      if (!fatto) { box.classList.remove('suggerisci'); void box.offsetWidth; box.classList.add('suggerisci'); }
+    });
+  });
+
+  // "Annulla" subito dopo un'azione dal telefono: sparisce allo scadere del tempo
+  var annulla = document.querySelector('[data-annulla-subito]');
+  if (annulla) setTimeout(function () { annulla.remove(); }, parseInt(annulla.dataset.annullaSubito, 10) * 1000);
+
+  // Microfono accanto a un campo (_macro.detta)
+  document.querySelectorAll('[data-detta]').forEach(function (b) {
+    var campo = document.getElementById(b.dataset.detta);
+    if (!campo || !window.DovinVoce) return;
+    b.addEventListener('click', function () { DovinVoce.ascolta(b, function (testo) { campo.value = testo; campo.dispatchEvent(new Event('input')); }); });
+  });
+
+  // Campo obbligatorio dentro un riquadro chiuso: il riquadro si apre da solo per mostrarlo
+  document.addEventListener('invalid', function (e) {
+    var d = e.target.closest && e.target.closest('details');
+    if (d && !d.open) d.open = true;
+  }, true);
+
+  // Tocca l'adesivo dalla home: su Android (Chrome) il telefono legge l'adesivo restando nell'app;
+  // su iPhone basta avvicinarlo all'adesivo con lo schermo acceso (si apre il link da solo)
+  document.querySelectorAll('[data-leggi-nfc]').forEach(function (b) {
+    var stato = b.querySelector('[data-nfc-stato]');
+    if (!('NDEFReader' in window)) return;
+    b.addEventListener('click', function () {
+      var lettore = new NDEFReader();
+      lettore.scan().then(function () {
+        b.classList.add('in-ascolto');
+        if (stato) stato.textContent = 'Avvicina il telefono all’adesivo sul parabrezza…';
+        lettore.onreading = function (e) {
+          e.message.records.forEach(function (r) {
+            if (r.recordType !== 'url' && r.recordType !== 'absolute-url') return;
+            var m = new TextDecoder().decode(r.data).match(/\/t\/([A-Za-z0-9-]+)/);
+            if (m) { if (navigator.vibrate) navigator.vibrate(60); location.href = '/t/' + m[1]; }
+          });
+        };
+      }).catch(function () { if (stato) stato.textContent = 'Lettore NFC non disponibile: avvicina il telefono all’adesivo.'; });
+    });
+  });
+
   // Evita doppio invio (doppio DDT) se si tocca due volte il bottone
   // (non si disabilita il bottone: il suo name/value, es. "predisponi", deve arrivare al server)
   document.querySelectorAll('form[data-una-volta]').forEach(function (f) {

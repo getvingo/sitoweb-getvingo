@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input %}
+{% from "_macro.html" import i, csrf_input, detta %}
 {% block titolo %}Segnala danno · Getvingo{% endblock %}
 {% block contenuto %}
 <div class="titolo-pagina"><div><a class="torna-indietro" href="{{ url_for('main.veicolo', veicolo_id=v.id) if g.utente.interno else url_for('main.home') }}">{{ i('indietro', 's') }} Annulla e torna all'auto</a>
@@ -14,11 +14,36 @@
     </label>
     <div class="anteprime" data-foto-anteprime></div>
     <p class="tenue piccolo" data-foto-stato style="margin:6px 0 14px">Almeno una foto. Puoi aggiungerne altre toccando di nuovo.</p>
-    <span class="etichetta">Dove si trova il danno</span>
+    {# Zona: si tocca sulla sagoma (vista dall'alto, davanti in alto) o si sceglie qui sotto (12/11/2026) #}
+    <span class="etichetta">Dove si trova il danno?</span>
+    <svg class="sagoma-auto" viewBox="0 0 200 300" role="img" aria-label="Sagoma dell'auto vista dall'alto: tocca la zona del danno">
+      <text x="100" y="12" text-anchor="middle">davanti</text>
+      <path data-zona="Anteriore" d="M50 32 Q100 14 150 32 L150 48 L50 48 Z"><title>Anteriore</title></path>
+      <path data-zona="Cofano" d="M52 52 H148 V104 H52 Z"><title>Cofano</title></path>
+      <path data-zona="Vetri / specchi" d="M54 108 H146 L142 122 H58 Z M54 208 H146 L142 196 H58 Z"><title>Vetri / specchi</title></path>
+      <path data-zona="Tetto" d="M60 126 H140 V192 H60 Z"><title>Tetto</title></path>
+      <path data-zona="Posteriore" d="M52 212 H148 V266 Q100 286 52 266 Z"><title>Posteriore</title></path>
+      <path data-zona="Lato sinistro" d="M30 52 H47 V262 H30 Q22 157 30 52 Z"><title>Lato sinistro</title></path>
+      <path data-zona="Lato destro" d="M153 52 H170 Q178 157 170 262 H153 Z"><title>Lato destro</title></path>
+      <text x="100" y="298" text-anchor="middle">dietro</text>
+    </svg>
     <div class="zone">{% for z in zone %}<label><input type="radio" name="zona" value="{{ z }}" required> {{ z }}</label>{% endfor %}</div>
-    <label class="campo"><span>Cosa hai visto</span><input name="descrizione" required maxlength="500" placeholder="Es. graffio di 10 cm sulla portiera, ammaccatura sul paraurti"></label>
+    <div class="campo-con-mic"><label class="campo"><span>Cosa hai visto <span class="tenue">(facoltativo)</span></span><input name="descrizione" id="descrizione-danno" maxlength="500" placeholder="Es. graffio di 10 cm sulla portiera"></label>{{ detta('descrizione-danno') }}</div>
   </div>
   <div class="barra-azione"><button class="btn primario pieno" style="background:var(--errore);border-color:var(--errore)">{{ i('attenzione') }} Invia segnalazione</button></div>
 </form>
 {% endblock %}
-{% block script %}<script src="{{ url_for('static', filename='foto.js', v=versione_statici) }}"></script>{% endblock %}
+{% block script %}<script src="{{ url_for('static', filename='foto.js', v=versione_statici) }}"></script>
+<script>
+  (function () {  // sagoma: toccare una parte sceglie la zona (e viceversa la zona scelta si colora)
+    var radio = document.querySelectorAll('input[name=zona]'), parti = document.querySelectorAll('.sagoma-auto [data-zona]');
+    function colora() {
+      var scelta = document.querySelector('input[name=zona]:checked');
+      parti.forEach(function (p) { p.classList.toggle('scelta', !!scelta && p.dataset.zona === scelta.value); });
+    }
+    parti.forEach(function (p) { p.addEventListener('click', function () {
+      radio.forEach(function (r) { if (r.value === p.dataset.zona) r.checked = true; }); colora();
+    }); });
+    radio.forEach(function (r) { r.addEventListener('change', colora); });
+  })();
+</script>{% endblock %}

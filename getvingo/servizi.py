@@ -463,9 +463,11 @@ def destinazione_scritta(nome, tipo="altro"):
     return sede
 
 
-def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, posizione=None):
+def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, posizione=None,
+                    lavorazione="", lavorazione_note=""):
     """"Inizia spostamento": si sceglie solo la destinazione, il resto viene dal profilo di guida.
-    La lavorazione, se la destinazione è esterna, si indica dopo (entro la chiusura del DDT)."""
+    La lavorazione, se la destinazione è esterna, si può scegliere già qui (schermata del tocco, 12/11/2026)
+    oppure dopo (entro la chiusura del DDT)."""
     mancano = profilo_guida_mancante(utente)
     if mancano:
         raise Vietato("Completa il tuo profilo di guida: manca " + ", ".join(mancano) + ".")
@@ -478,6 +480,13 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, p
             "vettore_id": utente.vettore_id, "conducente": utente.nome,
             "lavorazione": "" if a_sede.esterna else Movimento.NESSUNA, "lavorazione_note": "",
             "mezzo": utente.mezzo}
+    if a_sede.esterna and lavorazione:
+        note = " ".join((lavorazione_note or "").split())[:300]
+        if lavorazione not in Movimento.LAVORAZIONI or lavorazione == Movimento.NESSUNA:
+            raise Vietato("Scegli la lavorazione da fare.")
+        if not note:
+            raise Vietato("Scrivi (o detta) i dettagli della lavorazione da fare.")
+        dati.update(lavorazione=lavorazione, lavorazione_note=note)
     ddt = crea_movimento(veicolo, dati, utente, firma_conducente=utente.firma, lat=lat, lon=lon,
                          posizione=posizione)
     ddt.movimento.firma_salvata = True
@@ -1279,12 +1288,11 @@ def segnala_danno(veicolo, utente, zona, descrizione, foto, movimento=None):
     """foto: nomi dei file già salvati nella cartella foto."""
     if zona not in Danno.ZONE:
         raise Vietato("Indica in che zona dell'auto è il danno.")
-    if not (descrizione or "").strip():
-        raise Vietato("Descrivi il danno in poche parole.")
+    # la descrizione è facoltativa (12/11/2026): foto e zona bastano a capire
     if not foto:
         raise Vietato("Allega almeno una foto del danno.")
     danno = Danno(veicolo=veicolo, movimento=movimento, contesto="arrivo" if movimento else "piazzale",
-                  zona=zona, descrizione=descrizione.strip()[:500], segnalato_da_id=utente.id)
+                  zona=zona, descrizione=(descrizione or "").strip()[:500], segnalato_da_id=utente.id)
     db.session.add(danno)
     for nome in foto:
         db.session.add(DannoFoto(danno=danno, file=nome))
@@ -1332,9 +1340,31 @@ def _ultima_su_veicolo(azione):
     return ultima is not None and ultima.id == azione.id
 
 
+# "Annulla" subito dopo un'azione fatta dal telefono (12/11/2026): chi l'ha appena fatta la può annullare
+# per pochi secondi (il pulsante resta a schermo ANNULLA_SUBITO_S - 10 secondi; qualche secondo in più
+# al server per la rete lenta). Il DDT emesso e annullato va tra i Cancellati: il numero non si riusa.
+ANNULLA_SUBITO_S = 30
+ANNULLABILI_SUBITO = ("partenza", "presa_in_carico", "arrivo", "lavorazione_completata", "preparazione_fase",
+                      "consegna")
+
+
+def annullabile_subito(azione, utente):
+    """True se chi l'ha appena fatta può ancora annullare questa azione."""
+    if azione is None or azione.ripristinata_at or azione.utente_id != utente.id:
+        return False
+    if azione.tipo not in ANNULLABILI_SUBITO or (adesso() - azione.at).total_seconds() > ANNULLA_SUBITO_S:
+        return False
+    if azione.tipo == "arrivo" and azione.ddt is not None and azione.ddt.copie_inviate_at:
+        return False  # la copia firmata è già partita per email: si corregge dall'admin
+    return all(_ultima_su_veicolo(a) for a in _gruppo(azione))
+
+
 def puo_ripristinare(azione, utente):
     """Solo l'admin; per gli spostamenti solo l'ultima azione fatta sull'auto (su tutte le auto,
-    per un DDT multiplo), così stati e DDT restano coerenti. I danni si ripristinano sempre."""
+    per un DDT multiplo), così stati e DDT restano coerenti. I danni si ripristinano sempre.
+    Eccezione: chi ha appena fatto l'azione la annulla per pochi secondi (annullabile_subito)."""
+    if annullabile_subito(azione, utente):
+        return True
     if utente.ruolo != "admin" or azione.ripristinata_at:
         return False
     if azione.tipo in AZIONI_DANNO:
@@ -1359,7 +1389,7 @@ def ripristina(azione, utente):
         raise Vietato("Si può ripristinare solo l'ultima azione fatta su quest'auto.")
     gruppo = _gruppo(azione)
     d = azione.ddt
-    motivo = f"Ripristino di {utente.nome}"
+    motivo = f"Annullato subito da {utente.nome}" if utente.ruolo != "admin" else f"Ripristino di {utente.nome}"
 
     if azione.tipo in ("partenza", "predisposizione"):
         _annulla(d, utente, motivo)

@@ -280,7 +280,7 @@ class TestSpostamentoColTocco(Base):
         r = self.c.post("/t/ABCD2345", data=POS)
         self.assertIn(f"/veicolo/{vid}/tocco", r.headers["Location"])
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
-        self.assertIn("Inizia spostamento", pagina)
+        self.assertIn("Dove la porti?", pagina)  # dal 12/11/2026 le destinazioni stanno già qui
         self.assertIn('class="carta-auto', pagina)  # dati dell'auto subito in alto
 
     def test_tocco_anteprima_dati_preparazione_e_danno(self):
@@ -3454,3 +3454,139 @@ class TestUniformaEsistenti(Base):
             self.assertEqual(dati, {("Volkswagen", "Golf", "Bianco")})
             self.assertEqual(Veicolo.query.filter_by(vin="WVWZZZ1KZAW000803").one().versione, "1.5 eTSI")
         self.assertIn("Niente da correggere", self.c.get("/admin/uniforma").get_data(as_text=True))
+
+
+class TestTelefonoSnello(Base):
+    """Telefono snello (12/11/2026): il tocco mostra una cosa da fare, "scorri per confermare",
+    "Annulla" per pochi secondi a chi ha appena fatto l'azione."""
+    def profilo(self, chi="autista"):
+        self.entra(chi)
+        self.c.post("/profilo-guida", data={"vettore_id": self._id(Vettore, nome="Vettore X"),
+                                            "mezzo": "Bisarca", "firma": FIRMA})
+
+    def test_destinazioni_sotto_l_auto_e_lavorazione_scelta_alla_partenza(self):
+        vid = self.abbina()
+        self.profilo()
+        self.c.post("/t/ABCD2345", data=POS)
+        pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
+        for testo in ("Dove la porti?", "Carrozzeria B", "foglio-partenza", "data-scorri", "Altra destinazione"):
+            self.assertIn(testo, pagina)
+        torna = f"/veicolo/{vid}/tocco"
+        # lavorazione senza dettagli: non parte, si torna alla schermata del tocco
+        r = self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Carrozzeria B"),
+                                                        "lavorazione": "Carrozzeria", "torna": torna})
+        self.assertEqual(r.headers["Location"], torna)
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 0)
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Carrozzeria B"), "torna": torna,
+                                                    "lavorazione": "Carrozzeria", "lavorazione_note": " paraurti  dietro "})
+        d = self.ddt()
+        with self.app.app_context():
+            m = self.mov(d)
+            self.assertEqual((m.lavorazione, m.lavorazione_note, m.causale), ("Carrozzeria", "paraurti dietro", "Invio lavorazione"))
+        self.arrivo(d)  # con la lavorazione già indicata il DDT si chiude all'arrivo
+        with self.app.app_context():
+            self.assertEqual(self.mov(d).stato, "chiuso")
+
+    def test_annulla_subito_solo_chi_ha_fatto_e_solo_per_pochi_secondi(self):
+        vid = self.abbina()
+        self.profilo()
+        r = self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Officina D")})
+        pagina = self.c.get(r.headers["Location"]).get_data(as_text=True)
+        self.assertIn("annulla-subito", pagina)
+        self.assertNotIn("annulla-subito", self.c.get(r.headers["Location"]).get_data(as_text=True))  # una volta sola
+        with self.app.app_context():
+            azione = Azione.query.filter_by(tipo="partenza").one().id
+        self.entra("ufficio")  # un altro non può
+        self.c.post(f"/azione/{azione}/ripristina")
+        with self.app.app_context():
+            self.assertIsNone(Ddt.query.one().annullato_at)
+        self.entra("autista")
+        self.c.post(f"/azione/{azione}/ripristina")
+        with self.app.app_context():
+            d, v = Ddt.query.one(), db.session.get(Veicolo, vid)
+            self.assertIsNotNone(d.annullato_at)  # il DDT va tra i Cancellati, il numero non si riusa
+            self.assertIn("Annullato subito da Autista", d.motivo_annullamento)
+            self.assertEqual((v.stato, v.sede.nome), ("in_sede", "Sede A"))
+        # passato il tempo non si annulla più
+        self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Officina D")})
+        with self.app.app_context():
+            a = Azione.query.filter_by(tipo="partenza", ripristinata_at=None).one()
+            a.at = a.at - timedelta(seconds=servizi.ANNULLA_SUBITO_S + 1)
+            db.session.commit()
+            azione = a.id
+        self.c.post(f"/azione/{azione}/ripristina")
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.filter(Ddt.annullato_at.is_(None)).count(), 1)
+
+    def test_preparatore_il_tocco_vale_come_passo(self):
+        vid = self.abbina()
+        self.c.post(f"/veicolo/{vid}/preparazione")
+        with self.app.app_context():
+            u = Utente(nome="Prep", email="prep@t.it", ruolo="preparatore")
+            u.imposta_password("pw")
+            db.session.add(u)
+            db.session.commit()
+        fasi = lambda: [f.nome for f in Preparazione.query.one().fasi_fatte]
+        self.entra("autista")  # le altre mansioni: il tocco da solo non chiude il passo
+        self.c.post("/t/ABCD2345", data=POS)
+        with self.app.app_context():
+            self.assertEqual(fasi(), [])
+        self.entra("prep")
+        r = self.c.post("/t/ABCD2345", data=POS)
+        self.assertIn("fatto=0", r.headers["Location"])
+        self.assertIn("annulla-subito", self.c.get(r.headers["Location"]).get_data(as_text=True))
+        with self.app.app_context():
+            self.assertEqual(fasi(), ["Controllo rientro"])
+            azione = Azione.query.filter_by(tipo="preparazione_fase").one().id
+        self.c.post(f"/azione/{azione}/ripristina")  # toccato per sbaglio: si annulla subito
+        with self.app.app_context():
+            self.assertEqual(fasi(), [])
+
+    def test_ritiro_assegnato_dal_tocco_con_la_firma_salvata(self):
+        vid = self.abbina()
+        self.entra("ufficio")
+        self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
+        d = self.ddt()
+        self.profilo()
+        self.c.post("/t/ABCD2345", data={"lat": "45.0", "lon": "12.0"})  # sul posto, in Sede A
+        pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
+        self.assertIn("Il ritiro è tuo", pagina)
+        self.assertIn("Sei sul posto", pagina)
+        self.c.post(f"/ddt/{d}/presa-in-carico", data={"firma_salvata": "1", "conducente": "Autista"})
+        with self.app.app_context():
+            m = self.mov(d)
+            self.assertEqual((m.stato, m.firma_conducente, m.firma_salvata, m.mezzo), ("aperto", FIRMA, True, "Su strada (guidata)"))  # modalità: quella del DDT predisposto
+
+    def test_partner_lavori_finiti_dal_tocco(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        self.entra("carr")
+        self.arrivo(d)
+        self.c.post("/t/ABCD2345", data={"lat": "45.1", "lon": "12.1"})
+        pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
+        self.assertIn("Lavori finiti?", pagina)
+        self.c.post(f"/movimento/{self._id(Movimento, ddt_id=d)}/lavorazione-completata",
+                    data={"rientro": "1", "chi_riporta": "altro", "chi_riporta_altro": str(self._id(Utente, email="autista@t.it"))})
+        with self.app.app_context():
+            self.assertIsNotNone(self.mov(d).lavorazione_completata_at)
+            rientro = Movimento.query.filter_by(stato="predisposto").one()
+            self.assertEqual(rientro.assegnato_a.email, "autista@t.it")
+
+    def test_danno_senza_descrizione(self):
+        vid = self.abbina()
+        self.c.post(f"/veicolo/{vid}/danno", data={"zona": "Cofano", "foto": [(io.BytesIO(JPEG), "a.jpg")]},
+                    content_type="multipart/form-data")
+        with self.app.app_context():
+            self.assertEqual((Danno.query.one().zona, Danno.query.one().descrizione), ("Cofano", ""))
+        self.assertIn("Nessuna descrizione", self.c.get("/danno/1").get_data(as_text=True))
+
+    def test_home_dal_telefono_cose_per_te(self):
+        vid = self.abbina()
+        self.entra("ufficio")
+        self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
+        self.entra("autista")
+        pagina = self.c.get("/").get_data(as_text=True)
+        for testo in ("Cosa fai adesso?", "data-leggi-nfc", "Ritiro assegnato a te", "Panoramica"):
+            self.assertIn(testo, pagina)

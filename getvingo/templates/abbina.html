@@ -3,49 +3,45 @@
 {% block contenuto %}
 {{ indietro(url_for('main.piazzale')) }}
 <div class="titolo-pagina">
-  {% if tag %}<div><div class="sopratitolo">{{ i('nfc', 's') }} Adesivo {{ tag.codice }}</div><h1>Abbina un'auto</h1></div>
+  {% if tag %}<div><div class="sopratitolo">{{ i('nfc', 's') }} Adesivo {{ tag.codice }} · nuovo</div><h1>Nuova auto in stock</h1></div>
   {% else %}<div><h1>Nuova auto in stock</h1></div>{% endif %}
 </div>
-<p class="tenue">{% if tag %}Questo adesivo è nuovo. {% endif %}Fotografa l'etichetta VIN (parabrezza o montante porta): il codice si compila da solo.
-  {% if not tag %}Un'auto entra in stock solo con il suo adesivo NFC: scegli il codice dell'adesivo che attacchi sul parabrezza
-  (oppure tocca l'adesivo nuovo con il telefono: si apre questa pagina già collegata).{% endif %}</p>
+{# Snellito il 12/11/2026: prima la foto del VIN, i dati si compilano da soli (VIN, gestionale, posizione del
+   tocco) e restano ripiegati da controllare; "Nuova" / "Usata" salva. #}
+{% if not tag %}<p class="tenue">Un'auto entra in stock solo con il suo adesivo NFC: scegli il codice dell'adesivo che attacchi sul parabrezza
+  (oppure tocca l'adesivo nuovo con il telefono: si apre questa pagina già collegata).</p>{% endif %}
 
-<form method="post" data-una-volta>
+<form method="post" data-una-volta class="form-abbina">
   {{ csrf_input() }}{{ gps() }}
-  <div class="scheda">
-    {% if not tag %}
-    <label class="campo"><span>{{ i('nfc', 's') }} Adesivo NFC da attaccare</span>
-      {% if tag_liberi %}
-      <select name="tag" required><option value="">Scegli il codice scritto sull'adesivo…</option>
-        {% for t in tag_liberi %}<option value="{{ t.codice }}" {{ 'selected' if form.get('tag') == t.codice }}>{{ t.codice }}</option>{% endfor %}</select>
-      {% else %}
-      <p class="avviso errore" style="margin:0">{{ i('attenzione') }}<span>Non ci sono adesivi liberi: creali in Gestione → Adesivi NFC.</span></p>
-      {% endif %}
-    </label>
+  {% if not tag %}
+  <label class="campo"><span>{{ i('nfc', 's') }} Adesivo NFC da attaccare</span>
+    {% if tag_liberi %}
+    <select name="tag" required><option value="">Scegli il codice scritto sull'adesivo…</option>
+      {% for t in tag_liberi %}<option value="{{ t.codice }}" {{ 'selected' if form.get('tag') == t.codice }}>{{ t.codice }}</option>{% endfor %}</select>
+    {% else %}
+    <p class="avviso errore" style="margin:0">{{ i('attenzione') }}<span>Non ci sono adesivi liberi: creali in Gestione → Adesivi NFC.</span></p>
     {% endif %}
-    <label class="foto-vin">
-      {{ i('foto') }} Fotografa etichetta VIN
-      <input type="file" id="foto-vin" accept="image/*" capture="environment" hidden>
-    </label>
-    <p id="stato-lettura" class="tenue piccolo" role="status"></p>
+  </label>
+  {% endif %}
+  <label class="foto-vin foto-vin-grande">
+    {{ i('foto') }} <span><b>Fotografa l'etichetta VIN</b><small>parabrezza o montante della porta: il resto si compila da solo</small></span>
+    <input type="file" id="foto-vin" accept="image/*" capture="environment" hidden>
+  </label>
+  <p id="stato-lettura" class="tenue piccolo" role="status"></p>
 
-    <label class="campo"><span>VIN · controlla carattere per carattere</span>
-      <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
-             autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
-      <small id="conta-vin" class="contatore"></small>
-    </label>
-    <span class="etichetta-campo">Nuova o usata</span>
-    <div class="scelta-tipo" role="radiogroup" aria-label="Nuova o usata">
-      <label><input type="radio" name="condizione" value="nuovo" required {{ 'checked' if form.get('condizione') == 'nuovo' }}> {{ i('brilla', 's') }} Nuova</label>
-      <label><input type="radio" name="condizione" value="usato" {{ 'checked' if form.get('condizione') == 'usato' }}> {{ i('orologio', 's') }} Usata</label>
-    </div>
+  <label class="campo"><span>VIN · controlla carattere per carattere</span>
+    <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
+           autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
+    <small id="conta-vin" class="contatore"></small>
+  </label>
+
+  <details class="ripiega dati-auto" id="dati-auto" {{ 'open' if form.get('vin') }}>
+    <summary>{{ i('auto', 's') }} <span data-riassunto>Dati dell'auto</span> <span class="tenue">· controlla</span></summary>
     <span class="etichetta-campo">Tipo di veicolo</span>
     <div class="scelta-tipo" role="radiogroup" aria-label="Tipologia">
       <label><input type="radio" name="tipologia" value="vettura" {{ 'checked' if form.get('tipologia', 'vettura') == 'vettura' }}> Vettura</label>
       <label><input type="radio" name="tipologia" value="commerciale" {{ 'checked' if form.get('tipologia') == 'commerciale' }}> Veicolo commerciale</label>
     </div>
-    <label class="campo"><span>Targa <span class="tenue">(facoltativa, se già presente)</span></span>
-      <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
     <div class="griglia-2">
       <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required data-formato="nome" autocapitalize="words"></label>
       <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required data-formato="nome" autocapitalize="words"></label>
@@ -57,9 +53,14 @@
         <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select>
       </label>
     </div>
-  </div>
-  <div class="barra-azione">
-    <button type="submit" class="btn primario pieno" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('check') }} {{ 'Conferma abbinamento' if tag else 'Aggiungi allo stock con l’adesivo' }}</button>
+    <label class="campo"><span>Targa <span class="tenue">(facoltativa, se già presente)</span></span>
+      <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
+  </details>
+
+  <span class="etichetta-campo nuova-usata-titolo">Nuova o usata? <span class="tenue">· tocca per salvare</span></span>
+  <div class="nuova-usata">
+    <button type="submit" name="condizione" value="nuovo" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('brilla') }} Nuova</button>
+    <button type="submit" name="condizione" value="usato" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('orologio') }} Usata</button>
   </div>
 </form>
 {% endblock %}
@@ -67,4 +68,23 @@
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script src="{{ url_for('static', filename='vin.js', v=versione_statici) }}"></script>
+<script>
+  (function () {
+    // riassunto dei dati letti nella riga del riquadro ripiegato; se manca marca o modello si apre da solo
+    var form = document.querySelector('.form-abbina'), box = document.getElementById('dati-auto');
+    var riassunto = box.querySelector('[data-riassunto]');
+    function aggiorna() {
+      var val = function (n) { var el = form.querySelector('[name=' + n + ']'); return el ? el.value.trim() : ''; };
+      var sede = form.sede_id.options[form.sede_id.selectedIndex];
+      var parti = [[val('marca'), val('modello'), val('versione')].join(' ').trim(), val('colore'), sede && sede.value ? sede.text.split(' · ')[0] : ''];
+      riassunto.textContent = parti.filter(Boolean).join(' · ') || 'Dati dell’auto';
+    }
+    form.addEventListener('input', aggiorna); form.addEventListener('change', aggiorna);
+    document.addEventListener('vin-precompilato', function () {
+      aggiorna();
+      if (!form.marca.value.trim() || !form.modello.value.trim()) box.open = true;
+    });
+    aggiorna();
+  })();
+</script>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block classe_pagina %}pagina-fornitore{% endblock %}
-{% from "_macro.html" import i, marchio, targa, badge_condizione, filtri_stato %}
+{% from "_macro.html" import i, marchio, targa, badge_condizione, filtri_stato, tocca_adesivo %}
 {% from "_auto.html" import avanzamento_lavoro, cambia_stima, stima %}
 {% block titolo %}Lavorazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
@@ -15,6 +15,9 @@
 {% if not sede.firma %}
 <a class="avviso errore" href="{{ url_for('main.mia_firma') }}">{{ i('matita') }}<span>Imposta la firma di {{ sede.nome }}: verrà apposta in automatico su ogni ricezione e rientro. Tocca qui.</span></a>
 {% endif %}
+
+{# dal telefono: tocca l'adesivo dell'auto per l'arrivo o la fine dei lavori (12/11/2026) #}
+<div class="home-telefono solo-tocco">{{ tocca_adesivo() }}</div>
 
 {# ---- In arrivo: sempre visibile (anche vuota), si conferma all'arrivo ---- #}
 <section class="in-arrivo-fornitore">

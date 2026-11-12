@@ -1,10 +1,27 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, indietro, marchio, azioni_ddt %}
 {% from "_arrivo.html" import lavorazione_da_indicare, form_arrivo %}
-{% from "_auto.html" import in_viaggio_da, tocchi, stima %}
+{% from "_auto.html" import in_viaggio_da, tocchi, stima, carta_auto %}
 {% block titolo %}In viaggio · DDT {{ d.sigla }} · Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('main.home')) }}
+{% if puo_arrivo %}
+{# Schermata snella (12/11/2026): chi riceve vuole sapere che è l'auto giusta e confermare; il resto è sotto #}
+{% set vicino = distanza is not none and distanza <= raggio %}
+<div class="arrivo-testa">
+  <small class="sopra">{{ i('camion', 's') }} DDT n. {{ d.sigla }}{% if m.da_sede %} · da {{ m.da_sede.nome }}{% endif %} · in viaggio da {{ in_viaggio_da(m) }}</small>
+  <h1>{{ 'Sei arrivato a ' if vicino else 'Arrivo a ' }}{{ m.a_sede.nome }}</h1>
+  {% if distanza is not none and not destinatario_conferma_ovunque(m, g.utente) %}
+  <p class="{{ 'sul-posto' if vicino else 'lontano' }}">{{ i('pin', 's') }} {% if vicino %}Sei sul posto: puoi confermare{% else %}Sei a {{ '%.0f m'|format(distanza) if distanza < 1000 else ('%.1f km'|format(distanza / 1000))|replace('.', ',') }}: si conferma entro {{ raggio }} m{% endif %}</p>
+  {% endif %}
+</div>
+{{ carta_auto(m.veicolo, con_stato=False) }}
+{% if d.multiplo %}<p class="tenue piccolo" style="margin-top:10px">DDT multiplo con altre {{ d.movimenti|length - 1 }} auto.</p>{% endif %}
+{% if not m.lavorazione %}{{ lavorazione_da_indicare(d, lavorazioni, 'arrivo') }}{% endif %}
+{{ form_arrivo(d, m, raggio, dopo_tocco=dopo_tocco) }}
+<details class="ripiega dati-viaggio">
+  <summary>{{ i('doc', 's') }} Dati del viaggio e del DDT</summary>
+{% endif %}
 <div class="titolo-pagina"><div>
   <div class="sopratitolo">{{ i('camion', 's') }} In viaggio · DDT n. {{ d.sigla }}{% if d.revisione %} · rev. {{ d.revisione }}{% endif %}</div>
   <h1>{{ m.veicolo.descrizione }}{{ condizione(m.veicolo) }}</h1>
@@ -40,8 +57,7 @@
 <a class="btn-link piccolo" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}" style="display:inline-block;margin-top:10px">Apri il DDT completo (firme, cronologia, modifiche)</a>
 
 {% if puo_arrivo %}
-{% if not m.lavorazione %}{{ lavorazione_da_indicare(d, lavorazioni, 'arrivo') }}{% endif %}
-{{ form_arrivo(d, m, raggio, dopo_tocco=dopo_tocco) }}
+</details>
 {% elif m.stato == 'aperto' and m.a_sede and m.a_sede.tipo == 'propria' and not g.utente.interno %}
 <p class="scheda" style="margin-top:16px">{{ i('sede', 's') }} <b>La ricezione la conferma {{ g.utente.organizzazione.nome }}</b> a {{ m.a_sede.nome }}: consegna l'auto al personale della sede, che conferma l'arrivo dal suo account.</p>
 {% endif %}

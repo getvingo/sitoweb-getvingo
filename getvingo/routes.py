@@ -60,6 +60,27 @@ def _coord(usa_tocco=True):
         return _posizione_tocco() if usa_tocco else (None, None)
 
 
+def _offri_annulla(veicolo_id):
+    """Dopo un'azione fatta dal telefono compare per pochi secondi "Annulla" (servizi.annullabile_subito)."""
+    a = (Azione.query.filter_by(veicolo_id=veicolo_id, utente_id=g.utente.id, ripristinata_at=None)
+         .order_by(Azione.id.desc()).first())
+    if a is not None and servizi.annullabile_subito(a, g.utente):
+        session["annulla"] = a.id
+
+
+@bp.app_context_processor
+def _annulla_subito():
+    def annulla_subito():
+        """(azione, secondi rimasti) da offrire una volta sola nella pagina che segue l'azione, o None."""
+        aid = session.pop("annulla", None) if getattr(g, "utente", None) else None
+        a = db.session.get(Azione, aid) if aid else None
+        if a is None or not servizi.annullabile_subito(a, g.utente):
+            return None
+        rimasti = servizi.ANNULLA_SUBITO_S - 10 - int((adesso() - a.at).total_seconds())
+        return (a, rimasti) if rimasti > 2 else None
+    return {"annulla_subito": annulla_subito}
+
+
 def _movimenti(stato):
     """Movimenti in un certo stato, esclusi quelli con DDT cancellato."""
     return (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(Movimento.stato == stato, Ddt.annullato_at.is_(None)))
@@ -201,6 +222,28 @@ CHIAVI_FILTRO = ("tipologia", "marca", "modello", "colore", "fase", "sede")
 
 # ---------------------------------------------------------------- panoramica
 
+def _da_fare_per_te(quante=5):
+    """Home dal telefono (12/11/2026): solo le cose di chi guarda (ritiri assegnati a lui, viaggi che ha in
+    corso, passi di preparazione per il Preparatore). Il quadro di tutta la concessionaria resta sotto."""
+    voci = []
+    for m in _movimenti("predisposto").filter(Movimento.assegnato_a_id == g.utente.id).order_by(Movimento.ritiro_entro_at):
+        voci.append({"tipo": "da_ritirare", "titolo": "Ritiro assegnato a te", "v": m.veicolo,
+                     "testo": f"da {m.da_sede.nome if m.da_sede else '—'} a {m.a_sede.nome}",
+                     "url": url_for("main.tocco_scelta", veicolo_id=m.veicolo_id)})
+    for m in _movimenti("aperto").filter(Movimento.partenza_utente_id == g.utente.id).order_by(Movimento.partenza_at):
+        voci.append({"tipo": "in_viaggio", "titolo": "In viaggio con te", "v": m.veicolo,
+                     "testo": f"verso {m.a_sede.nome} · all'arrivo tocca l'adesivo",
+                     "url": url_for("main.arrivo_da_tap", ddt_id=m.ddt_id)})
+    if g.utente.ruolo == "preparatore":
+        for prep in (Preparazione.query.filter_by(completata_at=None)
+                     .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).limit(quante)):
+            voci.append({"tipo": "preparazione", "titolo": prep.prossima_fase, "v": prep.veicolo,
+                         "testo": f"passo {len(prep.fasi) + 1} di {len(Preparazione.FASI)}"
+                         + (f" · pronta entro {prep.pronta_entro_at:%d/%m %H:%M}" if prep.pronta_entro_at else ""),
+                         "url": url_for("main.tocco_scelta", veicolo_id=prep.veicolo_id)})
+    return voci[:quante]
+
+
 @bp.route("/")
 @login_richiesto
 def home():
@@ -295,7 +338,7 @@ def home():
     da_fare = [("viaggi", "Viaggi in ritardo", "camion", [x for x in ordinate if x["gruppo"] == "viaggi"]),
                ("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
                ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
-    return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni,
+    return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni, per_te=_da_fare_per_te(),
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
                            ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
 
@@ -465,9 +508,12 @@ def _posizione_fine_lavoro(mov):
 
 
 def _completa(mov):
+    chi = request.form.get("chi_riporta", "")
+    if chi == "altro":  # schermata del tocco: "Qualcuno della concessionaria…" scelto dall'elenco
+        chi = request.form.get("chi_riporta_altro", "")
     rientro = servizi.completa_lavorazione(mov, g.utente, request.form.get("note", ""),
                                            request.form.get("rientro") == "1", *_posizione_fine_lavoro(mov),
-                                           chi_riporta=request.form.get("chi_riporta", ""))
+                                           chi_riporta=chi)
     if rientro:
         flash(f"DDT di rientro n. {rientro.sigla} pronto: la concessionaria deve solo venire a ritirare.", "ok")
 
@@ -480,6 +526,7 @@ def lavorazione_completata(mov_id):
     try:
         _completa(mov)
         db.session.commit()
+        _offri_annulla(mov.veicolo_id)
         flash("Lavorazione completata: la concessionaria la vede “da ritirare” e la posizione dell'auto è "
               "aggiornata.", "ok")
     except Vietato as e:
@@ -814,10 +861,16 @@ def consegna(veicolo_id):
     if lat is None and current_app.config["DEMO"] and v.sede is not None:
         lat, lon = v.sede.lat, v.sede.lon
     try:
+        if not v.targa and _targa():  # schermata del tocco: targa e consegna in un gesto solo
+            if _targa_insolita():
+                raise Vietato(_targa_insolita())
+            v.targa = _targa()
         servizi.consegna_al_cliente(v, g.utente, lat, lon)
         db.session.commit()
+        _offri_annulla(v.id)
         flash(f"{v.descrizione} consegnata: la trovi nell'archivio “Consegnate”.", "ok")
     except Vietato as e:
+        db.session.rollback()
         flash(str(e), "errore")
     return redirect(request.form.get("torna") or url_for("main.veicolo", veicolo_id=v.id))
 
@@ -870,6 +923,20 @@ def tap(codice):
         if not g.utente.interno:
             abort(403)
         return redirect(url_for("main.abbina", codice=tag.codice))
+    # chi prepara le auto (mansione Preparatore): il tocco stesso chiude il passo, con "Annulla" per pochi secondi
+    prep = v.preparazione_attiva
+    if (prep is not None and g.utente.ruolo == "preparatore" and servizi.puo_vedere_veicolo(v, g.utente)
+            and not servizi.bloccata_da_danni(prep)):
+        prima = prep.avanzamento
+        try:
+            servizi.avanza_preparazione(prep, g.utente)
+            db.session.commit()
+            session.pop("ultimo_tocco", None)
+            _offri_annulla(v.id)
+            return _dopo_il_passo(v, prep, prima)
+        except Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
     # auto in viaggio: il tocco serve solo a confermare l'arrivo e chiudere il DDT
     if v.movimento_aperto:
         return redirect(url_for("main.arrivo_da_tap", ddt_id=v.movimento_aperto.ddt.id))
@@ -909,10 +976,59 @@ def tocco_scelta(veicolo_id):
     fatto = request.args.get("fatto", type=int)  # passo appena chiuso: la grafica lo anima
     if prep is None and fatto is not None and v.fase == "pronta":
         prep = v.ultima_preparazione  # ultimo passo appena fatto: si mostra il 100%
+    puo_spostare = servizi.puo_emettere(v, g.utente) or servizi.puo_emettere_ultimo_ddt(v, g.utente)
+    lat, lon = _posizione_tocco()
+    # ritiro predisposto: se è assegnato a chi ha toccato si prende in carico da qui
+    predisposto = v.movimento_predisposto
+    ritiro = predisposto if predisposto and servizi.puo_prendere_in_carico(predisposto, g.utente) else None
+    distanza_ritiro = None
+    if ritiro and lat is not None and not current_app.config["DEMO"] and ritiro.da_sede and ritiro.da_sede.lat is not None:
+        distanza_ritiro = servizi.distanza_m(lat, lon, ritiro.da_sede.lat, ritiro.da_sede.lon)
+    # il partner che ha l'auto: "Lavori finiti" sulla stessa schermata
+    arrivo = v.arrivo_qui
+    fine_lavori = arrivo if arrivo and servizi.puo_completare_lavorazione(arrivo, g.utente) else None
     return render_template("tocco_scelta.html", v=v, ddt=ddt, prep=prep, fatto=fatto,
                            da=request.args.get("da", type=int), tocco_valido=_tocco_valido(v),
-                           puo_spostare=servizi.puo_emettere(v, g.utente) or servizi.puo_emettere_ultimo_ddt(v, g.utente),
+                           puo_spostare=puo_spostare and not ritiro,
+                           proposte=_destinazioni_proposte(v) if puo_spostare and not ritiro else [],
+                           profilo_mancante=servizi.profilo_guida_mancante(g.utente) if puo_spostare else [],
+                           lavorazioni=Movimento.LAVORAZIONI[1:],
+                           ritiro=ritiro, distanza_ritiro=distanza_ritiro, raggio=servizi.RAGGIO_ARRIVO_M,
+                           fine_lavori=fine_lavori, **(_chi_riporta(v.sede) if fine_lavori else {}),
+                           puo_consegnare=servizi.puo_consegnare(v, g.utente),
+                           dopo_tocco=lat is not None,
                            no_preparazione=servizi.motivo_no_preparazione(v, g.utente))
+
+
+ORDINE_PROPOSTE = ("propria", "carrozzeria", "officina", "allestitore", "altro", "esposizione", "concessionario",
+                   "rivenditore", "cliente")
+
+
+def _destinazioni_proposte(v, quante=4):
+    """Le destinazioni da toccare subito sotto l'auto: prima il luogo da cui è arrivata (se ora è da un
+    fornitore: il rientro), poi le più usate da chi guarda, poi sedi proprie e fornitori."""
+    preferite, gruppi = servizi.destinazioni_rapide(v, g.utente)
+    altre = sorted((s for _, sedi in gruppi for s in sedi),
+                   key=lambda s: ORDINE_PROPOSTE.index(s.tipo) if s.tipo in ORDINE_PROPOSTE else 99)
+    elenco = preferite + altre
+    arrivo = v.arrivo_qui
+    if v.sede is not None and v.sede.esterna and arrivo and arrivo.da_sede in elenco:
+        elenco.remove(arrivo.da_sede)
+        elenco.insert(0, arrivo.da_sede)
+    return elenco[:quante]
+
+
+def _chi_riporta(sede):
+    """Chi può riportare l'auto dal fornitore (una persona precisa) e chi proporre: l'ultima persona scelta."""
+    noi = sorted((u for u in Utente.query.filter_by(attivo=True, sede_id=sede.id) if not u.eliminato),
+                 key=lambda u: (u.id != g.utente.id, u.nome))
+    dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno and not u.eliminato),
+                        key=lambda u: u.nome)
+    ultimo = (Movimento.query.filter(Movimento.da_sede_id == sede.id, Movimento.assegnato_a_id.isnot(None))
+              .order_by(Movimento.id.desc()).first())
+    ids = {u.id for u in noi + dipendenti}
+    proposto = ultimo.assegnato_a_id if ultimo and ultimo.assegnato_a_id in ids else g.utente.id
+    return {"noi": noi, "dipendenti": dipendenti, "chi_proposto": proposto}
 
 
 def _tocco_valido(v):
@@ -978,12 +1094,15 @@ def sposta(veicolo_id):
             if request.form.get("a_sede_causale"):  # concessionario/rivenditore: luogo e causale insieme
                 sid, _, causale = request.form["a_sede_causale"].partition("|")
                 sede = db.session.get(Sede, int(sid) if sid.isdigit() else 0)
-            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale, posizione=telefono)
+            documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale, posizione=telefono,
+                                                lavorazione=request.form.get("lavorazione", ""),
+                                                lavorazione_note=request.form.get("lavorazione_note", ""))
         except Vietato as e:
             db.session.rollback()
             flash(str(e), "errore")
-            return redirect(url_for("main.sposta", veicolo_id=v.id))
+            return _torna(url_for("main.sposta", veicolo_id=v.id))
         db.session.commit()
+        _offri_annulla(v.id)
         m = documento.movimento
         flash(f"DDT n. {documento.sigla} emesso verso {m.a_sede.nome}. Buon viaggio."
               + ("" if m.lavorazione else " Indica la lavorazione prima dell'arrivo."), "ok")
@@ -1056,9 +1175,13 @@ def arrivo_da_tap(ddt_id):
     m = d.movimento
     if m.stato != "aperto" or d.annullato_at:
         return _torna_al_ddt(d) if servizi.puo_vedere(d, g.utente) else redirect(url_for("main.home"))
+    lat, lon = _posizione_tocco()
+    distanza = None  # dalla posizione del tocco: si sa subito se si è nel raggio, prima di premere
+    if lat is not None and m.a_sede and m.a_sede.lat is not None and not current_app.config["DEMO"]:
+        distanza = servizi.distanza_m(lat, lon, m.a_sede.lat, m.a_sede.lon)
     return render_template("arrivo.html", d=d, m=m, raggio=servizi.RAGGIO_ARRIVO_M, lavorazioni=Movimento.LAVORAZIONI,
                            puo_arrivo=servizi.puo_confermare_arrivo(m, g.utente),
-                           dopo_tocco=_posizione_tocco()[0] is not None)
+                           dopo_tocco=lat is not None, distanza=distanza)
 
 
 @bp.route("/abbina/<codice>", methods=["GET", "POST"])
@@ -1109,7 +1232,12 @@ def abbina(codice):
         flash("Adesivo abbinato.", "ok")
         return redirect(url_for("main.veicolo", veicolo_id=veicolo.id))
 
-    return render_template("abbina.html", tag=tag, sedi=sedi, form={})
+    form = {}
+    lat, lon = _posizione_tocco()
+    vicine = [s for s in sedi if s.lat is not None]
+    if lat is not None and vicine:  # il piazzale si propone dalla posizione del tocco
+        form["sede_id"] = min(vicine, key=lambda s: servizi.distanza_m(lat, lon, s.lat, s.lon)).id
+    return render_template("abbina.html", tag=tag, sedi=sedi, form=form)
 
 
 def _targa():
@@ -1681,10 +1809,18 @@ def ddt_presa_in_carico(ddt_id):
         if lat is None and current_app.config["DEMO"]:  # demo senza GPS: come se fosse sul posto
             da = d.movimento.da_sede
             lat, lon = (da.lat, da.lon) if da is not None and da.lat is not None else _posizione_simulata(d.movimento.veicolo)
+        firma = servizi.firma_valida(request.form.get("firma"))
+        salvata = not firma and request.form.get("firma_salvata") == "1" and bool(g.utente.firma)
         servizi.prendi_in_carico(d.movimento, g.utente, request.form.get("conducente", "").strip()[:120],
-                                 servizi.firma_valida(request.form.get("firma")), lat, lon,
-                                 mezzo=request.form.get("mezzo", ""))
-    return _azione_ddt(ddt_id, presa, "Presa in carico confermata. Buon viaggio.")
+                                 g.utente.firma if salvata else firma, lat, lon,
+                                 mezzo=request.form.get("mezzo", "") or (g.utente.mezzo or ""))
+        if salvata:  # dalla schermata del tocco: firma del profilo di guida, come "Inizia spostamento"
+            d.movimento.firma_salvata = True
+    risposta = _azione_ddt(ddt_id, presa, "Presa in carico confermata. Buon viaggio.")
+    m = db.session.get(Ddt, ddt_id).movimento
+    if m.stato == "aperto":
+        _offri_annulla(m.veicolo_id)
+    return risposta
 
 
 @bp.route("/ddt/<int:ddt_id>/rinnova", methods=["POST"])
@@ -1724,6 +1860,8 @@ def ddt_arrivo(ddt_id):
     if documento.multiplo:
         return risposta
     m = documento.movimento
+    if m.stato == "chiuso":
+        _offri_annulla(m.veicolo_id)
     if m.stato == "chiuso" and request.form.get("danno") == "1":
         return redirect(url_for("main.nuovo_danno", veicolo_id=m.veicolo_id, movimento=m.id))
     # rientro in sede: si va dritti alla preparazione

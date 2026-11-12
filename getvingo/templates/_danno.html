@@ -7,7 +7,7 @@
     <div style="flex:1;min-width:0">
       {% if mostra_auto %}<h3>{{ d.veicolo.descrizione }}{{ condizione(d.veicolo) }}</h3>
       <div class="tenue piccolo">{{ d.veicolo.vin|vin }}</div>{% endif %}
-      <div style="margin-top:4px"><b>{{ d.zona }}</b> · {{ d.descrizione }}{{ condizione(d) }}</div>
+      <div style="margin-top:4px"><b>{{ d.zona }}</b>{% if d.descrizione %} · {{ d.descrizione }}{% endif %}{{ condizione(d) }}</div>
       <div class="tratta">{{ d.CONTESTI[d.contesto] }}{% if d.movimento %} · DDT {{ d.movimento.ddt.sigla }} ({{ d.movimento.da_sede.nome if d.movimento.da_sede else '—' }} → {{ d.movimento.sede_arrivo_effettiva.nome }}){% endif %}</div>
       <div class="tratta">{{ i('utente', 's') }} {{ d.segnalato_da.nome }} · {{ d.segnalato_at|data }} · {{ i('foto', 's') }} {{ d.foto_segnalazione|length }} foto</div>
       {% if not d.aperto and d.risolto_at %}<div class="tratta" style="color:var(--ok)">{{ i('check', 's') }} Risolto da {{ d.risolto_da.nome }} il {{ d.risolto_at|data('%d/%m/%Y') }}{% if d.nota_risoluzione %} · {{ d.nota_risoluzione }}{% endif %}</div>{% endif %}

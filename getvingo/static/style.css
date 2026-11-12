@@ -2047,3 +2047,196 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 .tabella-uniforma { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .tabella-uniforma th, .tabella-uniforma td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
 .tabella-uniforma th { font-size: var(--fs-12); color: var(--testo-2); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ===================================================================================================
+   Telefono snello (12/11/2026): il tocco mostra una cosa da fare, "scorri per confermare", "Annulla"
+   per pochi secondi, foglio di partenza, home "Cosa fai adesso?". Demo: output/demo-mobile-snello-v1.html
+   =================================================================================================== */
+/* Scorri per confermare (_macro.scorri) */
+.scorri { position: relative; height: 64px; border-radius: var(--r-pillola); background: var(--marchio-viola); color: #fff;
+  overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: pan-y; margin-top: 14px; }
+.scorri.verde { background: var(--st-pronta-pieno); } .scorri.magenta { background: var(--st-ritiro-pieno); }
+.scorri.rosso { background: var(--danno-scuro); }
+.scorri-riempi { position: absolute; inset: 0 auto 0 0; width: 64px; border-radius: var(--r-pillola); background: rgba(255,255,255,.18); }
+.scorri-testo { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 16px 0 68px; text-align: center;
+  font-weight: 700; font-size: var(--fs-16); line-height: 1.2; pointer-events: none; }
+.scorri-testo span { background: linear-gradient(90deg, rgba(255,255,255,.6) 0%, #fff 50%, rgba(255,255,255,.6) 100%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: luce-scorri 2.6s linear infinite; }
+@keyframes luce-scorri { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.scorri-pomo { position: absolute; top: 6px; left: 6px; width: 52px; height: 52px; min-height: 0; padding: 0; border: 0; border-radius: 50%;
+  background: #fff; color: var(--marchio-viola); display: grid; place-items: center; cursor: grab; touch-action: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25); z-index: 1; }
+.scorri.verde .scorri-pomo { color: var(--st-pronta-pieno); } .scorri.magenta .scorri-pomo { color: var(--st-ritiro-pieno); }
+.scorri-pomo .icona { width: 26px; height: 26px; }
+.scorri.trascina .scorri-pomo { cursor: grabbing; }
+.scorri.torna .scorri-pomo, .scorri.torna .scorri-riempi { transition: transform .2s ease, width .2s ease; }
+.scorri.fatto .scorri-pomo, .scorri.fatto .scorri-riempi { transition: transform .15s ease, width .15s ease; }
+.scorri.fatto .scorri-testo span { animation: none; color: #fff; }
+.scorri.suggerisci .scorri-pomo { animation: suggerisci-scorri .6s ease; }
+@keyframes suggerisci-scorri { 30% { transform: translateX(26px); } 60% { transform: translateX(-4px); } 100% { transform: translateX(0); } }
+.scorri-pomo:focus-visible { outline: 3px solid var(--arancio); outline-offset: 2px; }
+/* col mouse è un pulsante normale (tutta la barra si clicca) */
+.scorri.come-pulsante { height: 56px; }
+.scorri.come-pulsante .scorri-pomo { inset: 0; width: 100%; height: 100%; border-radius: inherit; background: transparent; box-shadow: none; cursor: pointer; }
+.scorri.come-pulsante .scorri-pomo .icona, .scorri.come-pulsante .scorri-riempi { display: none; }
+.scorri.come-pulsante .scorri-testo { padding: 0 16px; }
+.scorri.come-pulsante .scorri-testo span { animation: none; color: #fff; }
+.scorri.come-pulsante:hover { filter: brightness(1.12); }
+@media (prefers-reduced-motion: reduce) { .scorri-testo span, .scorri.suggerisci .scorri-pomo { animation: none; color: #fff; } }
+
+/* "Annulla" subito dopo un'azione */
+.annulla-subito { position: fixed; left: 12px; right: 12px; bottom: calc(var(--barra-sotto) + env(safe-area-inset-bottom) + 10px); z-index: 30;
+  max-width: 560px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--notte); color: #fff; border-radius: var(--r); padding: 6px 8px 6px 14px; overflow: hidden;
+  box-shadow: 0 6px 20px rgba(18,11,38,.3); animation: entra-su .2s ease-out; }
+.annulla-subito span { display: flex; align-items: center; gap: 8px; font-size: var(--fs-15); }
+.annulla-subito-btn { background: none; border: 0; color: #FFB86B; font: inherit; font-weight: 700; font-size: var(--fs-16);
+  min-height: var(--alt-piccola); padding: 0 12px; cursor: pointer; }
+.annulla-tempo { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--marchio-arancio); animation: tempo-annulla linear forwards; }
+@keyframes tempo-annulla { from { width: 100%; } to { width: 0; } }
+@media (min-width: 1024px) { .annulla-subito { bottom: 20px; } }
+
+/* Schermata del tocco */
+.tocco-dove { margin: 10px 0 0; }
+.tocco-dove > summary { margin-bottom: 0; color: var(--testo); font-weight: 600; display: flex; align-items: center; gap: 6px; min-height: var(--alt-piccola); }
+.tocco-dove[open] > summary { margin-bottom: 8px; }
+.tocco-azione { margin-top: 16px; }
+.tocco-azione h2, .tocco-destinazioni h2 { font-size: var(--fs-20); margin: 0 0 10px; }
+.tocco-azione .sopra, .arrivo-testa .sopra { display: block; font-size: var(--fs-13); font-weight: 700; color: var(--testo-2); margin-bottom: 2px; }
+.arrivo-testa .sopra .icona { vertical-align: -3px; margin-right: 4px; }
+.tocco-azione h2, .tocco-destinazioni h2, .foglio-testa h2 { text-transform: none; letter-spacing: normal; color: var(--testo); }
+.tocco-azione.ritiro { border-left: var(--bordo-stato) solid var(--st-ritiro); }
+.tocco-azione.ritiro .sopra { color: var(--st-ritiro-pieno); }
+.tocco-azione.consegna { border-left: var(--bordo-stato) solid var(--st-pronta); }
+.tocco-avviso { display: flex; gap: 8px; align-items: flex-start; margin-top: 16px; font-size: var(--fs-14); }
+.tratta-mini { display: flex; align-items: center; gap: 10px; background: var(--superficie); border-radius: var(--r-s); padding: 10px 12px; margin: 0 0 10px; }
+.tratta-mini > span { flex: 1; min-width: 0; }
+.tratta-mini small { display: block; font-size: var(--fs-12); color: var(--testo-2); }
+.tratta-mini b { display: block; overflow-wrap: anywhere; }
+.tratta-mini > .icona { flex: none; color: var(--testo-2); }
+.sul-posto, .lontano { display: flex; align-items: center; gap: 8px; font-size: var(--fs-14); font-weight: 650; border-radius: var(--r-s);
+  padding: 10px 12px; margin: 0 0 10px; }
+.sul-posto { color: var(--ok); background: var(--ok-tenue); }
+.lontano { color: var(--arancio-testo); background: var(--arancio-tenue); }
+.riga-profilo { font-size: var(--fs-13); color: var(--testo-2); margin: 10px 0 0; }
+.riga-profilo a { font-weight: 650; margin-left: 6px; }
+/* scelte a pillola (radio) */
+.scelta-chip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.scelta-chip label { position: relative; cursor: pointer; }
+.scelta-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.scelta-chip span { display: inline-flex; align-items: center; gap: 6px; min-height: var(--alt-piccola); padding: 0 14px;
+  border: 1.5px solid var(--bordo-forte); border-radius: var(--r-pillola); background: var(--carta); font-weight: 600; font-size: var(--fs-15); }
+.scelta-chip input:checked + span { background: var(--primario); border-color: var(--primario); color: var(--primario-testo); }
+.scelta-chip input:focus-visible + span { outline: 3px solid var(--segnale); outline-offset: 2px; }
+.scelta-chip .ok input:checked + span { background: var(--ok); border-color: var(--ok); color: #fff; }
+.scelta-chip .danno input:checked + span { background: var(--danno); border-color: var(--danno); color: #fff; }
+.campo-con-mic { display: flex; align-items: flex-end; gap: 8px; }
+.campo-con-mic .campo { flex: 1; }
+.campo-con-mic .btn-mic-piccolo { margin-bottom: 18px; }
+/* destinazioni sotto l'auto */
+.tocco-destinazioni { margin-top: 20px; }
+.scelte-destinazione { display: grid; gap: 8px; }
+.scelta-destinazione { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+  min-height: 60px; padding: 10px 14px; border: 1px solid var(--bordo); border-radius: var(--r); background: var(--carta);
+  color: var(--testo); font: inherit; cursor: pointer; box-shadow: var(--ombra); }
+.scelta-destinazione:hover { border-color: var(--segnale); }
+.scelta-destinazione:active { transform: scale(.98); }
+.scelta-destinazione b { display: block; }
+.scelta-destinazione small { display: block; color: var(--testo-2); font-size: var(--fs-13); }
+.altra-destinazione { display: inline-flex; align-items: center; min-height: var(--alt-piccola); font-weight: 650; margin-top: 4px; }
+/* foglio di partenza (dal basso sul telefono, al centro su computer) */
+dialog.foglio { border: 0; padding: 0; width: 100%; max-width: 560px; max-height: 92vh; margin: auto auto 0; border-radius: var(--r-l) var(--r-l) 0 0;
+  background: var(--superficie); color: var(--testo); }
+dialog.foglio::backdrop { background: rgba(18,11,38,.5); }
+dialog.foglio[open] { animation: entra-su .22s ease-out; }
+dialog.foglio form { padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); }
+.foglio-testa { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.foglio-testa h2 { margin: 0; font-size: var(--fs-20); }
+.foglio-testa .btn-link { min-height: var(--alt-piccola); font-weight: 650; color: var(--testo-2); }
+.foglio-gruppo { border: 0; padding: 0; margin: 0; min-width: 0; }
+.foglio-gruppo:disabled { display: none; }
+@media (min-width: 1024px) { dialog.foglio { margin: auto; border-radius: var(--r-l); } }
+/* le altre azioni: una riga, piccole */
+.tocco-secondarie { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: 20px; align-items: start; }
+.tocco-secondarie form { margin: 0; }
+.secondaria { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 68px;
+  padding: 8px 6px; border: 1px solid var(--bordo); border-radius: var(--r); background: var(--carta); color: var(--testo);
+  font: inherit; font-size: var(--fs-13); font-weight: 650; text-align: center; line-height: 1.2; cursor: pointer; list-style: none; }
+.secondaria::-webkit-details-marker { display: none; }
+.secondaria:hover { text-decoration: none; border-color: var(--testo-2); }
+.secondaria .icona { width: 22px; height: 22px; }
+.secondaria.prepara { color: var(--prep); } .secondaria.danno { color: var(--danno-scuro); }
+.secondaria-altro[open] { grid-column: 1 / -1; order: 9; }
+.secondaria-altro[open] > summary { display: none; }
+.altro-elenco { background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); overflow: hidden; }
+.altro-elenco > a, .altro-elenco > details > summary { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 14px;
+  border-bottom: 1px solid var(--bordo); color: var(--testo); font-weight: 600; cursor: pointer; list-style: none; }
+.altro-elenco > a:last-child { border-bottom: 0; }
+.altro-elenco > details > summary::-webkit-details-marker { display: none; }
+.altro-elenco .tocco-ddt-blocco { padding: 10px 14px; border-bottom: 1px solid var(--bordo); }
+.altro-elenco .conta { margin-left: auto; }
+
+/* Arrivo */
+.arrivo-testa { margin: 4px 0 12px; }
+.arrivo-testa h1 { font-size: var(--fs-24); margin: 2px 0 10px; }
+.form-arrivo { margin-top: 16px; }
+.form-arrivo .riepilogo { font-size: var(--fs-13); color: var(--testo-2); text-align: center; margin: 12px 0 0; }
+.nota-ricezione { margin: 4px 0 0; }
+.nota-ricezione > summary { margin-bottom: 8px; min-height: var(--alt-piccola); display: flex; align-items: center; gap: 6px; }
+.dati-viaggio { margin-top: 22px; border-top: 1px solid var(--bordo); padding-top: 10px; }
+.dati-viaggio > summary { min-height: var(--alt-piccola); display: flex; align-items: center; gap: 6px; }
+
+/* Nuova auto in stock */
+.foto-vin-grande { flex-direction: row; text-align: left; min-height: 96px; }
+.foto-vin-grande span { display: flex; flex-direction: column; }
+.foto-vin-grande small { font-weight: 500; font-size: var(--fs-13); color: var(--testo-2); }
+.dati-auto { margin: 0 0 6px; }
+.dati-auto > summary { min-height: var(--alt-piccola); display: flex; align-items: center; gap: 6px; color: var(--testo); }
+.dati-auto > summary [data-riassunto] { font-weight: 700; }
+.nuova-usata-titolo { margin-top: 12px; }
+.nuova-usata { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.nuova-usata button { min-height: 88px; border-radius: var(--r-l); border: 2px solid var(--bordo-forte); background: var(--carta);
+  color: var(--testo); font: inherit; font-size: var(--fs-20); font-weight: 700; display: flex; align-items: center; justify-content: center;
+  gap: 8px; cursor: pointer; }
+.nuova-usata button:hover { border-color: var(--primario); }
+.nuova-usata button:active { transform: scale(.97); }
+.nuova-usata button.in-corso { opacity: .6; }
+.nuova-usata button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Danno: sagoma dell'auto vista dall'alto */
+.sagoma-auto { display: block; width: 180px; height: auto; margin: 4px auto 12px; }
+.sagoma-auto path { fill: var(--spento-tenue); stroke: var(--bordo-forte); stroke-width: 2; cursor: pointer; }
+.sagoma-auto path:hover { fill: var(--danno-tenue); }
+.sagoma-auto path.scelta { fill: var(--danno); stroke: var(--danno); }
+.sagoma-auto text { font-size: 11px; fill: var(--testo-2); }
+
+/* Home dal telefono: "Cosa fai adesso?" (sotto 1024 px; su computer resta la Panoramica) */
+.home-telefono { margin-bottom: 26px; }
+.home-telefono h1 { font-size: var(--fs-24); margin: 0 0 12px; }
+.home-telefono.solo-tocco { margin: 0 0 16px; }
+.tocca-adesivo { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; padding: 26px 18px 22px;
+  border: 0; border-radius: var(--r-l); background: linear-gradient(160deg, #3D2779, var(--marchio-viola)); color: #fff;
+  font: inherit; text-align: center; cursor: pointer; box-shadow: 0 10px 24px rgba(44,26,92,.25); }
+.tocca-adesivo b { font-size: var(--fs-20); }
+.tocca-adesivo small { font-size: var(--fs-14); opacity: .85; }
+.tocca-adesivo .onde-nfc { width: 64px; height: 64px; background: rgba(255,255,255,.14); }
+.tocca-adesivo .onde-nfc i { border-color: rgba(255,255,255,.6); }
+.tocca-adesivo .onde-nfc .icona { width: 30px; height: 30px; }
+.tocca-adesivo.in-ascolto { box-shadow: 0 0 0 4px var(--marchio-arancio); }
+.titolo-sezione-piccolo { font-size: var(--fs-13); text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); margin: 20px 0 8px; }
+.per-te { display: grid; gap: 8px; }
+.per-te-voce { display: grid; grid-template-columns: 6px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; min-height: 64px;
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); color: var(--testo); }
+.per-te-voce:hover { text-decoration: none; border-color: var(--segnale); }
+.per-te-voce .per-te-barra { width: 6px; align-self: stretch; border-radius: 3px; background: var(--st-sede); }
+.per-te-voce.da_ritirare .per-te-barra { background: var(--st-ritiro); }
+.per-te-voce.in_viaggio .per-te-barra { background: var(--st-viaggio); }
+.per-te-voce.preparazione .per-te-barra { background: var(--st-prep); }
+.per-te-voce b { display: block; }
+.per-te-voce small { display: block; font-size: var(--fs-13); color: var(--testo-2); }
+.cerca-veloce { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 0 14px; min-height: 56px;
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); color: var(--testo-2); }
+.cerca-veloce input { flex: 1; border: 0; background: none; min-height: 52px; padding: 0; font: inherit; color: var(--testo); outline: none; }
+.cerca-veloce:focus-within { border-color: var(--segnale); }
+@media (min-width: 1024px) { .home-telefono { display: none; } }
+@media (prefers-reduced-motion: reduce) { .annulla-subito, dialog.foglio[open] { animation: none; } }

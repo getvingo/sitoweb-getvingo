@@ -1,14 +1,19 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input %}
+{% from "_macro.html" import i, csrf_input, scorri, detta %}
 {% from "_auto.html" import carta_auto, info_auto, ddt_mini, avanzamento_prep, avanzamento_lavoro, sollecito_lavoro, rientro_lavoro %}
 {% block titolo %}{{ v.descrizione }} · Getvingo{% endblock %}
+{% macro distanza_txt(m) %}{{ '%.0f m'|format(m) if m < 1000 else ('%.1f km'|format(m / 1000))|replace('.', ',') }}{% endmacro %}
 {% block contenuto %}
-{# Dati dell'auto subito in alto: si riconosce l'auto prima di fare qualsiasi cosa #}
+{# Schermata del tocco (snellita il 12/11/2026): l'auto in alto, poi UNA cosa da fare, scelta dallo stato
+   dell'auto e da chi tocca (ritiro assegnato, fine lavori, consegna, destinazioni). Il resto sta in "Altro". #}
 <div class="tocco-testa">
   <p class="tocco-nota">{{ i('nfc', 's') }} Adesivo {{ v.tag.codice if v.tag else '' }} toccato · posizione aggiornata</p>
   {{ carta_auto(v) }}
   {% if v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('attenzione', 's') }}<span><b>{{ v.danni_aperti|length }} {{ 'danno' if v.danni_aperti|length == 1 else 'danni' }} da verificare</b> · tocca per vedere</span></a>{% endif %}
-  {{ info_auto(v) }}
+  <details class="ripiega tocco-dove">
+    <summary>{{ i('pin', 's') }} {% if stai_qui(v) %}Qui · {{ v.sede.nome }}{% else %}{{ v.sede.nome if v.sede else 'Dove si trova' }}{% endif %} <span class="tenue">· dettagli</span></summary>
+    {{ info_auto(v) }}
+  </details>
 </div>
 
 {# Preparazione: anello di avanzamento + passi. Ogni passo si conferma con un tocco NFC #}
@@ -49,29 +54,178 @@
 </section>
 {% endif %}
 
-<div class="pila tocco-scelte">
-  {% if puo_spostare %}
-  {% if v.sede and v.sede.esterna %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>
-  {% else %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('camion') }} Inizia spostamento</a>{% endif %}
+{# ---- Il partner che ha l'auto: lavori finiti, con il DDT di rientro già preparato ---- #}
+{% if fine_lavori %}
+<form method="post" action="{{ url_for('main.lavorazione_completata', mov_id=fine_lavori.id) }}" class="scheda tocco-azione"
+      data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
+  {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+  <input type="hidden" name="rientro" value="1"><input type="hidden" name="torna" value="{{ url_for('main.home') }}">
+  <h2>Lavori finiti?</h2>
+  <span class="etichetta-campo">Chi la riporta?</span>
+  <div class="scelta-chip">
+    {% for u in noi %}<label><input type="radio" name="chi_riporta" value="{{ u.id }}" required {{ 'checked' if u.id == chi_proposto }}><span>{{ u.nome }}{{ ' (tu)' if u.id == g.utente.id }}</span></label>{% endfor %}
+    {% for u in dipendenti if u.id == chi_proposto %}<label><input type="radio" name="chi_riporta" value="{{ u.id }}" checked><span>{{ u.nome }} · {{ g.utente.organizzazione.nome }}</span></label>{% endfor %}
+    {% if dipendenti %}<label><input type="radio" name="chi_riporta" value="altro" data-mostra="chi-altro"><span>Qualcuno della concessionaria…</span></label>{% endif %}
+  </div>
+  <label class="campo" id="chi-altro" hidden><span>Chi della concessionaria?</span>
+    <select name="chi_riporta_altro">{% for u in dipendenti %}<option value="{{ u.id }}">{{ u.nome }}</option>{% endfor %}</select></label>
+  <small class="tenue">Solo questa persona potrà prenderla in carico, qui da voi. Il DDT di rientro è pronto subito.</small>
+  <div class="campo-con-mic"><label class="campo"><span>Note per la concessionaria <span class="tenue">(facoltative)</span></span>
+    <input name="note" id="note-fine" maxlength="300" placeholder="Es. sostituito paraurti, verniciato"></label>{{ detta('note-fine') }}</div>
+  <p class="avviso errore" data-gps-errore hidden></p>
+  {{ scorri('Scorri: lavori finiti', 'verde', 'Conferma: lavori conclusi') }}
+</form>
+{% endif %}
+
+{# ---- DDT da ritirare: se è assegnato a chi tocca, lo prende in carico da qui ---- #}
+{% if ritiro %}
+<section class="scheda tocco-azione ritiro">
+  <small class="sopra">DDT {{ ritiro.ddt.sigla }} · {{ 'assegnato a te' if ritiro.assegnato_a_id == g.utente.id else 'da ritirare' }}</small>
+  <h2>{{ 'Il ritiro è tuo' if ritiro.assegnato_a_id == g.utente.id else 'Da ritirare' }}</h2>
+  <div class="tratta-mini"><span><small>Da</small><b>{{ ritiro.da_sede.nome if ritiro.da_sede else '—' }}</b></span>{{ i('freccia', 's') }}<span><small>A</small><b>{{ ritiro.a_sede.nome }}</b></span></div>
+  {% if distanza_ritiro is not none %}
+  <p class="{{ 'sul-posto' if distanza_ritiro <= raggio else 'lontano' }}">{{ i('pin', 's') }} {% if distanza_ritiro <= raggio %}Sei sul posto{% else %}Sei a {{ distanza_txt(distanza_ritiro) }}: si prende in carico entro {{ raggio }} m{% endif %}</p>
   {% endif %}
+  {% if ritiro.scaduto %}
+  <p class="avviso errore">{{ i('orologio') }}<span>Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.</span></p>
+  {% elif not g.utente.firma or not g.utente.mezzo %}
+  <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
+  {% else %}
+  <form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=ritiro.ddt.id) }}" data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
+    {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+    <input type="hidden" name="firma_salvata" value="1"><input type="hidden" name="conducente" value="{{ g.utente.nome }}">
+    <p class="riga-profilo">Tu · {{ ritiro.mezzo or g.utente.mezzo }} · firma salvata</p>
+    <p class="avviso errore" data-gps-errore hidden></p>
+    {{ scorri('Scorri per prendere in carico e partire', 'magenta', 'Prendi in carico e parti') }}
+  </form>
+  {% endif %}
+</section>
+{% elif v.movimento_predisposto and v.movimento_predisposto.assegnato_a %}
+<p class="scheda tocco-avviso">{{ i('ritiro', 's') }} <span>DDT {{ v.movimento_predisposto.ddt.sigla }} da ritirare: è assegnato a <b>{{ v.movimento_predisposto.assegnato_a.nome }}</b>, solo lui o lei lo prende in carico.</span></p>
+{% endif %}
+
+{# ---- Auto pronta nella sede di consegna: targa (se manca) e consegna in un gesto ---- #}
+{% if puo_consegnare %}
+<form method="post" action="{{ url_for('main.consegna', veicolo_id=v.id) }}" class="scheda tocco-azione consegna"
+      data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
+  {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+  <input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
+  <small class="sopra">Pronta · {{ v.consegna_sede.nome }}</small>
+  <h2>Consegna{{ ' a ' ~ v.cliente_nome if v.cliente_nome else ' al cliente' }}</h2>
+  {% if not v.targa %}
+  <label class="campo"><span>Targa <span class="tenue">(senza targa non si consegna)</span></span>
+    <input name="targa" required maxlength="12" autocapitalize="characters" autocomplete="off" class="vin" placeholder="Es. GH123AB"></label>
+  {% endif %}
+  <p class="avviso errore" data-gps-errore hidden></p>
+  {{ scorri('Scorri: consegnata al cliente', 'verde', 'Consegnata al cliente') }}
+</form>
+{% endif %}
+
+{# ---- Auto ferma: le destinazioni probabili subito qui, si parte dal foglio che si apre ---- #}
+{% if puo_spostare and not fine_lavori %}
+<section class="tocco-destinazioni">
+  <h2>{{ 'Riportala a…' if v.sede and v.sede.esterna else ('Ultimo DDT verso…' if v.fase == 'pronta' else 'Dove la porti?') }}</h2>
+  {% if profilo_mancante %}
+  <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
+  <small class="tenue">Manca: {{ profilo_mancante|join(', ') }}. Si fa una volta sola.</small>
+  {% else %}
+  <div class="scelte-destinazione">
+    {% for s in proposte %}
+    <button type="button" class="scelta-destinazione" data-destinazione="{{ s.id }}" data-nome="{{ s.nome }}"
+            data-esterna="{{ 1 if s.esterna else '' }}" data-commercio="{{ 1 if s.tipo in ('concessionario', 'rivenditore') else '' }}">
+      <span class="tondo-piccolo">{{ i('chiave' if s.esterna else 'sede', 's') }}</span>
+      <span><b>{{ s.nome }}</b><small>{{ s.dove or s.TIPI[s.tipo] }}</small></span>{{ i('chevron', 's') }}
+    </button>
+    {% endfor %}
+  </div>
+  <a class="btn-link altra-destinazione" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">+ Altra destinazione…</a>
+
+  <dialog class="foglio" id="foglio-partenza" aria-labelledby="foglio-titolo">
+    <form method="post" action="{{ url_for('main.sposta', veicolo_id=v.id) }}" data-una-volta>
+      {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+      <input type="hidden" name="a_sede_id"><input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
+      <div class="foglio-testa"><h2 id="foglio-titolo">Partenza</h2><button type="button" class="btn-link" data-chiudi-foglio>✕ Chiudi</button></div>
+      <div class="tratta-mini"><span><small>Da</small><b>{{ v.sede.nome if v.sede else '—' }}</b></span>{{ i('freccia', 's') }}<span><small>A</small><b data-nome-destinazione></b></span></div>
+      <fieldset class="foglio-gruppo" data-se-commercio disabled>
+        <span class="etichetta-campo">Come la mandi?</span>
+        <div class="scelta-chip">
+          <label><input type="radio" name="a_sede_causale" value="" data-causale="Conto visione" required><span>Conto visione</span></label>
+          <label><input type="radio" name="a_sede_causale" value="" data-causale="Vendita"><span>Vendita</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="foglio-gruppo" data-se-esterna disabled>
+        <span class="etichetta-campo">Cosa deve fare?</span>
+        <div class="scelta-chip">
+          {% for l in lavorazioni %}<label><input type="radio" name="lavorazione" value="{{ l }}" required><span>{{ l }}</span></label>{% endfor %}
+        </div>
+        <div class="campo-con-mic"><label class="campo"><span>Dettagli</span>
+          <input name="lavorazione_note" id="dettagli-lavoro" required maxlength="300" placeholder="Es. paraurti posteriore graffiato"></label>{{ detta('dettagli-lavoro') }}</div>
+      </fieldset>
+      <p class="riga-profilo">Tu · {{ g.utente.mezzo }} · {{ g.utente.vettore.nome if g.utente.vettore else '' }} · firma salvata
+        <a href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">Cambia</a></p>
+      {{ scorri('Scorri per emettere il DDT e partire', '', 'Emetti il DDT e parti') }}
+    </form>
+  </dialog>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ---- Le altre cose: poche, piccole, una riga ---- #}
+<div class="tocco-secondarie">
   {% if not no_preparazione %}
   <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta>
     {{ csrf_input() }}<input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
-    <button type="submit" class="btn pieno btn-prepara">{{ i('brilla') }} Metti in preparazione</button>
+    <button type="submit" class="secondaria prepara">{{ i('brilla') }}<span>Metti in preparazione</span></button>
   </form>
   {% endif %}
-  <a class="btn pieno btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione') }} Segnala danno</a>
+  <a class="secondaria danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione') }}<span>Segnala danno</span></a>
+  <details class="secondaria-altro">
+    <summary class="secondaria">{{ i('doc') }}<span>Altro</span></summary>
+    <div class="altro-elenco">
+      <details class="tocco-dati">
+        <summary>{{ i('doc', 's') }} DDT su questo telaio <span class="conta">{{ ddt|length }}</span></summary>
+        <section class="tocco-ddt-blocco">
+          {% for d in ddt %}{{ ddt_mini(d) }}{% else %}<p class="tenue piccolo">Nessun DDT emesso finora.</p>{% endfor %}
+        </section>
+      </details>
+      {% if puo_spostare %}<a href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('camion', 's') }} Tutte le destinazioni</a>{% endif %}
+      <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ i('auto', 's') }} Apri la scheda completa</a>
+    </div>
+  </details>
 </div>
 
-<details class="tocco-dati">
-  <summary class="btn pieno">{{ i('doc') }} DDT su questo telaio <span class="conta">{{ ddt|length }}</span></summary>
-  <section class="tocco-ddt-blocco">
-    {% for d in ddt %}{{ ddt_mini(d) }}{% else %}<p class="tenue piccolo">Nessun DDT emesso finora.</p>{% endfor %}
-  </section>
-</details>
-<a class="btn-link piccolo" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" style="display:inline-block;margin-top:12px">Apri la scheda completa {{ i('freccia', 's') }}</a>
-
-{% if not puo_spostare and not prep and not lavoro %}
+{% if not puo_spostare and not prep and not lavoro and not ritiro and not puo_consegnare and not fine_lavori %}
 <p class="tenue piccolo" style="margin-top:12px">{% if v.movimento_predisposto %}C'è già un DDT da ritirare: lo trovi nella scheda completa.{% elif v.fase == 'pronta' %}Auto pronta: si sposta solo con l'ultimo DDT verso la sede di consegna, da indicare nella scheda completa.{% else %}Da qui non puoi spostare quest'auto: la bolla la emette chi la ha in carico.{% endif %}</p>
 {% endif %}
+{% endblock %}
+{% block script %}
+<script>
+  (function () {
+    // Foglio di partenza: si apre toccando una destinazione; i campi seguono il tipo di destinazione
+    var foglio = document.getElementById('foglio-partenza');
+    if (foglio) {
+      var form = foglio.querySelector('form');
+      document.querySelectorAll('[data-destinazione]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          form.a_sede_id.value = b.dataset.destinazione;
+          foglio.querySelector('[data-nome-destinazione]').textContent = b.dataset.nome;
+          foglio.querySelector('[data-se-esterna]').disabled = !b.dataset.esterna;
+          foglio.querySelector('[data-se-commercio]').disabled = !b.dataset.commercio;
+          foglio.querySelectorAll('[data-causale]').forEach(function (r) { r.value = b.dataset.destinazione + '|' + r.dataset.causale; r.checked = false; });
+          foglio.querySelector('#foglio-titolo').textContent = b.dataset.esterna ? 'Invio lavorazione' : 'Partenza';
+          if (foglio.showModal) foglio.showModal(); else foglio.setAttribute('open', '');
+        });
+      });
+      foglio.querySelector('[data-chiudi-foglio]').addEventListener('click', function () { foglio.close(); });
+      foglio.addEventListener('click', function (e) { if (e.target === foglio) foglio.close(); });  // tocco fuori dal foglio
+    }
+    // "Qualcuno della concessionaria…": compare la scelta della persona
+    document.querySelectorAll('input[name=chi_riporta]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        var altro = document.getElementById('chi-altro');
+        if (altro) altro.hidden = r.value !== 'altro' || !r.checked;
+      });
+    });
+  })();
+</script>
 {% endblock %}

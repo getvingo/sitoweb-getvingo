@@ -113,6 +113,17 @@
          data-scarica-pdf data-scarica-subito data-nome="DDT_{{ dd.numero }}_{{ dd.anno }}.pdf">{{ i('scarica', 's') }} Salva il PDF</a></div>
     {% endif %}{% endif %}
     {% block contenuto %}{% endblock %}
+    {# appena fatto dal telefono: "Annulla" per pochi secondi (servizi.annullabile_subito) #}
+    {% set ann = annulla_subito() if g.utente else none %}
+    {% if ann %}
+    <form method="post" action="{{ url_for('main.ripristina_azione', azione_id=ann[0].id) }}" class="annulla-subito" data-annulla-subito="{{ ann[1] }}" role="status">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=ann[0].veicolo_id) }}">
+      <span>{{ i('check', 's') }} <b>{{ ann[0].nome }}</b></span>
+      <button class="annulla-subito-btn">Annulla</button>
+      <i class="annulla-tempo" style="animation-duration:{{ ann[1] }}s" aria-hidden="true"></i>
+    </form>
+    {% endif %}
   </div>
 </main>
 {% endblock %}
