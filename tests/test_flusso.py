@@ -300,8 +300,7 @@ class TestSpostamentoColTocco(Base):
             db.session.commit()
         self.c.post("/t/ABCD2345", data=POS)
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
-        for testo in ('class="auto-breve', "Segnala danno", "Volkswagen Golf", "AW000123", "Sede A",
-                      "<span class=\"conta\">2</span>"):
+        for testo in ('class="auto-breve', "Segnala un danno", "Volkswagen Golf", "AW000123", "Sede A"):
             self.assertIn(testo, pagina)
         self.assertNotIn("Metti in preparazione", pagina)  # già pronta
 
@@ -310,7 +309,7 @@ class TestSpostamentoColTocco(Base):
         self.entra("autista")
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
         self.assertIn("Metti in preparazione", pagina)
-        self.assertIn("Nessun DDT emesso finora", pagina)
+        self.assertIn("Segnala un danno", pagina)  # dal 12/11/2026 sera: sul posto solo preparazione e danno
         self.c.post(f"/veicolo/{vid}/preparazione")
         with self.app.app_context():
             self.assertEqual((db.session.get(Veicolo, vid).fase, Ddt.query.count()), ("preparazione", 0))
@@ -1620,7 +1619,7 @@ class TestLavorazioniStimaESolleciti(Base):
             self.assertEqual((m.avanzamento_lavorazione, m.giorni_ritardo), (100, 0))
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("barra-lavoro", stock)
-        self.assertIn("anello-lavoro", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))
+        self.assertIn("lavoro-breve", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))  # dal 12/11/2026 barra compatta
 
     def test_sollecito_solo_in_ritardo_e_risposta_del_fornitore(self):
         vid, mid = self.in_carrozzeria(2)
@@ -3591,3 +3590,23 @@ class TestTelefonoSnello(Base):
         pagina = self.c.get("/").get_data(as_text=True)
         for testo in ("Cosa fai adesso?", "data-leggi-nfc", "Ritiro assegnato a te", "Panoramica"):
             self.assertIn(testo, pagina)
+
+
+class TestTelefonoEssenziale(Base):
+    """Dal telefono (12/11/2026 sera): due voci di menu, pagine da computer con un avviso, ricerca, Trova l'auto."""
+    def test_menu_e_pagine_da_computer(self):
+        vid = self.abbina()
+        self.entra("autista")
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("I tuoi lavori", home)
+        self.assertIn('grid-template-columns:repeat(2, 1fr)', home)  # Tocca · Cerca
+        for url in ("/stock", "/lavorazioni", "/preparazione", "/ddt", "/danni"):
+            self.assertIn("Questa pagina si usa dal computer", self.c.get(url).get_data(as_text=True), url)
+        cerca = self.c.get("/cerca?q=000123").get_data(as_text=True)
+        self.assertIn("risultati-telefono", cerca)
+        self.assertIn(f"/veicolo/{vid}", cerca)
+        scheda = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertIn("Trova l'auto", scheda)
+        trova = self.c.get(f"/veicolo/{vid}/trova").get_data(as_text=True)
+        self.assertIn("data-trova", trova)
+        self.assertIn("Apri nelle mappe", trova)

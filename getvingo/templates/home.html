@@ -8,15 +8,14 @@
   <div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div>
   <h1>Cosa fai adesso?</h1>
   {{ tocca_adesivo() }}
-  {% if per_te %}
-  <h2 class="titolo-sezione-piccolo">Da fare per te</h2>
+  <h2 class="titolo-sezione-piccolo">I tuoi lavori</h2>
   <div class="per-te">
     {% for x in per_te %}
     <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
       <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · {{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Niente assegnato a te adesso.</p>
     {% endfor %}
   </div>
-  {% endif %}
   <form class="cerca-veloce" action="{{ url_for('main.cerca') }}" role="search">
     {{ i('cerca') }}<input name="q" autocomplete="off" placeholder="Ultime cifre del telaio, targa, modello…" aria-label="Cerca un'auto">
   </form>

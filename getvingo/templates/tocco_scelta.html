@@ -11,28 +11,16 @@
 </div>
 {% endmacro %}
 {% macro altro(con_preparazione=True) %}
-{# le altre cose: una riga piccola in fondo, come nella demo #}
-<div class="tocco-secondarie">
+{# le altre due cose che si fanno sul posto: preparazione e danno (dal 12/11/2026 sera niente "Altro") #}
+<div class="tocco-fondo">
   {% if con_preparazione and not no_preparazione %}
   <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta>
     {{ csrf_input() }}<input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
-    <button type="submit" class="secondaria prepara" aria-label="Metti in preparazione">{{ i('brilla') }}<span>Preparazione</span></button>
+    <button type="submit" class="btn pieno btn-prepara-larga">{{ i('brilla') }} Metti in preparazione</button>
   </form>
   {% endif %}
-  <a class="secondaria danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}" aria-label="Segnala danno">{{ i('attenzione') }}<span>Danno</span></a>
-  <details class="secondaria-altro">
-    <summary class="secondaria">{{ i('doc') }}<span>Altro</span></summary>
-    <div class="altro-elenco">
-      <details class="tocco-dati">
-        <summary>DDT su questo telaio <span class="conta">{{ ddt|length }}</span></summary>
-        <section class="tocco-ddt-blocco">
-          {% for d in ddt %}{{ ddt_mini(d) }}{% else %}<p class="tenue piccolo">Nessun DDT emesso finora.</p>{% endfor %}
-        </section>
-      </details>
-      {% if puo_spostare %}<a href="{{ url_for('main.sposta', veicolo_id=v.id) }}">Tutte le destinazioni <span>›</span></a>{% endif %}
-      <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Scheda completa <span>›</span></a>
-    </div>
-  </details>
+  <a class="btn pieno btn-danno-larga" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione') }} Segnala un danno</a>
+  <a class="btn-link altra-destinazione solo-computer" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Apri la scheda completa</a>
 </div>
 {% endmacro %}
 {% block contenuto %}
@@ -153,6 +141,7 @@
 {% if puo_spostare %}
 <section class="tocco-destinazioni">
   <h2 class="sezione-t">{{ 'Riportala a…' if v.sede and v.sede.esterna else ('Ultimo DDT verso…' if v.fase == 'pronta' else 'Dove la porti?') }}</h2>
+  <p class="istruzione">Tocca la destinazione: il DDT si crea da solo.</p>
   {% if profilo_mancante %}
   <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
   <small class="tenue">Manca: {{ profilo_mancante|join(', ') }}. Si fa una volta sola.</small>

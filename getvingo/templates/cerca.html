@@ -1,7 +1,23 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, badge_veicolo, icona_fase, filtro_select, fase_css, legenda, targa, indietro %}
+{% from "_auto.html" import auto_breve %}
 {% block titolo %}Cerca · Getvingo{% endblock %}
 {% block contenuto %}
+{# Dal telefono (12/11/2026 sera): un campo solo e le auto trovate; toccandone una si vede dov'è e come trovarla #}
+<div class="solo-telefono tocco">
+  <div class="tocco-titolo"><h1>Cerca un'auto</h1></div>
+  <form class="cerca-veloce" role="search">{{ i('cerca') }}<input name="q" value="{{ f.q }}" autocomplete="off" placeholder="Ultime cifre del telaio, targa, modello…" aria-label="Cerca un'auto" {{ 'autofocus' if not f.q }}></form>
+  {% if f.q %}
+  <div class="risultati-telefono">
+    {% for v in risultati[:20] %}<a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ auto_breve(v) }}</a>
+    {% else %}<p class="vuoto-telefono">Nessuna auto trovata con “{{ f.q }}”.</p>{% endfor %}
+  </div>
+  {% if risultati|length > 20 %}<p class="istruzione">Sono {{ risultati|length }}: scrivi qualcosa in più (es. le ultime cifre del telaio).</p>{% endif %}
+  {% else %}
+  <p class="istruzione">Scrivi le ultime cifre del telaio, la targa o il modello.</p>
+  {% endif %}
+</div>
+<div class="solo-computer">
 {{ indietro(url_for('main.home')) }}
 <div class="titolo-pagina"><div><div class="sopratitolo">Tutte le auto, ovunque si trovino</div><h1>Cerca</h1></div>
   <span class="tenue piccolo" style="margin-top:8px">{{ risultati|length }} trovate</span></div>
@@ -31,5 +47,6 @@
   {% else %}
     <div class="vuoto">{{ i('auto') }}Nessun veicolo trovato.</div>
   {% endfor %}
+</div>
 </div>
 {% endblock %}

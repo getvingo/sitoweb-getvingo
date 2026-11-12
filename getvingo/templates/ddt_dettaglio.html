@@ -5,6 +5,25 @@
 {% block titolo %}DDT {{ d.sigla }} · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
+{# Dal telefono (12/11/2026 sera): solo stato, tratta e il documento da vedere o condividere #}
+{% from "_auto.html" import auto_breve as _auto_breve %}
+<div class="solo-telefono tocco">
+  <div class="tocco-titolo"><small class="sopra">DDT {{ d.sigla }}{% if d.multiplo %} · {{ d.movimenti|length }} auto{% endif %}</small>
+    <h1>{% if d.annullato_at %}DDT cancellato{% elif m.stato == 'predisposto' %}Da ritirare{% if m.ritiro_entro_at %} entro le {{ m.ritiro_entro_at|data('%H:%M del %d/%m') }}{% endif %}{% elif m.stato == 'aperto' %}In viaggio verso {{ m.a_sede.nome }}{% else %}Arrivata a {{ m.sede_arrivo_effettiva.nome }}{% endif %}</h1></div>
+  {% for x in (d.movimenti or [m])[:3] %}{{ _auto_breve(x.veicolo, stato=False) }}{% endfor %}
+  <div class="tratta-verticale">
+    <span class="pallino-da" aria-hidden="true"></span><div><small>Partenza</small><b>{{ m.da_sede.nome if m.da_sede else '—' }}</b></div>
+    <span class="linea" aria-hidden="true"></span><span></span>
+    <span class="pallino-a" aria-hidden="true"></span><div><small>Destinazione</small><b>{{ m.a_sede.nome }}</b></div>
+  </div>
+  {% if m.stato == 'predisposto' and m.assegnato_a %}<p class="istruzione">Lo prende in carico {{ m.assegnato_a.nome }}: tocca l'adesivo sull'auto.</p>{% endif %}
+  {% if m.stato == 'aperto' %}<p class="istruzione">{{ i('nfc', 's') }} All'arrivo tocca l'adesivo sull'auto per chiudere il DDT.</p>{% endif %}
+  <a class="btn primario pieno" href="{{ url_for('main.ddt_anteprima', ddt_id=d.id) }}">{{ i('doc') }} Vedi il DDT</a>
+  <button type="button" class="btn pieno" data-condividi-pdf="{{ url_for('main.ddt_pdf', ddt_id=d.id) }}"
+          data-nome="DDT_{{ d.numero }}_{{ d.anno }}.pdf" data-titolo="DDT n. {{ d.sigla }} · {{ m.veicolo.descrizione }}">{{ i('invia') }} Condividi</button>
+  <a class="btn-link altra-destinazione" href="{{ url_for('main.home') }}">Torna alla home</a>
+</div>
+<div class="solo-computer">
 {{ indietro(url_for('main.archivio_ddt')) }}
 <div class="titolo-pagina">
   <div>
@@ -204,5 +223,6 @@
 </details>
 {% endif %}
 </aside>
+</div>
 </div>
 {% endblock %}

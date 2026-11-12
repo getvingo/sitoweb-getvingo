@@ -5,6 +5,19 @@
 {% block titolo %}Lavorazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
+{# Dal telefono (12/11/2026 sera): tocca l'adesivo e le cose da fare; il quadro completo è sul computer #}
+<section class="solo-telefono tocco">
+  <div class="tocco-titolo"><small class="sopra">{{ sede.nome }}</small><h1>Cosa fai adesso?</h1></div>
+  {{ tocca_adesivo() }}
+  <h2 class="sezione-t">Da fare da voi</h2>
+  <div class="per-te">
+    {% for x in per_te %}
+    <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · {{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Niente da fare adesso.</p>{% endfor %}
+  </div>
+</section>
+<div class="solo-computer">
 {# Home di chi esegue le lavorazioni esterne (carrozzeria, officina, allestitore…). In cima le auto in arrivo,
    poi un solo elenco di lavorazioni filtrato per stato: Nei tempi · In ritardo · Completate. #}
 {% set qui = url_for('main.home', stato=stato or none) %}
@@ -16,8 +29,6 @@
 <a class="avviso errore" href="{{ url_for('main.mia_firma') }}">{{ i('matita') }}<span>Imposta la firma di {{ sede.nome }}: verrà apposta in automatico su ogni ricezione e rientro. Tocca qui.</span></a>
 {% endif %}
 
-{# dal telefono: tocca l'adesivo dell'auto per l'arrivo o la fine dei lavori (12/11/2026) #}
-<div class="home-telefono solo-tocco">{{ tocca_adesivo() }}</div>
 
 {# ---- In arrivo: sempre visibile (anche vuota), si conferma all'arrivo ---- #}
 <section class="in-arrivo-fornitore">
@@ -151,4 +162,5 @@
 </details>
 {% endif %}
 {% endif %}
+</div>
 {% endblock %}

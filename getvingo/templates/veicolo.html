@@ -6,6 +6,8 @@
 {% block titolo %}{{ v.descrizione }} · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
+<div class="solo-telefono">{% include "_auto_telefono.html" %}</div>
+<div class="solo-computer">
 {{ indietro(url_for('main.piazzale') if g.utente.interno else url_for('main.home')) }}
 <div class="scheda-auto-testa">
   {{ carta_auto(v, modificabile=g.utente.interno) }}
@@ -274,6 +276,7 @@
   </form>
 </details>
 {% endif %}{% endif %}
+</div>
 {% endblock %}
 {% block script %}
 {% if v.lat is not none and v.stato != 'consegnato' %}

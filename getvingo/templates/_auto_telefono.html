@@ -1,0 +1,24 @@
+{# Scheda dell'auto dal telefono (12/11/2026 sera): solo dove si trova, come trovarla in piazzale e il danno.
+   Spostare, preparare, consegnare: si fa toccando l'adesivo sull'auto. Il resto è sul computer. #}
+{% from "_macro.html" import i %}
+{% from "_auto.html" import auto_breve %}
+{% set pos = v.ultima_posizione %}{% set mov = v.movimento_aperto %}
+<div class="tocco">
+  {{ auto_breve(v) }}
+  {% if v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id) }}">{{ i('attenzione', 's') }}<span><b>{{ v.danni_aperti|length }} {{ 'danno' if v.danni_aperti|length == 1 else 'danni' }} da verificare</b> · tocca per vedere</span></a>{% endif %}
+  <div class="dove-auto">
+    <span class="tondo-piccolo">{{ i('pin', 's') }}</span>
+    <div>{% if v.stato == 'in_viaggio' and mov %}<b>In viaggio verso {{ mov.a_sede.nome }}</b><small>DDT {{ mov.ddt.sigla }}</small>
+      {% elif v.stato == 'consegnato' %}<b>Consegnata</b><small>{{ v.consegnato_at|data('%d/%m/%Y') }}</small>
+      {% else %}<b>{{ v.sede.nome if v.sede else 'Luogo non indicato' }}</b>{% if pos %}<small>posizione aggiornata {{ pos.at|da_quanto }}</small>{% endif %}{% endif %}</div>
+  </div>
+  {% if v.stato not in ('in_viaggio', 'consegnato') and v.lat is not none %}
+  <a class="btn btn-trova pieno" href="{{ url_for('main.trova', veicolo_id=v.id) }}">{{ i('pin') }} Trova l'auto</a>
+  {% elif mov %}
+  <a class="btn pieno" href="{{ url_for('main.ddt_anteprima', ddt_id=mov.ddt.id) }}">{{ i('doc') }} Vedi il DDT</a>
+  {% endif %}
+  {% if v.stato != 'consegnato' %}
+  <p class="istruzione">{{ i('nfc', 's') }} Per spostarla, prepararla o consegnarla: tocca l'adesivo sul parabrezza.</p>
+  <a class="btn pieno btn-danno-larga" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione') }} Segnala un danno</a>
+  {% endif %}
+</div>

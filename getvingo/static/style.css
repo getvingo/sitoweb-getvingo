@@ -107,7 +107,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px calc(var(--barra-so
 .nav-basso a.attivo { color: var(--segnale); }
 .nav-basso a:hover { text-decoration: none; }
 
-@media (min-width: 860px) {
+@media (min-width: 1024px) {  /* dal 12/11/2026 sera: telefono e tablet fino a 1023 px hanno la versione essenziale */
   .nav-alto { display: flex; }
   .nav-basso { display: none; }
   main { padding-bottom: 48px; }
@@ -177,7 +177,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px calc(var(--barra-so
   padding: 10px; background: var(--carta); border: 1px solid var(--bordo); border-radius: calc(var(--r) + 4px);
   box-shadow: 0 8px 28px rgba(28, 21, 51, .14); }
 .barra-azione .riepilogo { font-size: var(--fs-13); color: var(--testo-2); text-align: center; margin: 0 0 8px; }
-@media (min-width: 860px) { .barra-azione { bottom: 16px; } }
+@media (min-width: 1024px) { .barra-azione { bottom: 16px; } }
 
 /* Moduli */
 .campo { display: block; margin-bottom: 16px; }
@@ -2348,3 +2348,40 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .ddt-link { display: flex; justify-content: center; gap: 22px; font-size: var(--fs-14); font-weight: 650; }
 .ddt-link a, .ddt-link button { display: inline-flex; align-items: center; gap: 6px; min-height: var(--alt-piccola); }
 .prep-breve h2, .tocco-titolo h1 { text-transform: none; letter-spacing: normal; color: var(--testo); }
+
+/* ---- Sito da telefono essenziale (12/11/2026 sera): solo le azioni sul posto, il quadro completo sul computer ---- */
+.solo-telefono { display: none; }
+@media (max-width: 1023px) {
+  .solo-computer { display: none !important; }
+  .solo-telefono { display: block; }
+}
+.pagina-computer { text-align: center; padding: 40px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.pagina-computer > .icona { width: 40px; height: 40px; color: var(--testo-2); }
+.pagina-computer h1 { font-size: var(--fs-20); margin: 0; }
+.pagina-computer p { margin: 0; color: var(--testo-2); max-width: 320px; }
+.pagina-computer .btn { width: 100%; max-width: 320px; }
+.istruzione { font-size: var(--fs-14); color: var(--testo-2); margin: -6px 0 0; }
+.vuoto-telefono { text-align: center; color: var(--testo-2); font-size: var(--fs-14); padding: 18px 12px; background: var(--carta); border-radius: var(--r); }
+/* risultati della ricerca e luogo dell'auto */
+.risultati-telefono { display: grid; gap: 8px; }
+.risultati-telefono a { color: inherit; }
+.risultati-telefono a:hover { text-decoration: none; }
+.dove-auto { background: var(--carta); border-radius: var(--r); padding: 12px 14px; display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; }
+.dove-auto small { display: block; color: var(--testo-2); font-size: var(--fs-13); }
+.btn-trova { background: var(--segnale); border-color: var(--segnale); color: #fff; }
+.btn-trova:hover { background: var(--segnale-scuro); border-color: var(--segnale-scuro); }
+/* azioni grandi della schermata del tocco */
+.azione-larga { width: 100%; min-height: 56px; }
+.btn.btn-prepara-larga { color: var(--prep); border-color: var(--prep); }
+.btn.btn-danno-larga { color: var(--danno-scuro); border-color: var(--danno); }
+/* Trova l'auto: freccia che segue il telefono */
+.trova { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.bussola { position: relative; width: 240px; height: 240px; border-radius: 50%; background: var(--carta); box-shadow: var(--ombra);
+  border: 2px solid var(--bordo); display: grid; place-items: center; }
+.bussola-freccia { width: 120px; height: 120px; color: var(--segnale); transition: transform .25s ease-out; }
+.bussola-nord { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: var(--fs-12); font-weight: 700; color: var(--testo-2); }
+.trova-distanza { font-size: var(--fs-30); font-weight: 700; line-height: 1; }
+.trova-vicino .bussola { border-color: var(--ok); background: var(--ok-tenue); }
+.trova-vicino .bussola-freccia { color: var(--ok); }
+.per-te-voce.ritardo .per-te-barra { background: var(--liv-1); }
+.per-te-voce.lavorazione .per-te-barra { background: var(--st-lavoro); }

@@ -435,7 +435,19 @@ def _home_fornitore():
                  key=lambda u: (u.id != g.utente.id, u.nome))
     dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno and not u.eliminato),
                         key=lambda u: u.nome)
-    return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo,
+    # dal telefono: solo le cose da fare (auto in arrivo, lavori da finire, ritiri assegnati a chi guarda)
+    per_te = [{"tipo": "in_viaggio", "titolo": "In arrivo da voi", "v": m.veicolo,
+               "testo": f"DDT {m.ddt.sigla} · conferma quando arriva",
+               "url": url_for("main.arrivo_da_tap", ddt_id=m.ddt_id)} for m in in_arrivo]
+    per_te += [{"tipo": "da_ritirare", "titolo": "Ritiro assegnato a te", "v": m.veicolo,
+                "testo": f"verso {m.a_sede.nome}", "url": url_for("main.tocco_scelta", veicolo_id=m.veicolo_id)}
+               for m in da_ritirare.values() if m.assegnato_a_id == g.utente.id]
+    per_te += [{"tipo": "lavorazione" if not m.giorni_ritardo else "ritardo",
+                "titolo": f"{m.lavorazione}" + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else ""),
+                "v": v, "testo": (m.lavorazione_note or "lavori da finire") + " · tocca l'adesivo quando hai finito",
+                "url": url_for("main.tocco_scelta", veicolo_id=v.id)}
+               for v, m in lavori if not m.lavorazione_completata_at]
+    return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo, per_te=per_te,
                            lavori=visibili, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
                            solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti, noi=noi)
 
@@ -964,6 +976,14 @@ def demo_tocco():
     return render_template("demo_tocco.html", gruppi=gruppi)
 
 
+@bp.route("/veicolo/<int:veicolo_id>/trova")
+@login_richiesto
+def trova(veicolo_id):
+    """Trova l'auto in piazzale (12/11/2026 sera): freccia e distanza dal telefono all'ultima posizione nota."""
+    v = _veicolo_visibile(veicolo_id)
+    return render_template("trova.html", v=v)
+
+
 @bp.route("/veicolo/<int:veicolo_id>/tocco")
 @login_richiesto
 def tocco_scelta(veicolo_id):
@@ -1237,8 +1257,8 @@ def abbina(codice):
         servizi.registra_evento(veicolo, "abbinamento", g.utente, *_coord())
         db.session.commit()
         marchi.assicura(veicolo.marca)  # marca nuova: il logo si scarica da solo
-        flash("Adesivo abbinato.", "ok")
-        return redirect(url_for("main.veicolo", veicolo_id=veicolo.id))
+        flash("Auto in stock, abbinata all'adesivo.", "ok")
+        return redirect(url_for("main.tocco_scelta", veicolo_id=veicolo.id))
 
     form = {}
     lat, lon = _posizione_tocco()
@@ -2058,7 +2078,7 @@ def nuovo_danno(veicolo_id):
                                   foto, movimento=mov)
             db.session.commit()
             flash("Danno segnalato: compare come avviso nella panoramica.", "ok")
-            vai = url_for("main.veicolo", veicolo_id=v.id) if g.utente.interno else url_for("main.home")
+            vai = url_for("main.tocco_scelta", veicolo_id=v.id) if g.utente.interno else url_for("main.home")
             return jsonify(vai=vai) if da_script else redirect(vai)
         except Vietato as e:
             db.session.rollback()

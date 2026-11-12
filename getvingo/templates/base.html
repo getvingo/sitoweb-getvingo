@@ -54,6 +54,10 @@
 </svg>
 
 {% set ep = request.endpoint or '' %}
+{# Pagine che dal telefono non servono (12/11/2026 sera): il quadro completo si guarda dal computer #}
+{% set solo_pc = g.utente and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
+                  'main.analisi', 'main.nuova_auto', 'main.modifica_auto', 'main.cerca_avanzata')
+                  or ep.startswith('admin.') or ep.startswith('piattaforma.')) %}
 {% if g.utente %}
 <header class="testata">
   <div class="testata-dentro">
@@ -74,10 +78,10 @@
       <div class="menu-tendina">
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }} · {{ g.utente.sede.nome if g.utente.ruolo == 'fornitore' and g.utente.sede else g.utente.organizzazione.nome }}</span><span class="menu-email">{{ g.utente.email }}</span></div>
         <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
-        {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
-        {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore" role="separator"></div>{% endif %}
-        {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
-        {% if gestore() %}<a href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}
+        {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
+        {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore solo-computer" role="separator"></div>{% endif %}
+        {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
+        {% if gestore() %}<a class="solo-computer" href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}
         <div class="menu-separatore" role="separator"></div>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -112,7 +116,18 @@
       <a class="btn piccolo primario" href="{{ url_for('main.ddt_pdf', ddt_id=dd.id, scarica=1) }}" download="DDT_{{ dd.numero }}_{{ dd.anno }}.pdf"
          data-scarica-pdf data-scarica-subito data-nome="DDT_{{ dd.numero }}_{{ dd.anno }}.pdf">{{ i('scarica', 's') }} Salva il PDF</a></div>
     {% endif %}{% endif %}
-    {% block contenuto %}{% endblock %}
+    {% if solo_pc %}
+    <section class="solo-telefono pagina-computer">
+      {{ i('doc') }}
+      <h1>Questa pagina si usa dal computer</h1>
+      <p>Dal telefono tocca l'adesivo di un'auto oppure cercala.</p>
+      <a class="btn primario" href="{{ url_for('main.home') }}">{{ i('nfc', 's') }} Tocca un'auto</a>
+      {% if g.utente.interno %}<a class="btn" href="{{ url_for('main.cerca') }}">{{ i('cerca', 's') }} Cerca un'auto</a>{% endif %}
+    </section>
+    <div class="solo-computer">{% block contenuto %}{% endblock %}</div>
+    {% else %}
+    {{ self.contenuto() }}
+    {% endif %}
     {# appena fatto dal telefono: "Annulla" per pochi secondi (servizi.annullabile_subito) #}
     {% set ann = annulla_subito() if g.utente else none %}
     {% if ann %}
@@ -129,16 +144,13 @@
 {% endblock %}
 
 {% if g.utente %}
-<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat({{ 6 if g.utente.interno else 2 }}, 1fr)">
-  <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{% if g.utente.interno %}{{ i('home') }}Home{% else %}{{ i('chiave') }}Lavorazioni{% endif %}</a>
-  {% if g.utente.interno %}
-  <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto') }}Stock</a>
-  <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave') }}Lavori</a>
-  <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla') }}Prepara</a>
-  {% endif %}
-  <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}DDT</a>
-  {% if g.utente.interno %}<a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}"><span class="icona-nav">{{ i('attenzione') }}{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</span>Danni</a>{% endif %}
+{# Dal telefono due voci sole (12/11/2026 sera): tutto il resto si fa toccando l'adesivo dell'auto #}
+{% if g.utente.interno %}
+<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat(2, 1fr)">
+  <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('nfc') }}Tocca</a>
+  <a href="{{ url_for('main.cerca') }}" class="{{ 'attivo' if ep in ('main.cerca', 'main.veicolo', 'main.trova') }}">{{ i('cerca') }}Cerca</a>
 </nav>
+{% endif %}
 {% endif %}
 <script>window.GETVINGO_GMAPS = {{ config.GOOGLE_MAPS_KEY|tojson }};</script>
 <script>window.DOVIN_CSRF ="{{ csrf_token() if g.utente else '' }}";</script>

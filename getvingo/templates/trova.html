@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% from "_auto.html" import auto_breve %}
+{% block titolo %}Trova {{ v.descrizione }} · Getvingo{% endblock %}
+{% block contenuto %}
+{# Trova l'auto in piazzale: la freccia punta verso l'ultima posizione nota (GPS del telefono + bussola).
+   Vicino all'auto (entro 15 m) diventa verde: si tocca l'adesivo. #}
+{% set pos = v.ultima_posizione %}
+<div class="tocco trova" data-trova data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">
+  {{ auto_breve(v, stato=False) }}
+  {% if v.lat is none %}
+  <p class="vuoto-telefono">Posizione dell'auto non ancora nota: si registra al primo tocco dell'adesivo.{% if v.sede %} Ultimo luogo: <b>{{ v.sede.nome }}</b>.{% endif %}</p>
+  {% else %}
+  <div class="bussola" aria-hidden="true">
+    <span class="bussola-nord" data-nord>N</span>
+    <svg class="bussola-freccia" data-freccia viewBox="0 0 24 24"><path d="M12 2 L19 21 L12 17 L5 21 Z" fill="currentColor"/></svg>
+  </div>
+  <div class="trova-distanza" data-distanza role="status">…</div>
+  <p class="istruzione" data-istruzione>Cerco la tua posizione…</p>
+  <button type="button" class="btn piccolo" data-bussola hidden>{{ i('pin', 's') }} Attiva la bussola</button>
+  {% if pos %}<p class="suggerimento">Ultima posizione {{ pos.at|da_quanto }}{{ ' · ' ~ v.sede.nome if v.sede }}</p>{% endif %}
+  <a class="btn pieno" href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}&travelmode=walking" target="_blank" rel="noopener">{{ i('freccia') }} Apri nelle mappe</a>
+  {% endif %}
+</div>
+{% endblock %}
+{% block script %}
+<script>
+  (function () {
+    var box = document.querySelector('[data-trova]');
+    if (!box || !box.dataset.lat || box.dataset.lat === 'None') return;
+    var LAT = parseFloat(box.dataset.lat), LON = parseFloat(box.dataset.lon);
+    var freccia = box.querySelector('[data-freccia]'), dist = box.querySelector('[data-distanza]');
+    var istr = box.querySelector('[data-istruzione]'), btnBussola = box.querySelector('[data-bussola]');
+    var rotta = null, direzione = null;  // rotta verso l'auto (gradi dal nord), direzione del telefono
+    function rad(g) { return g * Math.PI / 180; }
+    function metri(a, b, c, d) {
+      var R = 6371000, x = rad(c - a), y = rad(d - b);
+      var h = Math.sin(x / 2) * Math.sin(x / 2) + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(y / 2) * Math.sin(y / 2);
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+    function verso(a, b, c, d) {
+      var y = Math.sin(rad(d - b)) * Math.cos(rad(c));
+      var x = Math.cos(rad(a)) * Math.sin(rad(c)) - Math.sin(rad(a)) * Math.cos(rad(c)) * Math.cos(rad(d - b));
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+    function ruota() {
+      if (rotta === null) return;
+      var r = direzione === null ? rotta : rotta - direzione;  // senza bussola: la freccia è rispetto al nord
+      freccia.style.transform = 'rotate(' + r + 'deg)';
+    }
+    if (!navigator.geolocation) { istr.textContent = 'Il telefono non dà la posizione: usa “Apri nelle mappe”.'; return; }
+    navigator.geolocation.watchPosition(function (p) {
+      var m = metri(p.coords.latitude, p.coords.longitude, LAT, LON);
+      rotta = verso(p.coords.latitude, p.coords.longitude, LAT, LON);
+      dist.textContent = m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km';
+      var vicino = m <= 15;
+      box.classList.toggle('trova-vicino', vicino);
+      istr.textContent = vicino ? 'Sei vicino all’auto: tocca l’adesivo sul parabrezza.'
+        : (direzione === null ? 'Segui la freccia (la N indica il nord).' : 'Cammina nella direzione della freccia.');
+      ruota();
+    }, function () { istr.textContent = 'Consenti la posizione per vedere la freccia, oppure usa “Apri nelle mappe”.'; },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    function bussola(e) {
+      var h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+      if (h == null) return;
+      direzione = h; box.querySelector('[data-nord]').hidden = true; ruota();
+    }
+    function avviaBussola() {
+      window.addEventListener('deviceorientationabsolute', bussola);
+      window.addEventListener('deviceorientation', bussola);
+    }
+    // iPhone: la bussola va autorizzata con un tocco
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      btnBussola.hidden = false;
+      btnBussola.addEventListener('click', function () {
+        DeviceOrientationEvent.requestPermission().then(function (ok) { if (ok === 'granted') { avviaBussola(); btnBussola.hidden = true; } });
+      });
+    } else { avviaBussola(); }
+  })();
+</script>
+{% endblock %}
