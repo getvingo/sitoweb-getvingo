@@ -942,7 +942,7 @@ def cerca():
     stock = Veicolo.query.filter(Veicolo.stato != "consegnato").all()
     auto_mappa, luoghi_mappa = _dati_mappa(stock)
     return render_template("cerca.html", f=f, risultati=_filtra_veicoli(tutti, f), auto_mappa=auto_mappa,
-                           luoghi_mappa=luoghi_mappa, miei_ddt=_ddt_miei(),
+                           luoghi_mappa=luoghi_mappa,
                            opzioni=_filtri_veicoli(tutti, f), filtri_attivi=[k for k in CHIAVI_FILTRO if f[k]])
 
 
@@ -1076,6 +1076,16 @@ def _destinazioni_proposte(v, quante=4):
         elenco.remove(arrivo.da_sede)
         elenco.insert(0, arrivo.da_sede)
     return elenco[:quante]
+
+
+@bp.route("/miei-ddt")
+@solo_interni
+def miei_ddt():
+    """Terza scheda del telefono (13/11/2026): i DDT legati a chi guarda, prima quelli in corso."""
+    elenco = _ddt_miei(30)
+    in_corso = [d for d in elenco if d.movimento.stato in ("predisposto", "aperto")]
+    chiusi = [d for d in elenco if d not in in_corso][:15]
+    return render_template("miei_ddt.html", in_corso=in_corso, chiusi=chiusi)
 
 
 def _ddt_miei(quanti=15):

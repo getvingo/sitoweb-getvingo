@@ -147,11 +147,12 @@
 {% endblock %}
 
 {% if g.utente %}
-{# Dal telefono due voci sole (12/11/2026 sera): tutto il resto si fa toccando l'adesivo dell'auto #}
+{# Dal telefono tre voci (13/11/2026): Home, Cerca, i tuoi DDT; tutto il resto si fa toccando l'adesivo dell'auto #}
 {% if g.utente.interno %}
-<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat(2, 1fr)">
+<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat(3, 1fr)">
   <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home') }}Home</a>
   <a href="{{ url_for('main.cerca') }}" class="{{ 'attivo' if ep in ('main.cerca', 'main.veicolo', 'main.trova') }}">{{ i('cerca') }}Cerca</a>
+  <a href="{{ url_for('main.miei_ddt') }}" class="{{ 'attivo' if ep in ('main.miei_ddt', 'main.ddt_dettaglio') }}">{{ i('doc') }}DDT</a>
 </nav>
 {% endif %}
 {% endif %}

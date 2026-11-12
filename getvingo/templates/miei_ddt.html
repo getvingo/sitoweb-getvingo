@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}I tuoi DDT · Getvingo{% endblock %}
+{% macro voce(d) %}{% set m = d.movimento %}
+<a class="per-te-voce {{ 'in_viaggio' if m.stato == 'aperto' else ('da_ritirare' if m.stato == 'predisposto' else 'chiuso') }}" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+  <span><b>DDT {{ d.sigla }} · {{ d.stato[1] }}</b><small>{{ m.veicolo.descrizione }}{% if d.multiplo %} e altre {{ d.movimenti|length - 1 }}{% endif %} · {{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.a_sede.nome }}</small></span>{{ i('chevron', 's') }}</a>
+{% endmacro %}
+{% block contenuto %}
+{# Terza scheda del telefono (13/11/2026): i DDT che hai emesso, preso in carico, ricevuto o che ti sono assegnati #}
+<div class="tocco">
+  <div class="tocco-titolo"><h1>I tuoi DDT</h1></div>
+  <p class="istruzione">Quelli che hai emesso, preso in carico o ricevuto, e quelli assegnati a te. Tocca per vederlo o condividerlo.</p>
+  <h2 class="sezione-t">In corso · {{ in_corso|length }}</h2>
+  <div class="per-te">{% for d in in_corso %}{{ voce(d) }}{% else %}<p class="vuoto-telefono">Nessun DDT in corso.</p>{% endfor %}</div>
+  <h2 class="sezione-t">Chiusi di recente</h2>
+  <div class="per-te">{% for d in chiusi %}{{ voce(d) }}{% else %}<p class="vuoto-telefono">Nessun DDT chiuso.</p>{% endfor %}</div>
+</div>
+{% endblock %}

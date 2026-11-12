@@ -3599,7 +3599,7 @@ class TestTelefonoEssenziale(Base):
         self.entra("autista")
         home = self.c.get("/").get_data(as_text=True)
         self.assertIn("I tuoi lavori", home)
-        self.assertIn('grid-template-columns:repeat(2, 1fr)', home)  # Tocca · Cerca
+        self.assertIn('grid-template-columns:repeat(3, 1fr)', home)  # Home · Cerca · DDT
         for url in ("/stock", "/lavorazioni", "/preparazione", "/ddt", "/danni"):
             self.assertIn("Questa pagina si usa dal computer", self.c.get(url).get_data(as_text=True), url)
         cerca = self.c.get("/cerca?q=000123").get_data(as_text=True)
@@ -3618,8 +3618,10 @@ class TestTelefonoEssenziale(Base):
             self.assertIn(f"/veicolo/{vid}", self.c.get(f"/cerca?q={q}&parziale=1").get_data(as_text=True), q)
         self.assertNotIn(f"/veicolo/{vid}", self.c.get("/cerca?q=golf+rosso&parziale=1").get_data(as_text=True))
         pagina = self.c.get("/cerca").get_data(as_text=True)
-        for testo in ("mappa-telefono", "I tuoi DDT", "DDT 1/"):
-            self.assertIn(testo, pagina)
+        self.assertIn("mappa-telefono", pagina)
+        ddt = self.c.get("/miei-ddt").get_data(as_text=True)  # terza scheda: i DDT legati a chi guarda
+        for testo in ("I tuoi DDT", "In corso · 1", "DDT 1/"):
+            self.assertIn(testo, ddt)
 
     def test_home_fornitori_preparazioni_e_calendario(self):
         vid = self.abbina()
