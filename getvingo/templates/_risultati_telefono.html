@@ -1,0 +1,9 @@
+{# Auto trovate dalla scheda Cerca del telefono (anche mentre si scrive: /cerca?q=…&parziale=1) #}
+{% from "_auto.html" import auto_breve %}
+{% if f.q %}
+<div class="risultati-telefono">
+  {% for v in risultati[:20] %}<a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ auto_breve(v) }}</a>
+  {% else %}<p class="vuoto-telefono">Nessuna auto trovata con “{{ f.q }}”.</p>{% endfor %}
+</div>
+{% if risultati|length > 20 %}<p class="istruzione">Sono {{ risultati|length }}: scrivi qualcosa in più (es. le ultime cifre del telaio).</p>{% endif %}
+{% endif %}

@@ -9,12 +9,28 @@
 <section class="solo-telefono tocco">
   <div class="tocco-titolo"><small class="sopra">{{ sede.nome }}</small><h1>Cosa fai adesso?</h1></div>
   {{ tocca_adesivo() }}
-  <h2 class="sezione-t">Da fare da voi</h2>
+  <h2 class="sezione-t">In arrivo · {{ in_arrivo|length }}</h2>
   <div class="per-te">
-    {% for x in per_te %}
-    <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
-      <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · {{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
-    {% else %}<p class="vuoto-telefono">Niente da fare adesso.</p>{% endfor %}
+    {% for m in in_arrivo %}
+    <a class="per-te-voce in_viaggio" href="{{ url_for('main.arrivo_da_tap', ddt_id=m.ddt_id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ m.veicolo.descrizione }}</b><small>DDT {{ m.ddt.sigla }} · {{ m.lavorazione or 'lavorazione da indicare' }} · partita {{ m.partenza_at|da_quanto }}</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Nessuna auto in viaggio verso di voi.</p>{% endfor %}
+  </div>
+  <h2 class="sezione-t">In lavorazione · {{ in_corso_tel|length }}</h2>
+  <div class="per-te">
+    {% for v, m in in_corso_tel %}
+    <a class="per-te-voce {{ 'ritardo' if m.giorni_ritardo else 'lavorazione' }}" href="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ v.descrizione }} · {{ m.lavorazione }}</b>
+        <small>{% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}da finire entro il {{ m.lavorazione_prevista_at|data('%d/%m') }}{% endif %} · finito? tocca l'adesivo</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Nessuna auto in lavorazione.</p>{% endfor %}
+  </div>
+  <h2 class="sezione-t">Pronte · {{ pronte_tel|length }}</h2>
+  <div class="per-te">
+    {% for v, m, r in pronte_tel %}
+    <a class="per-te-voce pronta" href="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ v.descrizione }} · {{ m.lavorazione }}</b>
+        <small>finita {{ m.lavorazione_completata_at|da_quanto }} · {% if r and r.assegnato_a %}la ritira {{ r.assegnato_a.nome }}{% elif r %}DDT di rientro pronto{% else %}da preparare il DDT di rientro{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Nessuna auto pronta da ritirare.</p>{% endfor %}
   </div>
 </section>
 <div class="solo-computer">

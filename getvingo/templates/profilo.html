@@ -36,6 +36,14 @@
     <div class="tenue piccolo">{{ 'Salvata · ' if u.sede.firma else '' }}Apposta in automatico quando confermate un arrivo; vale per tutti i vostri utenti</div></div>{{ i('freccia', 's') }}</a>
 {% endif %}
 
+{% if u.ruolo == 'admin' %}
+{# l'amministratore gestisce gli account anche dal telefono: pagine identiche a quelle del computer #}
+<h2>{{ i('gestione') }} Account</h2>
+<a class="voce profilo-voce" href="{{ url_for('admin.aziende') }}">
+  {{ i('utente') }}
+  <div class="corpo"><h3>Utenti e partner</h3><div class="tenue piccolo">Crea e modifica gli account, ruoli, inviti e password, come dal computer</div></div>{{ i('freccia', 's') }}</a>
+{% endif %}
+
 <h2>{{ i('chiave') }} Sicurezza</h2>
 <a class="voce profilo-voce" href="{{ url_for('auth.cambia_password') }}">
   {{ i('chiave') }}

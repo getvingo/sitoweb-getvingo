@@ -222,6 +222,39 @@ CHIAVI_FILTRO = ("tipologia", "marca", "modello", "colore", "fase", "sede")
 
 # ---------------------------------------------------------------- panoramica
 
+RUOLI_PREPARAZIONE = ("preparatore", "consegne", "admin")  # vedono preparazioni e calendario dal telefono
+
+
+def _home_telefono():
+    """Home dal telefono (12/11/2026 sera): auto dai fornitori (fine lavori stimata, da andare a prendere) per
+    tutti; preparazioni e calendario di quando saranno pronte per Preparatore, Consegne e amministratore."""
+    esterne = [(v, m) for _, voci in servizi.presso_fornitori() for v, m in voci if m and m.con_lavorazione]
+    da_prendere = [(v, m) for v, m in esterne if m.lavorazione_completata_at]
+    in_lavorazione = sorted(((v, m) for v, m in esterne if not m.lavorazione_completata_at),
+                            key=lambda x: x[1].lavorazione_prevista_at or adesso())
+    preparazioni, calendario = [], []
+    if g.utente.ruolo in RUOLI_PREPARAZIONE:
+        preparazioni = (Preparazione.query.filter_by(completata_at=None)
+                        .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).all())
+        oggi = adesso().date()
+        eventi = [(p.pronta_entro_at, p.veicolo, "pronta per la consegna", "preparazione", p.pronta_entro_at < adesso())
+                  for p in preparazioni if p.pronta_entro_at]
+        eventi += [(m.lavorazione_prevista_at, v, f"fine lavori · {m.sede_arrivo_effettiva.nome}", "lavorazione",
+                    bool(m.giorni_ritardo)) for v, m in in_lavorazione if m.lavorazione_prevista_at]
+        giorni = {}
+        for quando, v, cosa, tipo, ritardo in sorted(eventi, key=lambda e: e[0]):
+            giorno = max(quando.date(), oggi)  # i ritardi stanno su oggi
+            if (giorno - oggi).days > 13:
+                continue
+            giorni.setdefault(giorno, []).append({"quando": quando, "v": v, "cosa": cosa, "tipo": tipo, "ritardo": ritardo})
+        for giorno, voci in giorni.items():
+            nome = "Oggi" if giorno == oggi else ("Domani" if (giorno - oggi).days == 1 else
+                                                   f"{GIORNI_SETTIMANA[giorno.weekday()].capitalize()} {giorno:%d/%m}")
+            calendario.append((nome, voci))
+    return {"da_prendere": da_prendere, "in_lavorazione": in_lavorazione, "preparazioni": preparazioni,
+            "calendario": calendario}
+
+
 def _da_fare_per_te(quante=5):
     """Home dal telefono (12/11/2026): solo le cose di chi guarda (ritiri assegnati a lui, viaggi che ha in
     corso, passi di preparazione per il Preparatore). Il quadro di tutta la concessionaria resta sotto."""
@@ -339,6 +372,7 @@ def home():
                ("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
                ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
     return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni, per_te=_da_fare_per_te(),
+                           **_home_telefono(),
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
                            ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
 
@@ -435,19 +469,11 @@ def _home_fornitore():
                  key=lambda u: (u.id != g.utente.id, u.nome))
     dipendenti = sorted((u for u in Utente.query.filter_by(attivo=True, supporto=False) if u.interno and not u.eliminato),
                         key=lambda u: u.nome)
-    # dal telefono: solo le cose da fare (auto in arrivo, lavori da finire, ritiri assegnati a chi guarda)
-    per_te = [{"tipo": "in_viaggio", "titolo": "In arrivo da voi", "v": m.veicolo,
-               "testo": f"DDT {m.ddt.sigla} · conferma quando arriva",
-               "url": url_for("main.arrivo_da_tap", ddt_id=m.ddt_id)} for m in in_arrivo]
-    per_te += [{"tipo": "da_ritirare", "titolo": "Ritiro assegnato a te", "v": m.veicolo,
-                "testo": f"verso {m.a_sede.nome}", "url": url_for("main.tocco_scelta", veicolo_id=m.veicolo_id)}
-               for m in da_ritirare.values() if m.assegnato_a_id == g.utente.id]
-    per_te += [{"tipo": "lavorazione" if not m.giorni_ritardo else "ritardo",
-                "titolo": f"{m.lavorazione}" + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else ""),
-                "v": v, "testo": (m.lavorazione_note or "lavori da finire") + " · tocca l'adesivo quando hai finito",
-                "url": url_for("main.tocco_scelta", veicolo_id=v.id)}
-               for v, m in lavori if not m.lavorazione_completata_at]
-    return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo, per_te=per_te,
+    # dal telefono (12/11/2026 sera): auto in arrivo, in lavorazione e pronte (da ritirare)
+    in_corso_tel = [(v, m) for v, m in lavori if not m.lavorazione_completata_at]
+    pronte_tel = [(v, m, da_ritirare.get(v.id)) for v, m in lavori if m.lavorazione_completata_at]
+    return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo, in_corso_tel=in_corso_tel,
+                           pronte_tel=pronte_tel,
                            lavori=visibili, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
                            solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti, noi=noi)
 
@@ -757,6 +783,31 @@ def _zona_stock(v):
     return f"sede-{v.sede_id}"
 
 
+def _dati_mappa(risultati):
+    """Punti della mappa dello Stock (anche dal telefono, scheda Cerca): auto con la posizione e luoghi."""
+    # una sola mappa: da lontano un punto per luogo (sedi e fornitori), avvicinandosi le singole auto
+    auto = [{"lat": v.lat, "lon": v.lon, "fase": v.fase, "stato": Veicolo.FASI[v.fase], "sede": v.sede_id,
+             "titolo": v.descrizione, "sotto": v.targa or "VIN …" + v.vin[-8:],
+             "url": url_for("main.veicolo", veicolo_id=v.id), "id": v.id} for v in risultati if v.lat is not None]
+    piazzali = []
+    # tutti i piazzali con la posizione, anche vuoti, più i luoghi dove ci sono auto ferme
+    luoghi = {v.sede for v in risultati if v.sede is not None and v.stato == "in_sede"}
+    luoghi |= set(Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.isnot(None)))
+    luoghi = sorted(luoghi, key=lambda x: (x.tipo != "propria", x.nome))
+    for sede in luoghi:
+        voci = [v for v in risultati if v.sede is sede and v.stato == "in_sede"]
+        coord = [(v.lat, v.lon) for v in voci if v.lat is not None]
+        if sede.lat is not None:
+            centro = (sede.lat, sede.lon)
+        elif coord:
+            centro = (sum(c[0] for c in coord) / len(coord), sum(c[1] for c in coord) / len(coord))
+        else:
+            continue
+        piazzali.append({"id": sede.id, "nome": sede.nome, "n": len(voci), "lat": centro[0], "lon": centro[1],
+                         "esterna": sede.esterna})
+    return auto, piazzali
+
+
 @bp.route("/stock")
 @solo_interni
 def piazzale():
@@ -780,26 +831,7 @@ def piazzale():
     gruppi = [{"chiave": f"sede-{sd.id}", "titolo": sd.nome, "icona": "piazzale",
                "voci": per_zona[f"sede-{sd.id}"]} for sd in sedi_proprie]
     gruppi += [{"chiave": k, "titolo": t, "icona": ic, "voci": per_zona[k]} for k, t, ic in ZONE_STOCK if k in per_zona]
-    # una sola mappa: da lontano un punto per luogo (sedi e fornitori), avvicinandosi le singole auto
-    auto = [{"lat": v.lat, "lon": v.lon, "fase": v.fase, "stato": Veicolo.FASI[v.fase], "sede": v.sede_id,
-             "titolo": v.descrizione, "sotto": v.targa or "VIN …" + v.vin[-8:],
-             "url": url_for("main.veicolo", veicolo_id=v.id), "id": v.id} for v in risultati if v.lat is not None]
-    piazzali = []
-    # tutti i piazzali con la posizione, anche vuoti, più i luoghi dove ci sono auto ferme
-    luoghi = {v.sede for v in risultati if v.sede is not None and v.stato == "in_sede"}
-    luoghi |= set(Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.isnot(None)))
-    luoghi = sorted(luoghi, key=lambda x: (x.tipo != "propria", x.nome))
-    for sede in luoghi:
-        voci = [v for v in risultati if v.sede is sede and v.stato == "in_sede"]
-        coord = [(v.lat, v.lon) for v in voci if v.lat is not None]
-        if sede.lat is not None:
-            centro = (sede.lat, sede.lon)
-        elif coord:
-            centro = (sum(c[0] for c in coord) / len(coord), sum(c[1] for c in coord) / len(coord))
-        else:
-            continue
-        piazzali.append({"id": sede.id, "nome": sede.nome, "n": len(voci), "lat": centro[0], "lon": centro[1],
-                         "esterna": sede.esterna})
+    auto, piazzali = _dati_mappa(risultati)
     senza_posizione = Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.is_(None)).count()
     return render_template("piazzale.html", gruppi=gruppi, totale=len(risultati), f=f,
                            opzioni=_filtri_veicoli(stock, f), auto=auto, piazzali=piazzali,
@@ -896,14 +928,21 @@ def cerca():
     base = Veicolo.query
     if f["fase"] != "consegnato":
         base = base.filter(Veicolo.stato != "consegnato")
-    if f["q"]:
-        like = f"%{f['q']}%"
+    # ogni parola scritta deve trovarsi in un dato dell'auto (12/11/2026 sera: prima "Volkswagen Golf" o
+    # "golf bianca" non trovavano nulla, e il telaio si trovava solo dalle ultime cifre)
+    for parola in f["q"].split():
+        like = f"%{parola}%"
         base = base.filter(or_(
-            Veicolo.vin.ilike(f"%{vin_mod.normalizza(f['q'])}"),
-            Veicolo.modello.ilike(like), Veicolo.marca.ilike(like), Veicolo.colore.ilike(like),
-            Veicolo.targa.ilike(like.replace(" ", ""))))
+            Veicolo.vin.ilike(f"%{vin_mod.normalizza(parola)}%"), Veicolo.vin.ilike(like),
+            Veicolo.modello.ilike(like), Veicolo.marca.ilike(like), Veicolo.versione.ilike(like),
+            Veicolo.colore.ilike(like), Veicolo.targa.ilike(like)))
     tutti = base.order_by(Veicolo.marca, Veicolo.modello, Veicolo.id).limit(500).all()
-    return render_template("cerca.html", f=f, risultati=_filtra_veicoli(tutti, f),
+    if request.args.get("parziale"):  # dal telefono, mentre si scrive: solo le auto trovate
+        return render_template("_risultati_telefono.html", f=f, risultati=_filtra_veicoli(tutti, f))
+    stock = Veicolo.query.filter(Veicolo.stato != "consegnato").all()
+    auto_mappa, luoghi_mappa = _dati_mappa(stock)
+    return render_template("cerca.html", f=f, risultati=_filtra_veicoli(tutti, f), auto_mappa=auto_mappa,
+                           luoghi_mappa=luoghi_mappa, miei_ddt=_ddt_miei(),
                            opzioni=_filtri_veicoli(tutti, f), filtri_attivi=[k for k in CHIAVI_FILTRO if f[k]])
 
 
@@ -1037,6 +1076,22 @@ def _destinazioni_proposte(v, quante=4):
         elenco.remove(arrivo.da_sede)
         elenco.insert(0, arrivo.da_sede)
     return elenco[:quante]
+
+
+def _ddt_miei(quanti=15):
+    """DDT legati a chi guarda: emessi, presi in carico, assegnati o ricevuti da lui (scheda Cerca dal telefono)."""
+    me = g.utente.id
+    movimenti = (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id)
+                 .filter(Ddt.annullato_at.is_(None),
+                         or_(Ddt.creato_da_id == me, Movimento.partenza_utente_id == me,
+                             Movimento.assegnato_a_id == me, Movimento.arrivo_utente_id == me))
+                 .order_by(Ddt.emesso_at.desc()).limit(quanti * 3).all())
+    visti, elenco = set(), []
+    for m in movimenti:
+        if m.ddt_id not in visti:
+            visti.add(m.ddt_id)
+            elenco.append(m.ddt)
+    return elenco[:quanti]
 
 
 def _usate_da_me():

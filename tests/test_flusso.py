@@ -3610,3 +3610,31 @@ class TestTelefonoEssenziale(Base):
         trova = self.c.get(f"/veicolo/{vid}/trova").get_data(as_text=True)
         self.assertIn("data-trova", trova)
         self.assertIn("Apri nelle mappe", trova)
+
+    def test_cerca_per_parole_mappa_e_miei_ddt(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")  # DDT emesso dall'admin
+        for q in ("Volkswagen Golf", "golf bianco", "ZZZ1KZ", "AW000123"):
+            self.assertIn(f"/veicolo/{vid}", self.c.get(f"/cerca?q={q}&parziale=1").get_data(as_text=True), q)
+        self.assertNotIn(f"/veicolo/{vid}", self.c.get("/cerca?q=golf+rosso&parziale=1").get_data(as_text=True))
+        pagina = self.c.get("/cerca").get_data(as_text=True)
+        for testo in ("mappa-telefono", "I tuoi DDT", "DDT 1/"):
+            self.assertIn(testo, pagina)
+
+    def test_home_fornitori_preparazioni_e_calendario(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        self.entra("autista")  # mansione Consegne: anche preparazioni e calendario
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Dai fornitori · 1", home)
+        self.assertIn("fine stimata", home)
+        self.assertIn("Quando saranno pronte", home)
+        self.assertNotIn("cerca-veloce", home)  # la ricerca sta nella scheda Cerca
+        self.assertIn('class="home-telefono tocco solo-telefono"', home)  # sul computer non si vede
+
+    def test_admin_gestisce_gli_account_dal_telefono(self):
+        pagina = self.c.get("/admin/aziende").get_data(as_text=True)
+        self.assertNotIn("Questa pagina si usa dal computer", pagina)
+        self.assertIn("Utenti e partner", self.c.get("/profilo").get_data(as_text=True))
+        self.assertIn("Questa pagina si usa dal computer", self.c.get("/admin/sedi").get_data(as_text=True))

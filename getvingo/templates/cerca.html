@@ -5,17 +5,24 @@
 {% block contenuto %}
 {# Dal telefono (12/11/2026 sera): un campo solo e le auto trovate; toccandone una si vede dov'è e come trovarla #}
 <div class="solo-telefono tocco">
-  <div class="tocco-titolo"><h1>Cerca un'auto</h1></div>
-  <form class="cerca-veloce" role="search">{{ i('cerca') }}<input name="q" value="{{ f.q }}" autocomplete="off" placeholder="Ultime cifre del telaio, targa, modello…" aria-label="Cerca un'auto" {{ 'autofocus' if not f.q }}></form>
-  {% if f.q %}
-  <div class="risultati-telefono">
-    {% for v in risultati[:20] %}<a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">{{ auto_breve(v) }}</a>
-    {% else %}<p class="vuoto-telefono">Nessuna auto trovata con “{{ f.q }}”.</p>{% endfor %}
+  <div class="tocco-titolo"><h1>Cerca</h1></div>
+  <form class="cerca-veloce" role="search" data-cerca-vivo>{{ i('cerca') }}<input type="search" name="q" value="{{ f.q }}" autocomplete="off" enterkeyhint="search"
+    placeholder="Telaio, targa, marca, modello, colore…" aria-label="Cerca un'auto"></form>
+  <div data-risultati-vivo>{% include "_risultati_telefono.html" %}</div>
+
+  <h2 class="sezione-t">Auto sulla mappa</h2>
+  {% if luoghi_mappa %}
+  <div id="mappa-telefono" class="mappa-telefono"></div>
+  <p class="istruzione">Tocca un piazzale per vedere le auto, poi un'auto per aprirla.</p>
+  {% else %}<p class="vuoto-telefono">La mappa compare quando i piazzali hanno la loro posizione (si imposta dal computer).</p>{% endif %}
+
+  <h2 class="sezione-t">I tuoi DDT</h2>
+  <div class="per-te">
+    {% for d in miei_ddt %}{% set m = d.movimento %}{% set k = d.stato[0] %}
+    <a class="per-te-voce {{ 'in_viaggio' if m.stato == 'aperto' else ('da_ritirare' if m.stato == 'predisposto' else 'chiuso') }}" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>DDT {{ d.sigla }} · {{ d.stato[1] }}</b><small>{{ m.veicolo.descrizione }}{% if d.multiplo %} e altre {{ d.movimenti|length - 1 }}{% endif %} · {{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.a_sede.nome }}</small></span>{{ i('chevron', 's') }}</a>
+    {% else %}<p class="vuoto-telefono">Nessun DDT legato a te.</p>{% endfor %}
   </div>
-  {% if risultati|length > 20 %}<p class="istruzione">Sono {{ risultati|length }}: scrivi qualcosa in più (es. le ultime cifre del telaio).</p>{% endif %}
-  {% else %}
-  <p class="istruzione">Scrivi le ultime cifre del telaio, la targa o il modello.</p>
-  {% endif %}
 </div>
 <div class="solo-computer">
 {{ indietro(url_for('main.home')) }}
@@ -49,4 +56,66 @@
   {% endfor %}
 </div>
 </div>
+{% endblock %}
+{% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
+<script>
+  (function () {
+    // ricerca mentre si scrive: solo le auto trovate, senza ricaricare la pagina (la tastiera resta aperta)
+    var form = document.querySelector('[data-cerca-vivo]'), box = document.querySelector('[data-risultati-vivo]');
+    if (form && getComputedStyle(form).display !== 'none') {
+      var campo = form.q, attesa = null, ultima = campo.value;
+      campo.addEventListener('input', function () {
+        clearTimeout(attesa);
+        attesa = setTimeout(function () {
+          var q = campo.value.trim();
+          if (q === ultima) return;
+          ultima = q;
+          fetch('{{ url_for("main.cerca") }}?parziale=1&q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+            .then(function (r) { return r.text(); })
+            .then(function (html) { if (campo.value.trim() === q) box.innerHTML = html; });
+          try { history.replaceState(null, '', '?q=' + encodeURIComponent(q)); } catch (e) {}
+        }, 300);
+      });
+      form.addEventListener('submit', function (e) { e.preventDefault(); campo.blur(); });
+    }
+    // mappa delle auto, come quella dello Stock (senza elenco)
+    var el = document.getElementById('mappa-telefono');
+    if (!el || !window.L || getComputedStyle(el.parentElement).display === 'none') return;
+    var auto = {{ auto_mappa|tojson }}, piazzali = {{ luoghi_mappa|tojson }}, ZOOM_AUTO = 16;
+    var mappa = L.map(el, { zoomControl: true });
+    if (window.bloccaMappa) bloccaMappa(mappa);
+    GetvingoMappa.sfondo(mappa);
+    function colore(fase) {
+      var t = document.createElement('i'); t.className = fase; document.body.appendChild(t);
+      var c = getComputedStyle(t).getPropertyValue('--fase').trim() || '#1F6FB2'; t.remove(); return c;
+    }
+    var strato_luoghi = L.featureGroup(), strato_auto = L.featureGroup();
+    piazzali.forEach(function (p) {
+      L.marker([p.lat, p.lon], { icon: L.divIcon({ className: '', html: '<div class="marker-sede">' + p.n + '</div>', iconSize: [36, 36], iconAnchor: [18, 18] }) })
+        .on('click', function () {
+          var punti = auto.filter(function (a) { return a.sede === p.id; }).map(function (a) { return [a.lat, a.lon]; });
+          if (!punti.length) punti = [[p.lat, p.lon]];
+          mappa.flyToBounds(L.latLngBounds(punti).pad(0.35), { maxZoom: 19, duration: 0.8 });
+        }).addTo(strato_luoghi);
+    });
+    auto.forEach(function (a) {
+      var d = document.createElement('div');
+      var b = document.createElement('b'); b.textContent = a.titolo; d.appendChild(b);
+      var s = document.createElement('div'); s.textContent = a.sotto + ' · ' + a.stato; d.appendChild(s);
+      var l = document.createElement('a'); l.href = a.url; l.textContent = 'Apri →'; d.appendChild(l);
+      L.circleMarker([a.lat, a.lon], { radius: 11, color: '#fff', weight: 3, fillColor: colore(a.fase), fillOpacity: 1 })
+        .bindPopup(d).addTo(strato_auto);
+    });
+    function strati() {
+      if (mappa.getZoom() >= ZOOM_AUTO) { mappa.removeLayer(strato_luoghi); strato_auto.addTo(mappa); }
+      else { mappa.removeLayer(strato_auto); strato_luoghi.addTo(mappa); }
+    }
+    mappa.on('zoomend', strati);
+    mappa.fitBounds(L.latLngBounds(piazzali.map(function (p) { return [p.lat, p.lon]; })).pad(0.3), { maxZoom: 14 });
+    strati();
+  })();
+</script>
 {% endblock %}

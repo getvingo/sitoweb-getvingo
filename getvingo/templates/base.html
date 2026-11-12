@@ -57,7 +57,9 @@
 {# Pagine che dal telefono non servono (12/11/2026 sera): il quadro completo si guarda dal computer #}
 {% set solo_pc = g.utente and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
                   'main.analisi', 'main.nuova_auto', 'main.modifica_auto', 'main.cerca_avanzata')
-                  or ep.startswith('admin.') or ep.startswith('piattaforma.')) %}
+                  or (ep.startswith('admin.') and ep not in ('admin.utenti', 'admin.aziende', 'admin.gruppo_concessionaria',
+                                                            'admin.gruppo_fornitore', 'admin.utente'))
+                  or ep.startswith('piattaforma.')) %}
 {% if g.utente %}
 <header class="testata">
   <div class="testata-dentro">
@@ -78,6 +80,7 @@
       <div class="menu-tendina">
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }} · {{ g.utente.sede.nome if g.utente.ruolo == 'fornitore' and g.utente.sede else g.utente.organizzazione.nome }}</span><span class="menu-email">{{ g.utente.email }}</span></div>
         <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
+        {% if g.utente.ruolo == 'admin' %}<a class="solo-telefono" href="{{ url_for('admin.aziende') }}">{{ i('gestione', 's') }} Utenti e partner</a>{% endif %}
         {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
         {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore solo-computer" role="separator"></div>{% endif %}
         {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
@@ -147,7 +150,7 @@
 {# Dal telefono due voci sole (12/11/2026 sera): tutto il resto si fa toccando l'adesivo dell'auto #}
 {% if g.utente.interno %}
 <nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat(2, 1fr)">
-  <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('nfc') }}Tocca</a>
+  <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home') }}Home</a>
   <a href="{{ url_for('main.cerca') }}" class="{{ 'attivo' if ep in ('main.cerca', 'main.veicolo', 'main.trova') }}">{{ i('cerca') }}Cerca</a>
 </nav>
 {% endif %}

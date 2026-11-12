@@ -2350,10 +2350,9 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .prep-breve h2, .tocco-titolo h1 { text-transform: none; letter-spacing: normal; color: var(--testo); }
 
 /* ---- Sito da telefono essenziale (12/11/2026 sera): solo le azioni sul posto, il quadro completo sul computer ---- */
-.solo-telefono { display: none; }
+@media (min-width: 1024px) { .solo-telefono { display: none !important; } }  /* vince su .tocco, .pagina-computer… */
 @media (max-width: 1023px) {
   .solo-computer { display: none !important; }
-  .solo-telefono { display: block; }
 }
 .pagina-computer { text-align: center; padding: 40px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .pagina-computer > .icona { width: 40px; height: 40px; color: var(--testo-2); }
@@ -2375,13 +2374,32 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .btn.btn-prepara-larga { color: var(--prep); border-color: var(--prep); }
 .btn.btn-danno-larga { color: var(--danno-scuro); border-color: var(--danno); }
 /* Trova l'auto: freccia che segue il telefono */
-.trova { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.trova-auto { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .bussola { position: relative; width: 240px; height: 240px; border-radius: 50%; background: var(--carta); box-shadow: var(--ombra);
   border: 2px solid var(--bordo); display: grid; place-items: center; }
 .bussola-freccia { width: 120px; height: 120px; color: var(--segnale); transition: transform .25s ease-out; }
 .bussola-nord { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: var(--fs-12); font-weight: 700; color: var(--testo-2); }
 .trova-distanza { font-size: var(--fs-30); font-weight: 700; line-height: 1; }
-.trova-vicino .bussola { border-color: var(--ok); background: var(--ok-tenue); }
-.trova-vicino .bussola-freccia { color: var(--ok); }
+.trova-auto.trova-vicino .bussola { border-color: var(--ok); background: var(--ok-tenue); }
+.trova-auto.trova-vicino .bussola-freccia { color: var(--ok); }
 .per-te-voce.ritardo .per-te-barra { background: var(--liv-1); }
 .per-te-voce.lavorazione .per-te-barra { background: var(--st-lavoro); }
+.per-te-voce.pronta .per-te-barra { background: var(--st-pronta); }
+.per-te-voce .testo-ritardo { color: var(--liv-1-testo); font-weight: 650; }
+.home-telefono h2.sezione-t { margin: 8px 0 0; }
+/* calendario dal telefono: quando saranno pronte (preparazioni e fine lavori dei fornitori) */
+.agenda { display: grid; gap: 10px; }
+.agenda-giorno { background: var(--carta); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 6px; }
+.agenda-giorno > b { font-size: var(--fs-14); }
+.agenda-voce { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; color: var(--testo); padding: 6px 0;
+  border-top: 1px solid var(--bordo); }
+.agenda-voce:hover { text-decoration: none; }
+.agenda-voce small { display: block; color: var(--testo-2); font-size: var(--fs-13); }
+.agenda-ora { font-size: var(--fs-13); font-weight: 700; color: var(--prep); }
+.agenda-voce.lavorazione .agenda-ora { color: var(--st-lavoro-pieno); }
+.agenda-voce.ritardo .agenda-ora { color: var(--liv-1-testo); }
+.mappa-telefono { height: 320px; border-radius: var(--r); border: 1px solid var(--bordo); z-index: 0; }
+/* iPhone ingrandisce la pagina se il campo ha il testo sotto i 16 px: la barra di ricerca restava spostata */
+.cerca-veloce input { font-size: 16px; -webkit-appearance: none; appearance: none; }
+.cerca-veloce input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.cerca-veloce input, .cerca-veloce input:focus { border: 0; box-shadow: none; background: none; outline: none; padding: 0; }

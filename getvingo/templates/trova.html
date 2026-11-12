@@ -6,7 +6,7 @@
 {# Trova l'auto in piazzale: la freccia punta verso l'ultima posizione nota (GPS del telefono + bussola).
    Vicino all'auto (entro 15 m) diventa verde: si tocca l'adesivo. #}
 {% set pos = v.ultima_posizione %}
-<div class="tocco trova" data-trova data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">
+<div class="tocco trova-auto" data-trova data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">
   {{ auto_breve(v, stato=False) }}
   {% if v.lat is none %}
   <p class="vuoto-telefono">Posizione dell'auto non ancora nota: si registra al primo tocco dell'adesivo.{% if v.sede %} Ultimo luogo: <b>{{ v.sede.nome }}</b>.{% endif %}</p>

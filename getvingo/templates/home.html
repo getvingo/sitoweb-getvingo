@@ -4,11 +4,11 @@
 {% block contenuto %}
 {# Dal telefono (sotto 1024 px), come nella demo (12/11/2026): tocca un'auto, le tue cose da fare, cerca.
    Il quadro di tutta la concessionaria (Panoramica) sul telefono non si mostra: resta sul computer. #}
-<section class="home-telefono">
-  <div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div>
-  <h1>Cosa fai adesso?</h1>
+<section class="home-telefono tocco solo-telefono">
+  <div class="tocco-titolo"><small class="sopra">Ciao {{ g.utente.nome.split()[0] }}</small><h1>Cosa fai adesso?</h1></div>
   {{ tocca_adesivo() }}
-  <h2 class="titolo-sezione-piccolo">I tuoi lavori</h2>
+
+  <h2 class="sezione-t">I tuoi lavori</h2>
   <div class="per-te">
     {% for x in per_te %}
     <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
@@ -16,9 +16,54 @@
     {% else %}<p class="vuoto-telefono">Niente assegnato a te adesso.</p>
     {% endfor %}
   </div>
-  <form class="cerca-veloce" action="{{ url_for('main.cerca') }}" role="search">
-    {{ i('cerca') }}<input name="q" autocomplete="off" placeholder="Ultime cifre del telaio, targa, modello…" aria-label="Cerca un'auto">
-  </form>
+
+  {% if da_prendere %}
+  <h2 class="sezione-t">Da andare a prendere · {{ da_prendere|length }}</h2>
+  <div class="per-te">
+    {% for v, m in da_prendere %}{% set r = v.movimento_predisposto %}
+    <a class="per-te-voce da_ritirare" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ v.descrizione }} · {{ v.sede.nome }}</b>
+        <small>{{ m.lavorazione }} finita {{ m.lavorazione_completata_at|da_quanto }} · {% if r and r.assegnato_a %}la ritira {{ r.assegnato_a.nome }}{% elif r %}DDT di rientro pronto{% else %}manca il DDT di rientro{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if in_lavorazione %}
+  <h2 class="sezione-t">Dai fornitori · {{ in_lavorazione|length }}</h2>
+  <div class="per-te">
+    {% for v, m in in_lavorazione %}
+    <a class="per-te-voce {{ 'ritardo' if m.giorni_ritardo else 'lavorazione' }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ v.descrizione }} · {{ v.sede.nome }}</b>
+        <small>{{ m.lavorazione }} · {% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}fine stimata {{ m.lavorazione_prevista_at|data('%d/%m') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if preparazioni %}
+  <h2 class="sezione-t">In preparazione · {{ preparazioni|length }}</h2>
+  <div class="per-te">
+    {% for p in preparazioni %}{% set rit = p.pronta_entro_at and p.pronta_entro_at < adesso() %}
+    <a class="per-te-voce {{ 'ritardo' if rit else 'preparazione' }}" href="{{ url_for('main.veicolo', veicolo_id=p.veicolo_id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>{{ p.veicolo.descrizione }} · {{ p.avanzamento }}%</b>
+        <small>passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}: {{ p.prossima_fase }}{% if p.pronta_entro_at %} · {{ 'doveva essere pronta' if rit else 'pronta entro' }} {{ p.pronta_entro_at|data('%d/%m %H:%M') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if calendario %}
+  <h2 class="sezione-t">Quando saranno pronte</h2>
+  <div class="agenda">
+    {% for giorno, voci in calendario %}
+    <div class="agenda-giorno"><b>{{ giorno }}</b>
+      {% for e in voci %}
+      <a class="agenda-voce {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ url_for('main.veicolo', veicolo_id=e.v.id) }}">
+        <span class="agenda-ora">{% if e.ritardo %}in ritardo{% elif e.tipo == 'preparazione' %}{{ e.quando|data('%H:%M') }}{% else %}entro sera{% endif %}</span>
+        <span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></span></a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 </section>
 <div class="titolo-pagina">
   <div><div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div><h1>Panoramica</h1>
