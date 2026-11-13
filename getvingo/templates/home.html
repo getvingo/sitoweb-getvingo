@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, icona_fase, tocca_adesivo %}
+{% from "_macro.html" import i, icona_fase, tocca_adesivo, marchio, badge_condizione %}
 {% block larghezza %}largo{% endblock %}
 {% block contenuto %}
 {# Dal telefono (sotto 1024 px), come nella demo (12/11/2026): tocca un'auto, le tue cose da fare, cerca.
@@ -113,76 +113,56 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 </section>
 {% endif %}
 
-<div class="panoramica">
+{# Panoramica (14/11/2026): stesso stile delle altre pagine. In alto una riga di numeri a pillole (ognuno porta
+   alla sua pagina), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
+<div class="panoramica-righe">
+<nav class="numeri-riga" aria-label="Le auto oggi">
+  {% macro numero(url, fase, icona, n, etichetta) %}<a href="{{ url }}" class="numero-voce {{ fase }} {{ 'zero' if not n }}"><span class="numero-icona">{{ i(icona, 's') }}</span><b>{{ n }}</b><span>{{ etichetta }}</span></a>{% endmacro %}
+  {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
+  {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
+  {{ numero(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio, 'In viaggio') }}
+  {{ numero(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
+  {{ numero(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
+  {{ numero(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
+</nav>
+
 {% if danni %}
-{# Avviso proporzionato (10/11/2026): rosso pieno solo se un danno blocca una consegna (auto in preparazione o
-   pronta); altrimenti contenuto, sempre rosso ma senza coprire il resto della pagina #}
 {% set bloccanti = danni|selectattr('veicolo.fase', 'in', ['preparazione', 'pronta'])|list %}
-<a class="allerta-danni area-danni {{ 'pieno' if bloccanti else 'contenuto' }}" href="{{ url_for('main.danni') }}">
-  <span class="tondo danno">{{ i('attenzione') }}</span>
-  <div><b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
-    {% set primo = bloccanti[0] if bloccanti else danni[0] %}
-    <span>{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span></div>
-  {{ i('chevron') }}
+<a class="riga-avviso-danni" href="{{ url_for('main.danni') }}">
+  <span class="numero-icona">{{ i('attenzione', 's') }}</span>
+  <b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
+  {% set primo = bloccanti[0] if bloccanti else danni[0] %}
+  <span class="tenue">{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span>
+  {{ i('chevron', 's') }}
 </a>
 {% endif %}
 
-<section class="area-numeri">
-<h2>{{ i('auto') }} Le auto oggi</h2>
-<div class="riquadri">
-  {% set tot_auto = [conteggi.in_viaggio + conteggi.da_ritirare + conteggi.lavorazione + conteggi.preparazione + conteggi.pronta + conteggi.stock, 1]|max %}
-  {% macro riquadro(url, fase, icona, n, etichetta) %}
-  <a href="{{ url }}" class="{{ 'zero' if not n }}"><span class="tondo {{ fase }}">{{ i(icona) }}</span><div><strong data-conta="{{ n }}">{{ n }}</strong><span class="et">{{ etichetta }}</span></div>
-    <span class="barra-stato {{ fase }}" style="--quota: {{ '%.3f'|format(n / tot_auto) }}" aria-hidden="true"></span></a>
-  {% endmacro %}
-  {# ordine fisso (si impara a memoria): prima ciò che chiede un'azione, poi ciò che è in corso, poi lo stock #}
-  {{ riquadro(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
-  {{ riquadro(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte consegna') }}
-  {{ riquadro(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio,
-     'In viaggio' ~ (' · ' ~ conteggi.ddt_in_viaggio ~ ' DDT' if conteggi.ddt_in_viaggio and conteggi.ddt_in_viaggio != conteggi.in_viaggio else '')) }}
-  {{ riquadro(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
-  {{ riquadro(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
-  {{ riquadro(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
-</div>
-
-{# La giornata di oggi dal calendario della preparazione: solo le preparazioni delle auto #}
-<div class="oggi-calendario">
-  <div class="oggi-testa"><h2>{{ i('brilla') }} Preparazioni · oggi {{ oggi_data.strftime('%d/%m') }}</h2>
-    <a class="btn piccolo apri-calendario" href="{{ url_for('main.preparazione', vista='corso', modo='calendario') }}">{{ i('orologio', 's') }} Apri calendario</a></div>
-  {% for e in oggi %}
-  <a class="oggi-voce ev {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ url_for('main.veicolo', veicolo_id=e.v.id) }}">
-    <span class="ora">{{ e.at|data('%H:%M') if not e.ritardo else e.at|data('%d/%m') }}</span>
-    <span class="testo"><b>{{ e.v.descrizione }}{{ condizione(e.v) }}</b>
-      <small>{{ 'In ritardo · ' if e.ritardo }}{{ tipi_evento[e.tipo] }}{{ ' · ora: ' ~ e.nota if e.tipo == 'pronta_entro' and e.nota }}</small></span>
-  </a>
-  {% else %}
-  <p class="tenue piccolo" style="margin:0">Nessuna preparazione da finire oggi.</p>
+<div class="fare-testa"><h2>Da fare{% if totale_da_fare %} <span class="conta-arancio">{{ totale_da_fare }}</span>{% endif %}</h2>
+  <a class="btn piccolo" href="{{ url_for('main.preparazione', vista='corso', modo='calendario') }}">{{ i('orologio', 's') }} Calendario preparazioni</a></div>
+{% if not totale_da_fare %}<div class="vuoto">{{ i('check') }}Niente da fare adesso.</div>
+{% else %}
+<table class="tabella-stock tabella-fare">
+  <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-vai"></colgroup>
+  <thead><tr><th>Auto</th><th>Cosa fare</th><th><span class="nascosto">Apri</span></th></tr></thead>
+  {% for chiave, titolo, icona, voci in da_fare if voci %}
+  <tbody class="gruppo-stock">
+    <tr class="riga-gruppo"><th colspan="3">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th></tr>
+    {% for x in voci %}
+    <tr class="riga-stock fare-l{{ x.livello }} fare-{{ chiave }}" data-url="{{ x.url }}">
+      <td class="cella-auto"><div>{{ marchio(x.v) }}<span><a href="{{ x.url }}"><b>{{ x.v.descrizione }}</b></a>
+        <small>{{ badge_condizione(x.v) }}{% if x.v.targa %} <span class="targa-chip">{{ x.v.targa }}</span>{% endif %} <span class="vin">{{ x.v.vin[-8:] }}</span></small></span></div></td>
+      <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ x.etichetta }}</span><small>{{ x.testo }}</small></td>
+      <td class="cella-mappa">{{ i('chevron', 's') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
   {% endfor %}
-</div>
-</section>
-
-<section class="area-fare">
-<h2 class="importante">{{ i('attenzione') }} Da fare{% if totale_da_fare %} <span class="conta-arancio">{{ totale_da_fare }}</span>{% endif %}</h2>
-{% if not totale_da_fare %}<div class="vuoto">{{ i('check') }}Niente da fare adesso.</div>{% endif %}
-{% for chiave, titolo, icona, voci in da_fare if voci %}
-<div class="gruppo-fare gruppo-{{ chiave }}">
-  <h3 class="titolo-gruppo">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></h3>
-  <div class="lista da-fare">
-  {% for x in voci %}
-    <a class="voce l{{ x.livello }}" href="{{ x.url }}">
-      {{ icona_fase(x.v) }}
-      <div class="corpo"><span class="liv l{{ x.livello }}">{{ x.etichetta }}</span>
-        <h3>{{ x.v.descrizione }}{{ condizione(x.v) }}</h3><div class="tratta">{{ x.testo }}</div></div>
-      {{ i('chevron') }}
-    </a>
-  {% endfor %}
-  </div>
-</div>
-{% endfor %}
-</section>
+</table>
+{% endif %}
 </div>
 {% endblock %}
 {% block script %}
+<script src="{{ url_for('static', filename='righe.js', v=versione_statici) }}"></script>
 <script>
   // Trova: risultati mentre si scrive (frecce per scegliere, Invio per aprire, Esc per chiudere)
   (function () {

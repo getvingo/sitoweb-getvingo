@@ -59,11 +59,11 @@
       <td class="cella-auto"><div>{{ marchio(v) }}
         <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" title="{{ v.descrizione }}{{ ' · ' ~ v.versione if v.versione }}"><b>{{ v.descrizione }}</b></a>
           <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %}<span class="badge-comm">{{ i('camion', 's') }} Commerciale</span>{% endif %}</small></span></div></td>
-      <td class="cella-telaio">{% if v.targa %}<span class="targa-grande">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></td>
+      <td class="cella-telaio">{% if v.targa %}<span class="targa-chip">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></td>
       <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
         {% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}
         {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</td>
-      <td class="cella-da">{{ (v.stato_dal|da_tempo)|replace('da ', '') }}</td>
+      <td class="cella-da">{% if k != 'in_sede' %}{{ (v.stato_dal|da_tempo)|replace('da ', '') }}{% endif %}</td>
       <td class="cella-mappa">{% if v.lat is not none %}<button type="button" class="btn-icona" data-sulla-mappa="{{ v.id }}" title="Mostra sulla mappa" aria-label="Mostra {{ v.descrizione }} sulla mappa">{{ i('pin', 's') }}</button>{% endif %}</td>
     </tr>
     {% endfor %}

@@ -2616,3 +2616,33 @@ body.con-trova .nav-basso, body.con-trova .testata { display: none; }
 a.auto-breve-link { color: inherit; position: relative; padding-right: 54px; }
 a.auto-breve-link:hover { text-decoration: none; border-color: var(--segnale); }
 a.auto-breve-link::after { content: "Dati ›"; position: absolute; right: 12px; top: 12px; font-size: var(--fs-12); font-weight: 700; color: var(--segnale); }
+/* ---- Targa nelle righe (14/11/2026): chip pulito, scritta scura su fondo chiaro, senza fascia blu ---- */
+.targa-chip { display: inline-block; font-family: var(--mono); font-weight: 750; font-size: var(--fs-13); letter-spacing: .05em; line-height: 20px;
+  padding: 0 7px; border-radius: var(--r-xs); background: var(--superficie); border: 1px solid var(--bordo-forte); color: var(--testo); white-space: nowrap; }
+.cella-telaio .targa-chip { margin-bottom: 3px; }
+.cella-auto small .targa-chip { font-size: 11px; line-height: 17px; padding: 0 5px; margin-right: 4px; }
+/* ---- Panoramica a righe (14/11/2026): numeri a pillole, avviso danni in una riga, "Da fare" come le altre tabelle ---- */
+.numeri-riga { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.numero-voce { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px 0 6px; border-radius: var(--r-pillola);
+  border: 1.5px solid var(--bordo); background: var(--carta); color: var(--testo); font-size: var(--fs-14); font-weight: 600; }
+.numero-voce:hover { text-decoration: none; border-color: var(--fase); }
+.numero-voce b { font-size: var(--fs-20); color: var(--fase); font-variant-numeric: tabular-nums; }
+.numero-icona { width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center; flex: none;
+  background: color-mix(in srgb, var(--fase, var(--danno)) 15%, var(--carta)); color: var(--fase, var(--danno)); }
+.numero-voce.zero { opacity: .55; }
+.riga-avviso-danni { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; margin: 0 0 16px; border-radius: var(--r);
+  background: var(--carta); border: 1px solid var(--bordo); border-left: var(--bordo-stato) solid var(--danno); color: var(--testo); font-size: var(--fs-15); }
+.riga-avviso-danni:hover { text-decoration: none; border-color: var(--danno); }
+.riga-avviso-danni b { color: var(--danno-scuro); }
+.riga-avviso-danni .icona:last-child { margin-left: auto; color: var(--testo-2); }
+.fare-testa { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 2px; }
+.fare-testa h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.tabella-fare .c-auto { width: 38%; } .tabella-fare .c-cosa { width: auto; } .tabella-fare .c-vai { width: 48px; }
+.tabella-fare .cella-stato small { white-space: normal; }
+.tabella-fare .cella-mappa { color: var(--testo-2); }
+.riga-stock.fare-l1 { --fase: var(--liv-1); } .riga-stock.fare-l2 { --fase: var(--liv-2); } .riga-stock.fare-l3 { --fase: var(--liv-3); }
+.riga-stock.fare-viaggi { --fase: var(--st-viaggio); }
+.riga-stock.fare-preparazione.fare-l1 { --fase: var(--in-ritardo); } .riga-stock.fare-preparazione.fare-l2,
+.riga-stock.fare-preparazione.fare-l3 { --fase: var(--st-prep); }
+.riga-stock.fare-l1 .pillola-stato { background: var(--fase); color: #fff; } .riga-stock.fare-l1 .pillola-stato i { background: #fff; }
+.panoramica-righe { margin-top: 12px; }

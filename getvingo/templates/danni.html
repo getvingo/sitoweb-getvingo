@@ -23,7 +23,7 @@
   <tr class="riga-stock danno-{{ 'aperto' if d.aperto else 'risolto' }}" data-url="{{ url_for('main.danno', danno_id=d.id, torna=torna) }}"
       data-cerca="{{ [v.descrizione, v.vin, v.targa, d.zona, d.descrizione, d.segnalato_da.nome, d.CONTESTI[d.contesto]]|select|join(' ')|lower }}">
     <td class="cella-auto"><div>{{ marchio(v) }}<span><a href="{{ url_for('main.danno', danno_id=d.id, torna=torna) }}"><b>{{ v.descrizione }}</b></a>
-      <small>{% if v.targa %}<span class="targa-grande piccola">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
+      <small>{% if v.targa %}<span class="targa-chip">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
     <td class="cella-lavoro"><b>{{ d.zona }}</b><small title="{{ d.descrizione }}">{{ d.descrizione or 'Nessuna descrizione: vedi le foto' }}</small></td>
     <td class="cella-tratta"><span>{{ d.CONTESTI[d.contesto] }}{% if d.movimento %} · DDT {{ d.movimento.ddt.sigla }}{% endif %}</span>
       <small>{{ d.segnalato_da.nome }} · {{ d.segnalato_at|data('%d/%m %H:%M') }} · {{ d.foto_segnalazione|length }} foto</small></td>
