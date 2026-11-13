@@ -238,7 +238,8 @@ def carica():
     for v, entro, fatti, ore_fa in ((tucson, oggi_tardi, 1, 6),                                          # entro oggi
                                     (qashqai, slot_passato(), 2, 40),                                   # in ritardo
                                     (xc40, slot_da((adesso() + timedelta(days=3)).replace(hour=12, minute=0)), 0, 2)):
-        prep = servizi.metti_in_preparazione(v, utenti["ufficio"], entro)
+        # slot ricontrollato adesso: il venerdì sera "entro oggi" diventa lunedì 8:30, che la Puma può aver già preso
+        prep = servizi.metti_in_preparazione(v, utenti["ufficio"], slot_da(entro))
         prep.creata_at = _indietro(hours=ore_fa)
         passi(prep, fatti, ogni_ore=2)
     prep = rientro_in_sede(yaris, carrozzeria, utenti["carrozzeria"], giorni_fa=8, giorni_lav=4, ore_attesa=26)
