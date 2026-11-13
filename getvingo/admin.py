@@ -610,6 +610,7 @@ def importa():
                 scartati.append(n)
                 continue
             veicolo = Veicolo.query.filter_by(vin=vin).first()
+            nuovo = veicolo is None
             if veicolo is None:
                 veicolo = Veicolo(vin=vin)
                 db.session.add(veicolo)
@@ -619,6 +620,7 @@ def importa():
             for campo in ("marca", "modello", "versione", "colore"):
                 if riga.get(campo):
                     setattr(veicolo, campo, riga[campo])
+            vin_mod.completa(veicolo, tipologia=nuovo and not (riga.get("tipologia") or riga.get("tipo")))  # dal VIN ciò che manca
             uniforma.auto(veicolo)
             cond = (riga.get("condizione") or riga.get("nuovo/usato") or riga.get("stato") or "").strip().lower()
             if cond in ("nuovo", "nuova", "n"):

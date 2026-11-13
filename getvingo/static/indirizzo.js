@@ -38,6 +38,21 @@
     }
     function provincia(a) { return (a['ISO3166-2-lvl6'] || '').replace(/^IT-/, ''); }
     function comuneDi(a) { return a.municipality || a.city || a.town || a.village || ''; }
+    // "Via Roma, n. 12/a" → strada "Via Roma", civico "12/A" (anche 12 bis, snc). Il numero deve stare in fondo:
+    // "Via 4 Novembre" non ha civico.
+    function separa(via) {
+      var v = (via || '').replace(/\s+/g, ' ').trim();
+      if (/[\s,]s\.?\s?n\.?\s?c\.?$/i.test(v)) return { strada: v.replace(/[\s,]+s\.?\s?n\.?\s?c\.?$/i, ''), civico: 'snc' };
+      var m = v.match(/^(.*?\D)[\s,]+(?:n(?:r|um(?:ero)?)?\s?[.°º]?\s*)?(\d+)\s*(?:\/?\s*([a-z])|\s+(bis|ter|quater))?$/i);
+      if (!m) return { strada: v, civico: '' };
+      return { strada: m[1].replace(/[\s,]+$/, ''), civico: m[2] + (m[3] ? '/' + m[3].toUpperCase() : m[4] ? ' ' + m[4].toLowerCase() : '') };
+    }
+    function numero(civ) { return ((civ || '').split(/[;,]/)[0].match(/\d+/) || [''])[0]; }  // 12/A, "12;14" → 12
+    function semplice(t) { return (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, ''); }
+    function stessoComune(a, comune) {
+      var c0 = semplice(comune);
+      return [a.municipality, a.city, a.town, a.village, a.hamlet, a.suburb].some(function (x) { return x && semplice(x) === c0; });
+    }
     function compila(a, sovrascrivi) {
       var imposta = function (n, v) { if (v && (sovrascrivi || !c(n).value)) c(n).value = v; };
       imposta('comune', comuneDi(a)); imposta('cap', a.postcode); imposta('provincia', provincia(a));
@@ -54,25 +69,53 @@
         return cercaGoogle(via + ', ' + comune + ', ' + (c('stato').value || 'Italia'), null, true).then(function (ris) {
           var r = ris[0];
           if (!r || !r.via) { verificato(null); return stato('Via non trovata a ' + comune + ': controlla come è scritta, oppure tocca il punto sulla mappa.', 'errore'); }
-          c('comune').value = r.comune || comune; c('cap').value = r.cap || c('cap').value;
+          if (r.comune && semplice(r.comune) !== semplice(comune)) {
+            verificato(null); return stato('Via non trovata a ' + comune + ': controlla come è scritta, oppure tocca il punto sulla mappa.', 'errore');
+          }
+          c('cap').value = r.cap || c('cap').value;
           c('provincia').value = r.provincia || c('provincia').value; c('stato').value = r.stato || c('stato').value;
           verificato(r.lat, r.lon);
-          stato(/\d/.test(via) && !/\d/.test(r.via) ? 'Via trovata; il civico non è sulla mappa: controlla il punto.' : 'Indirizzo trovato ✓', 'ok');
+          var pg = separa(via), ng = numero(pg.civico);
+          stato(!pg.civico ? 'Via trovata · aggiungi il numero civico' : (numero(separa(r.via).civico) === ng || pg.civico === 'snc') ? 'Indirizzo trovato ✓' :
+                'Via trovata ✓ · il civico ' + pg.civico + ' non è sulla mappa: il punto è sulla via, spostalo sul numero giusto se serve', 'ok');
         }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
       }
-      var q = new URLSearchParams({ format: 'jsonv2', addressdetails: 1, limit: 1, 'accept-language': 'it',
-                                    street: via, city: comune, country: c('stato').value || 'Italia' });
-      fetch(NOMINATIM + 'search?' + q).then(function (r) { return r.json(); }).then(function (ris) {
-        var r = ris && ris[0], a = r && r.address;
-        if (!a || !a.road) {
+      // OpenStreetMap legge "Treviso" anche come provincia e restituisce la stessa via di un altro comune
+      // (Via Roma 12 a Castelfranco): si tengono solo i risultati del comune scritto. Prima con il civico,
+      // poi la sola via; il comune scritto non si sovrascrive mai.
+      var parti = separa(via), num = numero(parti.civico);
+      var tentativi = [num ? num + ' ' + parti.strada : '', parti.strada, via]
+        .filter(function (t, i, l) { return t && l.indexOf(t) === i; });
+      function prova(i) {
+        if (i >= tentativi.length) return Promise.resolve(null);
+        var q = new URLSearchParams({ format: 'jsonv2', addressdetails: 1, limit: 10, 'accept-language': 'it',
+                                      street: tentativi[i], city: comune, country: c('stato').value || 'Italia' });
+        return fetch(NOMINATIM + 'search?' + q).then(function (r) { return r.json(); }).then(function (ris) {
+          var qui = (ris || []).filter(function (r) { return r.address && r.address.road && stessoComune(r.address, comune); });
+          if (!qui.length) return prova(i + 1);
+          return qui.filter(function (r) { return num && numero(r.address.house_number) === num; })[0] || qui[0];
+        });
+      }
+      prova(0).then(function (r) {
+        if (chiave !== ultima) return;  // nel frattempo l'indirizzo è cambiato
+        if (!r) {
           verificato(null);
           return stato('Via non trovata a ' + comune + ': controlla come è scritta, oppure tocca il punto sulla mappa.', 'errore');
         }
-        compila(a, true);
+        var a = r.address, trovato = num && numero(a.house_number) === num;
+        ['cap', 'provincia', 'stato'].forEach(function (n) {
+          var v = n === 'cap' ? a.postcode : n === 'provincia' ? provincia(a) : a.country;
+          if (v) c(n).value = v;
+        });
+        // via scritta come sulla mappa e civico in forma pulita (12/A), se non la si sta ancora scrivendo
+        if (document.activeElement !== c('indirizzo')) {
+          c('indirizzo').value = a.road + (parti.civico ? ' ' + parti.civico : '');
+          ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
+        }
         verificato(r.lat, r.lon);
-        var civico = /\d/.test(via) && !a.house_number;
-        stato(civico ? 'Via trovata (' + a.road + '); il civico non è sulla mappa: controlla il punto.' :
-                       'Indirizzo trovato ✓', 'ok');
+        if (!parti.civico) return stato('Via trovata · aggiungi il numero civico', 'ok');
+        stato(trovato || parti.civico === 'snc' ? 'Indirizzo trovato ✓' :
+              'Via trovata ✓ · il civico ' + parti.civico + ' non è sulla mappa: il punto è sulla via, spostalo sul numero giusto se serve', 'ok');
       }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
     }
     function daPunto(la, lo) {
@@ -87,7 +130,8 @@
         .then(function (r) { return r.json(); }).then(function (d) {
           var a = d && d.address;
           if (!a || !a.road) return stato('Qui non c’è una via: tocca più vicino alla strada.', 'errore');
-          c('indirizzo').value = a.road + (a.house_number ? ' ' + a.house_number : '');
+          var civ = a.house_number ? separa('x ' + a.house_number.split(/[;,]/)[0]).civico || a.house_number : '';
+          c('indirizzo').value = a.road + (civ ? ' ' + civ : '');
           compila(a, true);
           ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
           verificato(la, lo);

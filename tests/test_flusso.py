@@ -3640,3 +3640,63 @@ class TestTelefonoEssenziale(Base):
         self.assertNotIn("Questa pagina si usa dal computer", pagina)
         self.assertIn("Utenti e partner", self.c.get("/profilo").get_data(as_text=True))
         self.assertIn("Questa pagina si usa dal computer", self.c.get("/admin/sedi").get_data(as_text=True))
+
+
+class TestDecodificaVin(unittest.TestCase):
+    """Decodifica dal VIN (references/01_Guida_Struttura_VIN.md, 02_VIN_Knowledge_Base_AI.md): solo dati certi."""
+    def test_esempi_delle_guide(self):
+        from datetime import date
+        from getvingo.vin import cifra_controllo, decodifica
+        oggi = date(2026, 11, 13)
+        d = decodifica("WVWZZZ1KZ6W000001", oggi)
+        self.assertEqual((d["marca"], d["modello"], d["generazione"], d["anno_modello"], d["paese"]),
+                         ("Volkswagen", "Golf", "V", 2006, "Germania"))
+        d = decodifica("ZFA31200000123456", oggi)  # Fiat: progetto 312 = 500, anno non codificato
+        self.assertEqual((d["marca"], d["modello"], d["anno_modello"], d["paese"]), ("Fiat", "500", None, "Italia"))
+        self.assertEqual(cifra_controllo("1M8GDM9A_KP042788".replace("_", "0")), "X")
+        d = decodifica("1M8GDM9AXKP042788", oggi)  # USA: posizione 7 numerica = ciclo 1980-2009
+        self.assertEqual((d["anno_modello"], d["cifra_controllo"]["ok"], d["avvisi"]), (1989, True, []))
+        self.assertEqual(decodifica("WAUZZZGY5RA037752", oggi)["anno_modello"], 2024)
+        self.assertEqual(decodifica("ZFA25000001234567", oggi)["tipologia"], "commerciale")  # Ducato
+        self.assertEqual(decodifica("WDD2050421F123456", oggi)["modello"], "Classe C")
+
+    def test_niente_dati_inventati(self):
+        from getvingo.vin import decodifica
+        d = decodifica("VR3UHZKXZRJ456120")  # Peugeot: modello e anno non si ricavano in Europa
+        self.assertEqual((d["marca"], d["modello"], d["anno_modello"], d["paese"]), ("Peugeot", "", None, "Francia"))
+        self.assertEqual(decodifica("WF0XXXTTGXKA12345")["tipologia"], "")  # Ford fa auto e furgoni: non si indovina
+        self.assertEqual(decodifica("XXX00000000000000")["marca"], "")
+
+    def test_cifra_di_controllo_sbagliata_solo_proposta(self):
+        from getvingo.vin import decodifica
+        d = decodifica("1M8GDM9AXKP04278B")  # l'OCR ha letto B al posto di 8
+        self.assertEqual(d["vin"], "1M8GDM9AXKP04278B")  # il VIN non cambia da solo
+        self.assertEqual(d["proposta"], "1M8GDM9AXKP042788")
+        self.assertIn("forse è 1M8GDM9AXKP042788", d["avvisi"][0])
+        self.assertEqual(decodifica("WVWZZZ1KZ6W000001")["avvisi"], [])  # in Europa la posizione 9 è libera
+
+
+class TestCivico(unittest.TestCase):
+    def test_via_e_civico_puliti(self):
+        from getvingo.anagrafica import pulisci_via
+        for scritto, atteso in [("Via Roma, n. 12/a", "Via Roma 12/A"), ("via Roma n°12", "via Roma 12"),
+                                ("Via Roma 12 A", "Via Roma 12/A"), ("Via Roma 12 BIS", "Via Roma 12 bis"),
+                                ("Via 4 Novembre", "Via 4 Novembre"), ("Via 4 Novembre  7", "Via 4 Novembre 7"),
+                                ("Via Roma s.n.c.", "Via Roma snc"), ("Via Roma 12/14", "Via Roma 12/14")]:
+            self.assertEqual(pulisci_via(scritto), atteso, scritto)
+
+
+class TestCompilaDalVin(Base):
+    def test_api_e_salvataggio(self):
+        r = self.c.get("/api/veicolo?vin=WVWZZZAUZFW123456").json
+        self.assertEqual((r["marca"], r["modello"], r["tipologia"], r["anno_modello"], r["paese"]),
+                         ("Volkswagen", "Golf", "vettura", 2015, "Germania"))
+        self.assertEqual(r["fonti"], {"marca": "DAL VIN", "modello": "DAL VIN", "tipologia": "DAL VIN"})
+        r = self.c.get("/api/veicolo?vin=1M8GDM9A0KP042788").json  # cifra di controllo sbagliata: avviso
+        self.assertIn("non torna", r["avvisi"][0])
+        # modello non scritto: al salvataggio quello del VIN
+        self.c.post("/abbina/ABCD2345", data={"vin": "ZFA31200000654321", "condizione": "nuovo",
+                                              "sede_id": self._id(Sede, nome="Sede A")})
+        with self.app.app_context():
+            v = Veicolo.query.filter_by(vin="ZFA31200000654321").one()
+            self.assertEqual((v.marca, v.modello), ("Fiat", "500"))

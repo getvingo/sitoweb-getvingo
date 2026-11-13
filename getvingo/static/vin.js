@@ -56,7 +56,8 @@
     precompila(vin);
   }
   function precompila(vin) {
-    // se il veicolo è già arrivato dal gestionale, compila marca/modello/colore
+    // dati del gestionale (se l'auto è stata importata) e, per ciò che manca, quelli che il VIN dice con
+    // certezza (marca, tipo, modello per le marche che lo codificano): vedi vin.decodifica sul server
     fetch('/api/veicolo?vin=' + encodeURIComponent(vin)).then(function (r) {
       return r.ok ? r.json() : null;
     }).then(function (d) {
@@ -66,11 +67,28 @@
         var el = document.querySelector('[name=' + k + ']');
         if (el && !el.value && d[k]) { el.value = d[k]; el.dataset.corretto = '1'; }  // nome ufficiale: non si riformatta
       });
-      if (d.da_vin && d.marca) stato.textContent = 'Marca ricavata dal VIN: ' + d.marca + '. Controlla e completa il modello.';
       var targa = document.querySelector('[name=targa]');
       if (targa && !targa.value && d.targa) targa.value = d.targa;
       var tipo = d.tipologia && document.querySelector('[name=tipologia][value=' + d.tipologia + ']');
       if (tipo) tipo.checked = true;
+      // cosa dice il VIN; se la cifra di controllo non torna, l'avviso (e la proposta da confermare a vista)
+      stato.textContent = '';
+      if (d.avvisi && d.avvisi.length) {
+        stato.textContent = d.avvisi[0] + ' ';
+        if (d.proposta) {
+          var usa = document.createElement('button');
+          usa.type = 'button'; usa.className = 'btn-link'; usa.textContent = 'Usa ' + d.proposta;
+          usa.addEventListener('click', function () {
+            campo.value = d.proposta;
+            campo.dispatchEvent(new Event('input', { bubbles: true }));  // riconta e rilegge i dati
+          });
+          stato.appendChild(usa);
+        }
+      } else {
+        var dalVin = Object.keys(d.fonti || {}).filter(function (k) { return d.fonti[k] === 'DAL VIN'; });
+        if (dalVin.length) stato.textContent = 'Dal VIN: ' + [d.marca, d.modello].filter(Boolean).join(' ') +
+          (d.modello ? '' : ' (il modello scrivilo tu)') + '. Controlla e completa.';
+      }
     }).catch(function () {});
   }
 

@@ -35,8 +35,9 @@
   <div class="letti abbina-solo-letto">
     <div><span>Marca</span><b><span data-letto="marca"></span><em data-fonte="marca"></em></b></div>
     <div><span>Modello · versione</span><b><span data-letto="modello"></span><em data-fonte="modello"></em></b></div>
-    <div><span>Colore</span><b><span data-letto="colore"></span><em data-fonte="modello"></em></b></div>
+    <div><span>Colore</span><b><span data-letto="colore"></span><em data-fonte="colore"></em></b></div>
     <div><span>Tipo</span><b><span data-letto="tipologia"></span><em data-fonte="tipologia"></em></b></div>
+    <div data-riga-origine hidden><span>Costruita</span><b><span data-origine></span><em>DAL VIN</em></b></div>
     <div><span>Dove</span><b><span data-letto="sede"></span>{% if sede_da_posizione %}<em>POSIZIONE</em>{% endif %}</b></div>
   </div>
   <button type="button" class="btn-link altra-destinazione abbina-solo-letto" data-correggi>Qualcosa non torna? Correggi</button>
@@ -106,9 +107,12 @@
     form.addEventListener('invalid', function () { form.classList.add('a-mano'); }, true);  // manca un dato: si mostrano i campi
     document.addEventListener('vin-precompilato', function (e) {
       var d = e.detail || {};
-      fonte('marca', d.marca ? (d.da_vin ? 'DAL VIN' : 'GESTIONALE') : '');
-      fonte('modello', d.modello ? 'GESTIONALE' : '');
-      fonte('tipologia', d.tipologia ? 'GESTIONALE' : '');
+      var f = d.fonti || {};
+      fonte('marca', f.marca || ''); fonte('modello', f.modello || ''); fonte('tipologia', f.tipologia || ''); fonte('colore', f.colore || '');
+      // solo informativi (non si salvano): dove è stata costruita e anno modello, se il VIN li codifica
+      var origine = [d.paese, d.anno_modello ? 'anno modello ' + d.anno_modello : ''].filter(Boolean).join(' · ');
+      form.querySelector('[data-origine]').textContent = origine;
+      form.querySelector('[data-riga-origine]').hidden = !origine;
       aggiorna();
       if (!val('marca') || !val('modello')) form.classList.add('a-mano');  // manca qualcosa: si completa a mano
     });

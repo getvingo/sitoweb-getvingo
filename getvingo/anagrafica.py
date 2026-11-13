@@ -67,10 +67,28 @@ def leggi_fiscali(oggetto, obbligatori=True, solo_cf=False):
     oggetto.piva, oggetto.codice_fiscale = piva, cf
 
 
+_SNC = re.compile(r"[\s,]+s\.?\s?n\.?\s?c\.?$", re.I)
+_CIVICO = re.compile(r"^(.*?\D)[\s,]+(?:n(?:r|um(?:ero)?)?\s?[.°º]?\s*)?(\d+)\s*(?:/?\s*([a-z])|\s+(bis|ter|quater))?$", re.I)
+
+
+def pulisci_via(via):
+    """Via e civico scritti sempre allo stesso modo (come in static/indirizzo.js): "Via Roma, n. 12/a" →
+    "Via Roma 12/A", "12 bis", "snc". Se il civico non si riconosce la via resta com'è scritta."""
+    v = " ".join((via or "").split())
+    if _SNC.search(v):
+        return _SNC.sub("", v) + " snc"
+    m = _CIVICO.match(v)
+    if not m:
+        return v
+    strada, num, lettera, extra = m.groups()
+    return f"{strada.rstrip(' ,')} {num}" + (f"/{lettera.upper()}" if lettera else f" {extra.lower()}" if extra else "")
+
+
 def leggi_indirizzo(oggetto, obbligatorio=True):
     """Indirizzo completo dal modulo. Vale solo se trovato sulla mappa (coordinate presenti): se la via
     non esiste la pagina la segna in rosso e non manda le coordinate, e qui ci si ferma."""
     valori = {c: _testo(c) for c in CAMPI_INDIRIZZO}
+    valori["indirizzo"] = pulisci_via(valori["indirizzo"])
     valori["provincia"] = valori["provincia"].upper()[:4]
     valori["stato"] = valori["stato"] or "Italia"
     try:

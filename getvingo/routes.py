@@ -1302,8 +1302,7 @@ def abbina(codice):
             valore = " ".join(request.form.get(campo, "").split())
             if valore:
                 setattr(veicolo, campo, valore)
-        if not veicolo.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
-            veicolo.marca = vin_mod.marca_da_vin(vin)
+        vin_mod.completa(veicolo)  # marca e modello non scritti: quelli che il VIN dice con certezza
         uniforma.auto(veicolo)  # scritte tutte allo stesso modo
         if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
             veicolo.tipologia = request.form["tipologia"]
@@ -1386,8 +1385,7 @@ def nuova_auto():
             for k in ("marca", "modello", "versione", "colore"):
                 if request.form.get(k, "").strip():
                     setattr(v, k, " ".join(request.form[k].split()))
-            if not v.marca:  # marca non scritta: quella del costruttore ricavata dal VIN
-                v.marca = vin_mod.marca_da_vin(vin)
+            vin_mod.completa(v)  # marca e modello non scritti: quelli che il VIN dice con certezza
             uniforma.auto(v)
             tag.veicolo, tag.abbinato_at = v, adesso()
             servizi.registra_evento(v, "inserimento", g.utente, *_coord())
@@ -1508,15 +1506,26 @@ def modifica_dati_auto(veicolo_id):
 @bp.route("/api/veicolo")
 @solo_interni
 def api_veicolo():
-    """Dati già noti di un VIN (es. importato dal gestionale), per precompilare l'abbinamento;
-    se l'auto non c'è ancora, almeno la marca ricavata dal VIN."""
+    """Dati per precompilare l'abbinamento: quelli già noti (es. importati dal gestionale) e, per ciò che
+    manca, quelli che il VIN dice con certezza (vin.decodifica: marca, tipo, modello dove la marca lo
+    codifica). `fonti` dice da dove viene ogni dato (GESTIONALE / DAL VIN); anno e Paese sono solo informativi."""
     vin = vin_mod.normalizza(request.args.get("vin"))
+    d = vin_mod.decodifica(vin)
     v = Veicolo.query.filter_by(vin=vin).first()
-    if v is None:
-        marca = vin_mod.marca_da_vin(vin)
-        return ({"vin": vin, "marca": marca, "da_vin": True} if marca else ({}, 404))
-    return {"vin": v.vin, "marca": v.marca, "modello": v.modello, "versione": v.versione, "colore": v.colore, "tipologia": v.tipologia,
-            "targa": v.targa}
+    dati, fonti = {}, {}
+    if v is not None:
+        for k in ("marca", "modello", "versione", "colore", "targa"):
+            if getattr(v, k):
+                dati[k], fonti[k] = getattr(v, k), "GESTIONALE"
+        if v.tipologia:
+            dati["tipologia"], fonti["tipologia"] = v.tipologia, "GESTIONALE"
+    for k in ("marca", "modello", "tipologia"):
+        if k not in dati and d[k] and (k != "tipologia" or d[k] in Veicolo.TIPOLOGIE):
+            dati[k], fonti[k] = d[k], "DAL VIN"
+    if not dati and not d["avvisi"]:
+        return {}, 404
+    return {"vin": vin, **dati, "fonti": fonti, "da_vin": fonti.get("marca") == "DAL VIN",
+            "anno_modello": d["anno_modello"], "paese": d["paese"], "avvisi": d["avvisi"], "proposta": d["proposta"]}
 
 
 @bp.route("/veicolo/<int:veicolo_id>/note", methods=["POST"])
