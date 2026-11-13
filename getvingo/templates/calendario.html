@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}Calendario · Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{% block contenuto %}
+{# Calendario completo (14/11/2026): preparazioni e fine lavori dei fornitori insieme, per organizzare gli spostamenti.
+   Colori: verde acqua preparazioni, senape lavorazioni; piene se pronte/finite in anticipo; bordo rosso che lampeggia se in ritardo #}
+<div class="titolo-pagina"><div><h1>Calendario</h1>
+  <p class="descrizione-pagina">Quando le auto saranno pronte: preparazioni e fine lavori dei fornitori, giorno per giorno.</p></div>
+  <a class="btn piccolo" href="{{ url_for('main.home') }}">{{ i('home', 's') }} Torna alla Home</a></div>
+
+<div class="barra-modo">
+  <span class="barra-modo-sx">
+    <a class="cal-tel-freccia cal-nav" href="{{ url_for('main.calendario_completo', mese=prec) }}" aria-label="Mese prima">‹</a>
+    <b class="cal-mese-titolo">{{ titolo }}</b>
+    <a class="cal-tel-freccia cal-nav" href="{{ url_for('main.calendario_completo', mese=succ) }}" aria-label="Mese dopo">›</a>
+    <a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">Oggi</a>
+  </span>
+  <span class="legenda-pronte">
+    <span class="lg preparazione">Preparazione</span><span class="lg preparazione-anticipo">Pronta in anticipo</span>
+    <span class="lg lavorazione">Fine lavori fornitore</span><span class="lg lavorazione-anticipo">Finita in anticipo</span>
+    <span class="lg ritardo">In ritardo{% if conta.ritardo %} · {{ conta.ritardo }}{% endif %}</span></span>
+</div>
+
+<div class="cal-mese">
+  {% for nome in ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'] %}<div class="cal-mese-sett">{{ nome }}</div>{% endfor %}
+  {% for settimana in settimane %}{% for g_ in settimana %}
+  <section class="cal-giorno cal-mese-cella {{ 'oggi' if g_.oggi }} {{ 'fuori' if not g_.nel_mese }}">
+    <h3>{{ g_.data.day }}{% if g_.voci %}<span class="conteggio">{{ g_.voci|length }}</span>{% endif %}</h3>
+    {% for e in g_.voci %}
+    <a class="cal-voce {{ e.tipo }} {{ e.stato }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
+      <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
+    {% endfor %}
+  </section>
+  {% endfor %}{% endfor %}
+</div>
+{% endblock %}

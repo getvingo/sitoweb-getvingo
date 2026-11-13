@@ -59,7 +59,7 @@
       <div class="cal-tel-testa"><button type="button" class="cal-tel-freccia" data-cal-prec aria-label="Mese prima">‹</button>
         <b data-cal-titolo></b><button type="button" class="cal-tel-freccia" data-cal-succ aria-label="Mese dopo">›</button></div>
       <div class="cal-tel-griglia" data-cal-griglia></div>
-      <div class="cal-tel-legenda">{% if not cal_solo_prep %}<span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori</span>{% endif %}<span class="lg ritardo">In ritardo</span></div>
+      <div class="cal-tel-legenda">{% if not cal_solo_prep %}<span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori</span>{% endif %}<span class="lg anticipo-preparazione">Pronta prima</span>{% if not cal_solo_prep %}<span class="lg anticipo-lavorazione">Finita prima</span>{% endif %}<span class="lg ritardo">In ritardo</span></div>
     </div>
     <h3 class="cal-tel-giorno" data-cal-giorno></h3>
     <div class="per-te" data-cal-voci></div>
@@ -67,7 +67,7 @@
   </section>
 </section>
 <div class="titolo-pagina">
-  <div><div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div><h1>Panoramica</h1>
+  <div><div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div><h1>Home</h1>
     <p class="descrizione-pagina">Cosa c'è da fare adesso e dove sono le auto, a colpo d'occhio.</p></div>
 </div>
 
@@ -138,25 +138,19 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 </a>
 {% endif %}
 
-{# Quando saranno pronte (14/11/2026): preparazioni (verde acqua, con l'orario) e fine lavori dei fornitori (senape)
-   per oggi e i prossimi 9 giorni lavorativi; i ritardi stanno su oggi con il bordo rosso che lampeggia #}
-<div class="fare-testa"><h2>Quando saranno pronte</h2>
-  <span class="legenda-pronte"><span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori fornitore</span><span class="lg ritardo">In ritardo</span></span></div>
-<div class="cal-pronte">
-  {% for g_ in calendario_pronte %}
-  <section class="cal-giorno {{ 'oggi' if g_.oggi }} {{ 'vuoto' if not g_.voci }}">
-    <h3>{{ g_.nome }} <small>{{ g_.data.strftime('%d/%m') }}</small>{% if g_.voci %}<span class="conteggio">{{ g_.voci|length }}</span>{% endif %}</h3>
-    {% for e in g_.voci %}
-    <a class="cal-voce {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
-      <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
-    {% else %}<p class="cal-niente">—</p>
-    {% endfor %}
-  </section>
+{# Pronte oggi (14/11/2026): solo il giorno corrente (ritardi compresi); il mese intero nel Calendario completo #}
+<div class="fare-testa"><h2>Pronte oggi{% if pronte_oggi %} <span class="conteggio">{{ pronte_oggi|length }}</span>{% endif %}</h2>
+  <a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">{{ i('orologio', 's') }} Calendario completo</a></div>
+<div class="oggi-pronte">
+  {% for e in pronte_oggi %}
+  <a class="cal-voce {{ e.tipo }} {{ e.stato }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
+    <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
+  {% else %}<p class="vuoto">Niente in calendario per oggi.</p>
   {% endfor %}
 </div>
+<p class="legenda-pronte" style="margin:-8px 0 18px"><span class="lg preparazione">Preparazione</span><span class="lg preparazione-anticipo">Pronta in anticipo</span><span class="lg lavorazione">Fine lavori</span><span class="lg lavorazione-anticipo">Finita in anticipo</span><span class="lg ritardo">In ritardo</span></p>
 
-<div class="fare-testa"><h2>Da fare{% if totale_da_fare %} <span class="conta-arancio">{{ totale_da_fare }}</span>{% endif %}</h2>
-  <a class="btn piccolo" href="{{ url_for('main.preparazione', vista='corso', modo='calendario') }}">{{ i('orologio', 's') }} Calendario preparazioni</a></div>
+<div class="fare-testa"><h2>Da fare{% if totale_da_fare %} <span class="conta-arancio">{{ totale_da_fare }}</span>{% endif %}</h2></div>
 {% if not totale_da_fare %}<div class="vuoto">{{ i('check') }}Niente da fare adesso.</div>
 {% else %}
 <table class="tabella-stock tabella-fare">
@@ -200,7 +194,7 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
       if (!lista.length) { var p = document.createElement('p'); p.className = 'vuoto-telefono'; p.textContent = 'Nessuna auto in calendario.'; dove.appendChild(p); return; }
       lista.forEach(function (e) {
         var a = document.createElement('a'); a.href = e.u;
-        a.className = 'per-te-voce ' + (e.r ? 'ritardo cal-ritardo' : (e.t === 'preparazione' ? 'preparazione' : 'lavorazione'));
+        a.className = 'per-te-voce ' + (e.r ? 'ritardo cal-ritardo' : e.s === 'anticipo' ? 'anticipo-' + e.t : (e.t === 'preparazione' ? 'preparazione' : 'lavorazione'));
         a.innerHTML = '<span class="per-te-barra" aria-hidden="true"></span><span><b></b><small></small></span>';
         a.querySelector('b').textContent = e.o + ' · ' + e.n; a.querySelector('small').textContent = e.c;
         dove.appendChild(a);
@@ -219,7 +213,10 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
         if (id === oggi) b.classList.add('oggi'); if (id === scelto) b.classList.add('scelto'); if (id < oggi) b.classList.add('passato');
         b.innerHTML = '<span>' + n + '</span><i></i>';
         var punti = b.querySelector('i');
-        ['preparazione', 'lavorazione'].forEach(function (t) { if (lista.some(function (e) { return e.t === t && !e.r; })) { var p = document.createElement('em'); p.className = t; punti.appendChild(p); } });
+        ['preparazione', 'lavorazione'].forEach(function (t) {
+          if (lista.some(function (e) { return e.t === t && e.s === 'previsto'; })) { var p = document.createElement('em'); p.className = t; punti.appendChild(p); }
+          if (lista.some(function (e) { return e.t === t && e.s === 'anticipo'; })) { var q = document.createElement('em'); q.className = 'anticipo-' + t; punti.appendChild(q); }
+        });
         if (lista.some(function (e) { return e.r; })) { var p = document.createElement('em'); p.className = 'ritardo'; punti.appendChild(p); }
         b.dataset.giorno = id;
         b.addEventListener('click', function () { scelto = this.dataset.giorno; griglia(); voci(); });

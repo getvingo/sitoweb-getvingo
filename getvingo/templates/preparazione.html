@@ -25,20 +25,22 @@
   <td class="cella-da">{{ (p.creata_at|da_tempo)|replace('da ', '') }}</td>
   <td class="cella-azione">
     {% if bloccata %}<a class="btn piccolo btn-danno-riga" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.preparazione')) }}">Vedi danno</a>{% endif %}
-    <button type="button" class="btn-icona" data-apri-riga="prep-{{ p.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button></td>
+    {# 14/11/2026: "⋯" apre un piccolo menu lì accanto (niente riga che si espande) #}
+    <span class="menu-riga-box"><button type="button" class="btn-icona" data-menu-riga aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
+      <span class="menu-riga" hidden>
+        {% if not p.pronta_entro_at %}<button type="button" class="btn-link" data-apri-riga="prep-{{ p.id }}">{{ i('orologio', 's') }} Fissa l'orario</button>{% endif %}
+        {% if p.fasi %}{{ annulla(annullabile(p.veicolo_id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.preparazione')) }}{% endif %}
+        {{ elimina_prep(p) }}
+        {% if not p.fasi and p.pronta_entro_at and g.utente.ruolo != 'admin' %}<span class="tenue piccolo">Nessuna azione</span>{% endif %}
+      </span></span></td>
 </tr>
-<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
-  <div>{% if p.movimento and p.movimento.da_sede %}Rientrata da {{ p.movimento.da_sede.nome }} · {% endif %}in preparazione {{ p.creata_at|da_tempo }}{% for f in p.fasi_fatte %} · {{ f.nome }} {{ f.at|data('%d/%m %H:%M') }}{% endfor %}</div>
-  {% if not p.pronta_entro_at %}
+{% if not p.pronta_entro_at %}<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
   <form method="post" action="{{ url_for('main.scadenza_preparazione', prep_id=p.id) }}" data-una-volta class="azioni" style="align-items:flex-end">
     {{ csrf_input() }}<input type="hidden" name="torna" value="{{ url_for('main.preparazione') }}">
     <div class="campo" style="margin:0"><span>Entro quando deve essere pronta <span class="tenue">(poi non si sposta)</span></span>{{ scegli_slot('pronta_entro', slot_prep, vuoto='Scegli giorno e orario') }}</div>
     <button class="btn">Fissa</button>
   </form>
-  {% endif %}
-  {% if p.fasi %}{{ annulla(annullabile(p.veicolo_id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.preparazione')) }}{% endif %}
-  {{ elimina_prep(p) }}
-</div></td></tr>
+</div></td></tr>{% endif %}
 {% endmacro %}
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>Preparazione</h1>
@@ -135,13 +137,14 @@
       <td class="cella-da">{{ (v.stato_dal|da_tempo)|replace('da ', '') }}</td>
       <td class="cella-azione">{% if v.verso_consegna %}<a class="btn piccolo" href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}">Segui il viaggio</a>
         {% else %}<a class="btn piccolo {{ 'primario' if not mancano }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{% if not v.consegna_sede %}Indica la sede{% elif v.sede_id != v.consegna_sede_id %}Ultimo DDT{% elif not v.targa %}Targa e consegna{% else %}Consegna{% endif %}</a>
-        <button type="button" class="btn-icona" data-apri-riga="pronta-{{ v.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>{% endif %}</td>
+        <span class="menu-riga-box"><button type="button" class="btn-icona" data-menu-riga aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
+          <span class="menu-riga" hidden>
+            {{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=v.ultima_preparazione.id), 'Non è ancora pronta: annulla “Pronta”', url_for('main.preparazione', vista='pronte', tipologia=tipologia)) }}
+            {{ elimina_prep(v.ultima_preparazione, url_for('main.preparazione', vista='pronte')) }}
+            <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione">{{ i('cronometro', 's') }} Tempi della preparazione</a>
+          </span></span>{% endif %}</td>
     </tr>
-    {% if not v.verso_consegna %}<tr class="riga-dettagli" id="pronta-{{ v.id }}" hidden><td colspan="4"><div class="dettagli-lavoro">
-      {{ riepilogo_lavorazione(v.ultima_preparazione) }}
-      {{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=v.ultima_preparazione.id), 'Non è ancora pronta: annulla “Pronta”', url_for('main.preparazione', vista='pronte', tipologia=tipologia)) }}
-      {{ elimina_prep(v.ultima_preparazione, url_for('main.preparazione', vista='pronte')) }}
-    </div></td></tr>{% endif %}
+
     {% endfor %}
     </tbody>
   </table>

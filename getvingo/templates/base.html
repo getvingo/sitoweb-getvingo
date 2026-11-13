@@ -65,7 +65,7 @@
   <div class="testata-dentro">
     <a class="marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="Getvingo"></a>
     <nav class="nav-alto">
-      <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home', 's') }} {{ 'Panoramica' if g.utente.interno else 'Lavorazioni' }}</a>
+      <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home', 's') }} {{ 'Home' if g.utente.interno else 'Lavorazioni' }}</a>
       {% if g.utente.interno %}
       <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto', 's') }} Stock</a>
       <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave', 's') }} Lavorazioni</a>

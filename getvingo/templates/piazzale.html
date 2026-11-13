@@ -6,7 +6,7 @@
 {% block larghezza %}largo{% endblock %}
 {% macro dettaglio_riga(v) %}{% set f = v.fase %}{% if f == 'preparazione' and v.preparazione_attiva %}{% set p = v.preparazione_attiva %}Passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}{% if p.pronta_entro_at and p.pronta_entro_at < adesso() %} · in ritardo{% endif %}{% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}{{ v.sede.nome }}{% if m.con_lavorazione %} · {{ m.lavorazione }}{% endif %}{% if f == 'da_ritirare' %} · {{ 'DDT di rientro pronto' if v.movimento_predisposto else 'manca il DDT di rientro' }}{% elif m.giorni_ritardo %} · in ritardo di {{ m.giorni_ritardo }} gg{% endif %}{% elif f == 'in_viaggio' and v.movimento_aperto %}{% set m = v.movimento_aperto %}{{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.a_sede.nome }}{% if v.verso_consegna %} · ultimo DDT, poi consegna{% endif %}{% elif f == 'pronta' %}{% if v.consegna_sede %}Consegna a {{ v.consegna_sede.nome }}{% if v.sede_id != v.consegna_sede_id %} · serve l'ultimo DDT{% endif %}{% else %}Sede di consegna da indicare{% endif %}{% if not v.targa %} · senza targa{% endif %}{% endif %}{% endmacro %}
 {% block contenuto %}
-<div class="titolo-pagina"><div><h1>Stock <span class="conteggio">{{ totale }}</span></h1>
+<div class="titolo-pagina"><div><h1>Stock</h1>
   <p class="descrizione-pagina">Tutte le auto finché non sono consegnate al cliente: in sede, in preparazione, pronte, dai fornitori o in viaggio, con la posizione sulla mappa.</p></div>
   <a class="btn piccolo primario" href="{{ url_for('main.nuova_auto') }}">+ Nuova auto</a></div>
 
@@ -53,7 +53,7 @@
   <thead><tr><th>Auto</th><th>Targa · telaio</th><th>Stato</th><th>Da</th><th><span class="nascosto">Mappa</span></th></tr></thead>
   {% for gr in gruppi %}
   <tbody class="gruppo-stock" data-zona="{{ gr.chiave }}">
-    <tr class="riga-gruppo"><th colspan="5">{{ i(gr.icona, 's') }} {{ gr.titolo }} <span class="conteggio">{{ gr.voci|length }}</span></th></tr>
+    <tr class="riga-gruppo"><th colspan="5">{{ i(gr.icona, 's') }} {{ gr.titolo }} <span class="numero-gruppo">· {{ gr.voci|length }}</span></th></tr>
     {% for v in gr.voci %}{% set k, etichetta = v.stato_per(g.utente) %}{% set dett = dettaglio_riga(v) %}
     <tr class="riga-stock {{ k }} {{ 'con-danno' if v.danni_aperti }}" id="auto-{{ v.id }}" data-sede="{{ v.sede_id or '' }}"
         data-url="{{ url_for('main.veicolo', veicolo_id=v.id) }}" data-id="{{ v.id }}"

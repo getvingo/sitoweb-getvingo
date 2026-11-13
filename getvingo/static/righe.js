@@ -3,7 +3,7 @@
 (function () {
   document.querySelectorAll('.riga-stock[data-url]').forEach(function (r) {
     r.addEventListener('click', function (e) {
-      if (!e.target.closest('a, button, summary, form, input, select, textarea, label')) location.href = r.dataset.url;
+      if (!e.target.closest('a, button, summary, form, input, select, textarea, label, .menu-riga-box')) location.href = r.dataset.url;
     });
   });
   document.querySelectorAll('[data-apri-riga]').forEach(function (b) {
@@ -37,4 +37,23 @@
     if (nessuna) nessuna.hidden = totale > 0;
   });
   campo.form && campo.form.addEventListener('submit', function (e) { if (document.activeElement === campo) e.preventDefault(); });
+})();
+// "⋯" che apre un piccolo menu accanto al pulsante (14/11/2026); si chiude toccando fuori o con Esc
+(function () {
+  function chiudi(tranne) {
+    document.querySelectorAll('.menu-riga:not([hidden])').forEach(function (m) {
+      if (m !== tranne) { m.hidden = true; var b = m.parentNode.querySelector('[data-menu-riga]'); if (b) { b.setAttribute('aria-expanded', 'false'); b.classList.remove('attivo'); } }
+    });
+  }
+  document.querySelectorAll('[data-menu-riga]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var m = b.parentNode.querySelector('.menu-riga'), apri = m.hidden;
+      chiudi(m); m.hidden = !apri; b.setAttribute('aria-expanded', String(apri)); b.classList.toggle('attivo', apri);
+    });
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.menu-riga')) chiudi(null); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') chiudi(null); });
+  // dal menu: "Fissa l'orario" apre la riga con il calendario degli slot
+  document.querySelectorAll('.menu-riga [data-apri-riga]').forEach(function (b) { b.addEventListener('click', function () { chiudi(null); }); });
 })();

@@ -1781,7 +1781,7 @@ class TestRegole0311Sera(Base):
         pagina = self.c.get("/preparazione").get_data(as_text=True)
         self.assertIn("in ritardo di", pagina.lower())
         self.assertNotIn('name="pronta_entro" value="2020', pagina)  # niente campo per spostarlo
-        self.assertIn("in preparazione da", pagina)
+        self.assertIn("In preparazione", pagina)  # colonna "da quanto" (14/11/2026)
         self.assertIn("Volkswagen Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
 
     def test_consegna_senza_appuntamento(self):
@@ -3616,7 +3616,7 @@ class TestTelefonoSnello(Base):
         self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
         self.entra("autista")
         pagina = self.c.get("/").get_data(as_text=True)
-        for testo in ("Cosa fai adesso?", "data-leggi-nfc", "Ritiro assegnato a te", "Panoramica"):
+        for testo in ("Cosa fai adesso?", "data-leggi-nfc", "Ritiro assegnato a te", "<h1>Home</h1>"):  # Panoramica → Home (14/11/2026)
             self.assertIn(testo, pagina)
 
 
@@ -3819,6 +3819,8 @@ class TestCalendarioPanoramica(Base):
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Quando saranno pronte", home)
-        self.assertIn('class="cal-voce lavorazione', home)  # fine lavori del fornitore (senape)
-        self.assertIn("fine lavori", home)
+        self.assertIn("Pronte oggi", home)              # in Home solo oggi (14/11/2026)
+        self.assertIn("/calendario", home)
+        cal = self.c.get("/calendario").get_data(as_text=True)  # il mese intero: preparazioni e lavorazioni insieme
+        self.assertIn('class="cal-voce lavorazione previsto', cal)
+        self.assertIn("fine lavori", cal)

@@ -2785,3 +2785,37 @@ details.filtri-stock > summary .icona { color: var(--segnale); }
 @media (prefers-reduced-motion: reduce) { .per-te-voce.cal-ritardo { animation: none; } }
 .tabella-fasi .c-auto { width: 25%; } .tabella-fasi .c-cosa { width: 17%; } .tabella-fasi .c-avanz { width: 21%; }
 .tabella-fasi .c-entro { width: 12%; } .tabella-fasi .c-da { width: 9%; } .tabella-fasi .c-azione { width: 16%; }
+/* ---- Calendario completo e "Pronte oggi" (14/11/2026): stati previsto · in anticipo (pieno) · in ritardo (bordo rosso) ---- */
+.cal-voce.anticipo { background: var(--c-pieno); border-left-color: var(--c-pieno); color: #fff; }
+.cal-voce.anticipo small, .cal-voce.anticipo .cal-ora { color: rgba(255,255,255,.88); }
+.cal-voce.preparazione { --c-pieno: var(--st-prep-pieno); } .cal-voce.lavorazione { --c-pieno: var(--st-lavoro-pieno); }
+.cal-voce.anticipo:hover { background: var(--c-pieno); filter: brightness(1.08); }
+.legenda-pronte .preparazione-anticipo::before { background: var(--st-prep-pieno); }
+.legenda-pronte .lavorazione-anticipo::before { background: var(--st-lavoro-pieno); }
+.legenda-pronte .preparazione-anticipo, .legenda-pronte .lavorazione-anticipo { --c: transparent; }
+.oggi-pronte { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin: 6px 0 14px; }
+.oggi-pronte .vuoto { grid-column: 1 / -1; margin: 0; }
+.cal-mese { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.cal-mese-sett { font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); padding: 0 4px; }
+.cal-mese-cella { min-height: 120px; }
+.cal-mese-cella.fuori { opacity: .45; }
+.cal-mese-titolo { font-size: var(--fs-20); text-transform: capitalize; min-width: 160px; text-align: center; }
+a.cal-nav { display: inline-grid; place-items: center; }
+a.cal-nav:hover { text-decoration: none; border-color: var(--segnale); }
+/* telefono: anticipo pieno anche nell'elenco del giorno e pallino pieno */
+.per-te-voce.anticipo-preparazione { background: var(--st-prep-pieno); color: #fff; } .per-te-voce.anticipo-lavorazione { background: var(--st-lavoro-pieno); color: #fff; }
+.per-te-voce.anticipo-preparazione small, .per-te-voce.anticipo-lavorazione small { color: rgba(255,255,255,.88); }
+.per-te-voce.anticipo-preparazione .per-te-barra, .per-te-voce.anticipo-lavorazione .per-te-barra { background: #fff; }
+.cal-tel-cella em.anticipo-preparazione { --c: var(--st-prep-pieno); box-shadow: 0 0 0 1.5px var(--carta), 0 0 0 3px var(--st-prep-pieno); }
+.cal-tel-cella em.anticipo-lavorazione { --c: var(--st-lavoro-pieno); box-shadow: 0 0 0 1.5px var(--carta), 0 0 0 3px var(--st-lavoro-pieno); }
+.cal-tel-legenda .anticipo-preparazione { --c: var(--st-prep-pieno); } .cal-tel-legenda .anticipo-lavorazione { --c: var(--st-lavoro-pieno); }
+.numero-gruppo { font-weight: 600; color: var(--testo-2); }
+/* menu "⋯" accanto al pulsante (14/11/2026) */
+.menu-riga-box { position: relative; display: inline-block; vertical-align: middle; }
+.menu-riga { position: absolute; right: 0; top: calc(100% + 6px); z-index: 25; min-width: 240px; display: grid; gap: 2px; padding: 6px;
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r-s); box-shadow: 0 10px 28px rgba(28,21,51,.18); text-align: left; white-space: nowrap; }
+.menu-riga form.annulla { display: block; margin: 0; }
+.menu-riga .btn-link, .menu-riga > a { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 10px; border-radius: var(--r-xs);
+  font-size: var(--fs-14); font-weight: 600; color: var(--testo); text-align: left; }
+.menu-riga .btn-link:hover, .menu-riga > a:hover { background: var(--superficie); text-decoration: none; }
+.menu-riga .testo-pericolo { color: var(--danno-scuro); }
