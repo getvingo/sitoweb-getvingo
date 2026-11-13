@@ -3734,3 +3734,19 @@ class TestDatiAutoObbligatori(Base):
         with self.app.app_context():
             v = Veicolo.query.one(); v.colore = "rosso corsa"; db.session.commit()
         self.assertEqual(self.c.get("/api/formatta?campo=colore&testo=ROSSO CORSA").json["testo"], "Rosso Corsa")
+
+
+class TestRientroDaComputer(Base):
+    def test_concessionaria_predispone_partner_crea(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        with self.app.app_context():
+            m = Movimento.query.filter_by(veicolo_id=vid).one()
+            m.lavorazione_completata_at = adesso()
+            db.session.commit()
+        for url in (f"/veicolo/{vid}", "/lavorazioni"):
+            pagina = self.c.get(url).get_data(as_text=True)
+            self.assertNotIn("Crea DDT di rientro", pagina, url)  # vale solo sul posto: da computer no
+        self.assertIn("Predisponi il DDT di rientro", self.c.get("/lavorazioni").get_data(as_text=True))
+        self.assertIn('id="predisponi"', self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
