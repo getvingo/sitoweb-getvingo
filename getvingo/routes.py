@@ -821,7 +821,9 @@ def piazzale():
     if f["q"]:
         parole = f["q"].lower().split()
         risultati = [v for v in risultati if all(
-            p in f"{v.marca} {v.modello} {v.colore} {v.vin} {v.targa or ''}".lower()
+            p in " ".join(str(x) for x in (v.marca, v.modello, v.versione, v.colore, v.alimentazione, v.anno, v.vin,
+                                          v.targa, v.tag.codice if v.tag else "", v.sede.nome if v.sede else "")
+                          if x).lower()
             or vin_mod.normalizza(p).lower() in v.vin.lower()
             for p in parole)]
     # zone: prima le sedi proprie (auto ferme), poi preparazione, lavorazioni esterne, viaggio

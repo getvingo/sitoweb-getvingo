@@ -4,27 +4,26 @@
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
 {% block titolo %}Stock · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
+{% macro dettaglio_riga(v) %}{% set f = v.fase %}{% if f == 'preparazione' and v.preparazione_attiva %}{% set p = v.preparazione_attiva %}Passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}{% if p.pronta_entro_at and p.pronta_entro_at < adesso() %} · in ritardo{% endif %}{% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}{{ v.sede.nome }}{% if m.con_lavorazione %} · {{ m.lavorazione }}{% endif %}{% if f == 'da_ritirare' %} · {{ 'DDT di rientro pronto' if v.movimento_predisposto else 'manca il DDT di rientro' }}{% elif m.giorni_ritardo %} · in ritardo di {{ m.giorni_ritardo }} gg{% endif %}{% elif f == 'in_viaggio' and v.movimento_aperto %}{% set m = v.movimento_aperto %}{{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.a_sede.nome }}{% if v.verso_consegna %} · ultimo DDT, poi consegna{% endif %}{% elif f == 'pronta' %}{% if v.consegna_sede %}Consegna a {{ v.consegna_sede.nome }}{% if v.sede_id != v.consegna_sede_id %} · serve l'ultimo DDT{% endif %}{% else %}Sede di consegna da indicare{% endif %}{% if not v.targa %} · senza targa{% endif %}{% endif %}{% endmacro %}
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>Stock <span class="conteggio">{{ totale }}</span></h1>
   <p class="descrizione-pagina">Tutte le auto finché non sono consegnate al cliente: in sede, in preparazione, pronte, dai fornitori o in viaggio, con la posizione sulla mappa.</p></div>
   <a class="btn piccolo primario" href="{{ url_for('main.nuova_auto') }}">+ Nuova auto</a></div>
 
-<form>
-  <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" placeholder="Telaio, modello o colore" aria-label="Cerca nello stock"></div>
-  <details class="ripiega filtri-ripiegabili" style="margin-top:10px" {{ 'open' if filtri_attivi }}>
-  <summary>{{ i('gestione', 's') }} Filtri{% if filtri_attivi %} · attivi{% endif %}</summary>
-  <div class="barra-filtri">
-    {{ filtro_select('tipologia', 'Tipologia', opzioni.tipologia, f.tipologia, 'Tutte') }}
-    {{ filtro_select('marca', 'Marca', opzioni.marca, f.marca, 'Tutte') }}
-    {{ filtro_select('modello', 'Modello', opzioni.modello, f.modello) }}
-    {{ filtro_select('colore', 'Colore', opzioni.colore, f.colore) }}
-    {{ filtro_select('fase', 'Stato', opzioni.fase, f.fase) }}
-  </div>
+{# 13/11/2026: una ricerca che capisce tutto (filtra mentre si scrive) e pochi filtri in un pannello chiuso #}
+<form class="stock-cerca">
+  <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" id="cerca-stock" autocomplete="off"
+       placeholder="Cerca: marca, modello, versione, colore, telaio, targa, adesivo…" aria-label="Cerca nello stock"></div>
+  <details class="ripiega filtri-stock" {{ 'open' if filtri_attivi }}>
+    <summary>{{ i('gestione', 's') }} Filtri{% if filtri_attivi %} · {{ filtri_attivi|length }} attivi{% endif %}</summary>
+    <div class="barra-filtri">
+      {{ filtro_select('fase', 'Stato', opzioni.fase, f.fase) }}
+      {{ filtro_select('tipologia', 'Tipologia', opzioni.tipologia, f.tipologia, 'Tutte') }}
+    </div>
   </details>
-  {% if filtri_attivi or f.q %}<a class="chip" href="{{ url_for('main.piazzale') }}">✕ Azzera filtri</a>{% endif %}
+  {% if filtri_attivi or f.q %}<a class="chip" href="{{ url_for('main.piazzale') }}">✕ Azzera</a>{% endif %}
 </form>
 
-{# scelta della sede a tutta larghezza, sopra mappa ed elenco: filtra tutti e due #}
 {% if piazzali %}
 <nav class="interruttore filtro-gruppo in-riga tutta-larghezza" id="scegli-piazzale" style="margin-top:14px" aria-label="Scegli la sede">
   <a href="#" data-sede="" class="attivo" title="Tutte le sedi">{{ i('piazzale') }} <span class="nome" data-corto="Tutte">Tutte le sedi</span> <span class="n">{{ totale }}</span></a>
@@ -45,46 +44,65 @@
 {% if piazzali and senza_posizione %}<p class="tenue piccolo" style="margin:-6px 0 14px">{{ senza_posizione }} {{ 'piazzale non è' if senza_posizione == 1 else 'piazzali non sono' }} sulla mappa: manca la posizione{% if g.utente.ruolo == 'admin' %} (<a href="{{ url_for('admin.sedi') }}">completa</a>){% endif %}.</p>{% endif %}
 </aside>
 <div class="stock-elenco">
-{{ legenda(gruppi|map(attribute='voci')|sum(start=[])) }}
-{% for gr in gruppi %}
-<section class="gruppo zona-{{ gr.chiave.split('-')[0] }}" data-zona="{{ gr.chiave }}">
-  <div class="gruppo-testa"><h3>{{ i(gr.icona, 's') }} {{ gr.titolo }} <span class="conteggio">{{ gr.voci|length }}</span></h3></div>
-  <div class="lista">
-  {% for v in gr.voci %}
-    <div class="voce {{ fase_css(v) }} {{ 'con-danno' if v.danni_aperti }}" style="display:block" id="auto-{{ v.id }}" data-sede="{{ v.sede_id or '' }}">
-      <div class="riga-auto" style="display:flex;gap:12px;align-items:center">
-        {{ marchio(v) }}
-        <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" style="color:inherit;flex:1;min-width:0">
-          <h3>{{ v.descrizione }}{{ targa(v) }}{% if v.tipologia == 'commerciale' %}<span class="tipologia">Comm.</span>{% endif %}</h3>
-          <div class="tenue piccolo">{{ v.vin|vin }}</div></a>
-        <div class="lato" style="text-align:right">{% if v.lat is not none %}<button type="button" class="btn-link piccolo sulla-mappa" data-sulla-mappa="{{ v.id }}">{{ i('pin', 's') }} Sulla mappa</button><br>{% endif %}{{ badge_condizione(v) }}{% if v.danni_aperti %}<div style="margin-top:6px"><span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span></div>{% endif %}</div>
-      </div>
-      {% if gr.chiave == 'preparazione' %}{% set prep = v.preparazione_attiva %}
-      <div class="stato-zona">
-        <div class="barra-avanzamento"><span style="width:{{ prep.avanzamento }}%"></span></div>
-        <div class="piccolo"><b>Passo {{ prep.fasi|length + 1 }} di {{ prep.FASI|length }} · {{ prep.prossima_fase }}</b> · {{ prep.avanzamento }}% · {{ v.sede.nome if v.sede else '' }}{% if prep.pronta_entro_at %} · {{ prep.pronta_entro_at|slot }}{% endif %}</div>
-      </div>
-      {% elif gr.chiave == 'esterne' %}{% set m = v.arrivo_qui %}
-      <div class="stato-zona">
-        <div class="piccolo" style="margin-bottom:6px">{{ i('chiave', 's') }} <b>{{ v.sede.nome }}</b>{% if m %} · {{ m.lavorazione }}{% endif %}</div>
-        {% if m and m.con_lavorazione %}{{ avanzamento_lavoro(m) }}{% endif %}
-      </div>
-      {% elif gr.chiave == 'pronte' %}
-      <div class="stato-zona piccolo">{{ i('bandiera', 's') }} {% if v.consegna_sede %}Consegna a <b>{{ v.consegna_sede.nome }}</b>{% if v.sede_id != v.consegna_sede_id %} · ora a {{ v.sede.nome }}, serve l'ultimo DDT{% endif %}{% else %}Pronta a {{ v.sede.nome }} · <b>sede di consegna da indicare</b>{% endif %}{% if not v.targa %} · senza targa{% endif %}</div>
-      {% elif gr.chiave == 'viaggio' %}{% set m = v.movimento_aperto %}
-      {% if m %}<div class="stato-zona piccolo">{{ i('camion', 's') }} {{ m.da_sede.nome if m.da_sede else '—' }} → <b>{{ m.a_sede.nome }}</b> · in viaggio da {{ in_viaggio_da(m) }}{% if v.verso_consegna %} · <b>ultimo DDT, poi consegna</b>{% endif %}</div>{% endif %}
-      {% endif %}
-    </div>
+{# Elenco a righe (13/11/2026): una riga per auto, il colore della fase sul bordo e sulla pillola dello stato #}
+{% if gruppi %}
+<table class="tabella-stock">
+  <colgroup><col class="c-auto"><col class="c-telaio"><col class="c-stato"><col class="c-da"><col class="c-mappa"></colgroup>
+  <thead><tr><th>Auto</th><th>Telaio</th><th>Stato</th><th>Da</th><th><span class="nascosto">Mappa</span></th></tr></thead>
+  {% for gr in gruppi %}
+  <tbody class="gruppo-stock" data-zona="{{ gr.chiave }}">
+    <tr class="riga-gruppo"><th colspan="5">{{ i(gr.icona, 's') }} {{ gr.titolo }} <span class="conteggio">{{ gr.voci|length }}</span></th></tr>
+    {% for v in gr.voci %}{% set k, etichetta = v.stato_per(g.utente) %}{% set dett = dettaglio_riga(v) %}
+    <tr class="riga-stock {{ k }} {{ 'con-danno' if v.danni_aperti }}" id="auto-{{ v.id }}" data-sede="{{ v.sede_id or '' }}"
+        data-url="{{ url_for('main.veicolo', veicolo_id=v.id) }}" data-id="{{ v.id }}"
+        data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.alimentazione, v.anno, v.vin, v.targa, v.tag.codice if v.tag else '', v.sede.nome if v.sede else '', etichetta]|select|join(' ')|lower }}">
+      <td class="cella-auto"><div>{{ marchio(v) }}
+        <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" title="{{ v.descrizione }}{{ ' · ' ~ v.versione if v.versione }}"><b>{{ v.descrizione }}</b></a>
+          <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %} · Comm.{% endif %}{% if v.targa %} · <span class="targa">{{ v.targa }}</span>{% endif %}</small></span></div></td>
+      <td class="cella-telaio"><span class="vin">{{ v.vin[-8:] }}</span></td>
+      <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
+        {% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}
+        {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</td>
+      <td class="cella-da">{{ (v.stato_dal|da_tempo)|replace('da ', '') }}</td>
+      <td class="cella-mappa">{% if v.lat is not none %}<button type="button" class="btn-icona" data-sulla-mappa="{{ v.id }}" title="Mostra sulla mappa" aria-label="Mostra {{ v.descrizione }} sulla mappa">{{ i('pin', 's') }}</button>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
   {% endfor %}
-  </div>
-</section>
+</table>
+<p class="vuoto" id="stock-nessuna" hidden>Nessuna auto con questa ricerca.</p>
 {% else %}
 <div class="vuoto">{{ i('piazzale') }}Nessuna auto in stock{{ ' con questi filtri' if filtri_attivi or f.q }}.</div>
-{% endfor %}
+{% endif %}
 </div>
 </div>
 {% endblock %}
 {% block script %}
+<script>
+  (function () {
+    // righe cliccabili (tranne i pulsanti), ricerca che filtra mentre si scrive, insieme alla sede scelta
+    document.querySelectorAll('.riga-stock[data-url]').forEach(function (r) {
+      r.addEventListener('click', function (e) { if (!e.target.closest('a, button')) location.href = r.dataset.url; });
+    });
+    var campo = document.getElementById('cerca-stock'), nessuna = document.getElementById('stock-nessuna');
+    window.sedeStock = '';
+    window.filtraStock = function () {
+      var parole = (campo ? campo.value : '').toLowerCase().split(/\s+/).filter(Boolean), totale = 0;
+      document.querySelectorAll('.tabella-stock tbody.gruppo-stock').forEach(function (g) {
+        var visibili = 0;
+        g.querySelectorAll('.riga-stock').forEach(function (r) {
+          var testo = r.dataset.cerca || '';
+          var ok = (!window.sedeStock || r.dataset.sede === window.sedeStock) &&
+                   parole.every(function (p) { return testo.indexOf(p) >= 0; });
+          r.hidden = !ok; if (ok) visibili++;
+        });
+        g.hidden = !visibili; totale += visibili;
+      });
+      if (nessuna) nessuna.hidden = totale > 0;
+    };
+    if (campo) campo.addEventListener('input', window.filtraStock);
+  })();
+</script>
 {% if piazzali %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='mappe.js', v=versione_statici) }}"></script>
@@ -137,17 +155,17 @@
     }
     mappa.on('zoomend', aggiornaStrati);
 
-    var chip = document.querySelectorAll('#scegli-piazzale a'), gruppi = document.querySelectorAll('.gruppo[data-zona]');
+    var chip = document.querySelectorAll('#scegli-piazzale a');
+    // passando sulla riga l'auto si evidenzia sulla mappa (se la si vede da vicino)
+    document.querySelectorAll('.riga-stock[data-id]').forEach(function (r) {
+      var m = marcatori[r.dataset.id];
+      if (!m) return;
+      r.addEventListener('mouseenter', function () { m.setStyle({ radius: 16, weight: 4 }); m.bringToFront(); if (mappa.hasLayer(strato_auto)) m.openTooltip(); });
+      r.addEventListener('mouseleave', function () { m.setStyle({ radius: 11, weight: 3 }); m.closeTooltip(); });
+    });
     function scegli(id) {
       chip.forEach(function (c) { c.classList.toggle('attivo', c.dataset.sede === id); });
-      gruppi.forEach(function (g) {
-        var visibili = 0;
-        g.querySelectorAll('.voce[data-sede]').forEach(function (v) {
-          v.hidden = id !== '' && v.dataset.sede !== id;
-          if (!v.hidden) visibili++;
-        });
-        g.hidden = !visibili;
-      });
+      window.sedeStock = id; if (window.filtraStock) window.filtraStock();
       var punti = id ? auto.filter(function (a) { return String(a.sede) === id; }).map(function (a) { return [a.lat, a.lon]; })
                      : piazzali.map(function (p) { return [p.lat, p.lon]; });
       if (id && !punti.length) { var p = piazzali.filter(function (x) { return String(x.id) === id; })[0]; punti = [[p.lat, p.lon]]; }

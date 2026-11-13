@@ -2415,3 +2415,52 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 
 /* Via e civico in due campi (13/11/2026) */
 .riga-via { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 10px; }
+
+/* ---- Stock a righe (13/11/2026): una riga per auto, il colore della fase sul bordo e sulla pillola ---- */
+.stock-cerca { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.stock-cerca .ricerca { flex: 1 1 420px; margin: 0; }
+.stock-cerca .filtri-stock { flex: 0 0 auto; margin: 0; }
+.stock-cerca .filtri-stock[open] { flex-basis: 100%; }
+.stock-cerca .filtri-stock .barra-filtri { margin-top: 10px; }
+.tabella-stock { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: var(--fs-15); }
+.tabella-stock thead th { text-align: left; font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--testo-2); padding: 0 10px 2px; }
+.tabella-stock .riga-gruppo th { text-align: left; font-size: var(--fs-13); font-weight: 700; color: var(--testo-2); padding: 12px 4px 0; }
+.tabella-stock .riga-gruppo .icona { vertical-align: -3px; }
+.riga-stock { cursor: pointer; }
+.riga-stock > td { background: var(--carta); padding: 7px 10px; vertical-align: middle; border-top: 1px solid var(--bordo); border-bottom: 1px solid var(--bordo); }
+.riga-stock > td:first-child { border-left: var(--bordo-stato) solid var(--fase, var(--st-sede)); border-radius: var(--r-s) 0 0 var(--r-s); }
+.riga-stock > td:last-child { border-right: 1px solid var(--bordo); border-radius: 0 var(--r-s) var(--r-s) 0; }
+.riga-stock:hover > td { background: color-mix(in srgb, var(--fase, var(--st-sede)) 7%, var(--carta)); }
+.riga-stock.con-danno > td:first-child { box-shadow: inset 3px 0 0 var(--danno); }
+.tabella-stock { table-layout: fixed; }
+.tabella-stock .c-auto { width: 36%; } .tabella-stock .c-telaio { width: 14%; } .tabella-stock .c-stato { width: 34%; }
+.tabella-stock .c-da { width: 10%; } .tabella-stock .c-mappa { width: 52px; }
+.cella-auto > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cella-auto b, .cella-auto small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cella-auto a { display: block; min-width: 0; overflow: hidden; }
+.cella-auto .logo-marca { width: 36px; height: 36px; }
+.cella-auto .logo-marca img { width: 26px; height: 26px; }
+.cella-auto a { color: var(--testo); }
+.cella-auto b { font-size: var(--fs-15); }
+.tabella-stock small { display: block; font-size: var(--fs-13); color: var(--testo-2); }
+.cella-telaio .vin { font-size: var(--fs-14); font-weight: 650; }
+.pillola-stato { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; border-radius: var(--r-pillola);
+  font-size: var(--fs-13); font-weight: 700; white-space: nowrap; color: var(--testo);
+  background: color-mix(in srgb, var(--fase, var(--st-sede)) 16%, var(--carta)); }
+.pillola-stato i { width: 9px; height: 9px; border-radius: 50%; background: var(--fase, var(--st-sede)); }
+.cella-stato .badge { margin-left: 6px; vertical-align: 1px; }
+.cella-stato .testo-ritardo { color: var(--liv-1-testo); font-weight: 650; }
+.cella-da { white-space: nowrap; color: var(--testo-2); font-size: var(--fs-14); }
+.cella-mappa { width: 44px; text-align: right; }
+.btn-icona { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--bordo); background: var(--carta); color: var(--segnale);
+  display: inline-grid; place-items: center; cursor: pointer; }
+.btn-icona:hover { border-color: var(--segnale); }
+@media (min-width: 1024px) { .stock-layout:has(.tabella-stock) { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); } }
+.cella-auto > span { min-width: 0; }
+.tabella-stock thead th:first-child { padding-left: 16px; }
+.cella-auto > div > span { flex: 1; min-width: 0; }
+.cella-auto .logo-marca { flex: none; }
+@media (max-width: 1279px) { .tabella-stock .c-auto { width: 40%; } .tabella-stock .c-telaio { width: 15%; } .tabella-stock .c-stato { width: 31%; } .cella-stato .badge { margin: 4px 0 0; } }
+.cella-auto small .badge { font-size: 11px; padding: 0 6px; min-height: 0; vertical-align: 1px; }
+.cella-auto small .badge .icona { width: 12px; height: 12px; }

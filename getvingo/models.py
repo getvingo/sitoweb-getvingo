@@ -351,6 +351,25 @@ class Veicolo(PerOrganizzazione, db.Model):
         return "in_sede"
 
     @property
+    def stato_dal(self):
+        """Da quando l'auto è nella fase attuale (colonna "Da" dello Stock)."""
+        f = self.fase
+        if f == "in_viaggio":
+            m = self.movimento_aperto
+            return m.partenza_at if m else None
+        if f in ("lavorazione", "da_ritirare"):
+            m = self.arrivo_qui
+            if not m:
+                return None
+            return m.lavorazione_completata_at if f == "da_ritirare" and m.lavorazione_completata_at else m.arrivo_at
+        if f == "preparazione":
+            return self.preparazione_attiva.creata_at
+        if f == "pronta":
+            return self.ultima_preparazione.completata_at
+        arrivo = self.ultimo_arrivo
+        return arrivo.arrivo_at if arrivo and arrivo.arrivo_at else self.creato_at
+
+    @property
     def verso_consegna(self):
         """Pronta e in viaggio con l'ultimo DDT verso la sede di consegna: resta tra le pronte
         (e in stock) finché non è consegnata al cliente."""
