@@ -2751,3 +2751,37 @@ details.filtri-stock > summary .icona { color: var(--segnale); }
 .stock-cerca .filtri-stock .barra-filtri { margin: 0; }
 .tabella-stock .c-auto { width: 34%; } .tabella-stock .c-stato { width: 39%; }
 .tabella-stock .cella-auto small { text-overflow: clip; }
+/* ---- Lavorazioni e Preparazione con le stesse colonne (14/11/2026) ---- */
+.tabella-fasi .c-auto { width: 26%; } .tabella-fasi .c-cosa { width: 19%; } .tabella-fasi .c-avanz { width: 22%; }
+.tabella-fasi .c-entro { width: 12%; } .tabella-fasi .c-da { width: 9%; } .tabella-fasi .c-azione { width: 12%; }
+.cella-cosa b, .cella-cosa small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cella-avanz .mini-barra, .cella-avanz .passi-riga { margin: 6px 0 2px; max-width: 200px; }
+.cella-avanz .passi-riga li { max-width: none; }
+.cella-entro { font-size: var(--fs-14); font-weight: 600; }
+.riga-stock.prep-ritardo .cella-entro { color: var(--in-ritardo-testo); }
+/* ---- Calendario dal telefono (14/11/2026): compatto su oggi, il mese come un calendario vero ---- */
+.cal-tel { display: grid; gap: 10px; }
+.cal-tel-mese { background: var(--carta); border-radius: var(--r); padding: 10px; }
+.cal-tel-testa { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal-tel-testa b { text-transform: capitalize; }
+.cal-tel-freccia { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--bordo); background: var(--carta); font-size: 22px; line-height: 1; cursor: pointer; color: var(--testo); }
+.cal-tel-griglia { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-tel-sett { text-align: center; font-size: var(--fs-12); font-weight: 700; color: var(--testo-2); padding: 2px 0; }
+.cal-tel-cella { aspect-ratio: 1; border: 0; border-radius: var(--r-s); background: var(--superficie); display: grid; place-items: center; align-content: center;
+  gap: 2px; font: inherit; font-size: var(--fs-14); font-weight: 600; color: var(--testo); cursor: pointer; padding: 0; }
+.cal-tel-cella.passato { opacity: .45; }
+.cal-tel-cella.oggi { box-shadow: inset 0 0 0 2px var(--segnale); }
+.cal-tel-cella.scelto { background: var(--inchiostro); color: #fff; }
+.cal-tel-cella i { display: flex; gap: 3px; height: 6px; }
+.cal-tel-cella em { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.cal-tel-cella em.preparazione { --c: var(--st-prep); } .cal-tel-cella em.lavorazione { --c: var(--st-lavoro); } .cal-tel-cella em.ritardo { --c: var(--danno); }
+.cal-tel-legenda { display: flex; gap: 12px; justify-content: center; margin-top: 8px; font-size: var(--fs-12); color: var(--testo-2); }
+.cal-tel-legenda .lg::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--c); }
+.cal-tel-legenda .preparazione { --c: var(--st-prep); } .cal-tel-legenda .lavorazione { --c: var(--st-lavoro); } .cal-tel-legenda .ritardo { --c: var(--danno); }
+.cal-tel-giorno { margin: 4px 0 0; font-size: var(--fs-15); text-transform: none; letter-spacing: 0; color: var(--testo); }
+.cal-tel-giorno::first-letter { text-transform: uppercase; }
+.per-te-voce.cal-ritardo { border-color: var(--danno); animation: cal-lampeggia-bordo 1.4s ease-in-out infinite; }
+@keyframes cal-lampeggia-bordo { 50% { border-color: var(--bordo); } }
+@media (prefers-reduced-motion: reduce) { .per-te-voce.cal-ritardo { animation: none; } }
+.tabella-fasi .c-auto { width: 25%; } .tabella-fasi .c-cosa { width: 17%; } .tabella-fasi .c-avanz { width: 21%; }
+.tabella-fasi .c-entro { width: 12%; } .tabella-fasi .c-da { width: 9%; } .tabella-fasi .c-azione { width: 16%; }

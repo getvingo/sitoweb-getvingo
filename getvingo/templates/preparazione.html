@@ -15,16 +15,19 @@
     data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.vin, v.targa, v.sede.nome if v.sede else '', p.prossima_fase]|select|join(' ')|lower }}">
   <td class="cella-auto"><div>{{ marchio(v) }}
     <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"><b>{{ v.descrizione }}</b></a>
-      <small>{{ badge_condizione(v) }} · <span class="vin">{{ v.vin[-8:] }}</span>{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small></span></div></td>
-  <td class="cella-passi"><ol class="passi-riga" aria-label="Passo {{ fatti + 1 }} di 4">{% for f in fasi %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}" title="{{ f }}{% if loop.index0 < fatti %} · {{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') }}{% endif %}"></li>{% endfor %}</ol>
-    <small>{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }} bloccato da un danno</b>{% else %}Passo {{ fatti + 1 }} di 4 · <b>{{ p.prossima_fase }}</b>{% endif %}</small></td>
-  <td class="cella-stato">{% if p.pronta_entro_at %}<span class="pillola-stato"><i aria-hidden="true"></i>{{ p.pronta_entro_at|slot }}</span>{% if rit %}<small class="testo-ritardo">in ritardo di {{ rit }}</small>{% endif %}{% else %}<small>orario non fissato</small>{% endif %}</td>
+      <small>{{ badge_condizione(v) }}{% if v.targa %} <span class="targa-chip">{{ v.targa }}</span>{% endif %} <span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
+  {# 14/11/2026: stesse colonne delle Lavorazioni (Auto · Cosa · Avanzamento · Entro · Da) #}
+  <td class="cella-cosa">{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }} bloccato</b><small>danno da verificare</small>{% else %}<b>{{ p.prossima_fase }}</b><small>passo {{ fatti + 1 }} di 4{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small>{% endif %}</td>
+  <td class="cella-avanz"><span class="pillola-stato"><i aria-hidden="true"></i>{% if rit %}In ritardo di {{ rit }}{% else %}Nei tempi{% endif %}</span>
+    <ol class="passi-riga" aria-label="Passo {{ fatti + 1 }} di 4">{% for f in fasi %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}" title="{{ f }}{% if loop.index0 < fatti %} · {{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') }}{% endif %}"></li>{% endfor %}</ol>
+    <small>{{ fatti }} di 4 passi fatti</small></td>
+  <td class="cella-entro">{% if p.pronta_entro_at %}{{ p.pronta_entro_at|slot }}{% else %}<span class="tenue">da fissare</span>{% endif %}</td>
   <td class="cella-da">{{ (p.creata_at|da_tempo)|replace('da ', '') }}</td>
   <td class="cella-azione">
     {% if bloccata %}<a class="btn piccolo btn-danno-riga" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.preparazione')) }}">Vedi danno</a>{% endif %}
     <button type="button" class="btn-icona" data-apri-riga="prep-{{ p.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button></td>
 </tr>
-<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="5"><div class="dettagli-lavoro">
+<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
   <div>{% if p.movimento and p.movimento.da_sede %}Rientrata da {{ p.movimento.da_sede.nome }} · {% endif %}in preparazione {{ p.creata_at|da_tempo }}{% for f in p.fasi_fatte %} · {{ f.nome }} {{ f.at|data('%d/%m %H:%M') }}{% endfor %}</div>
   {% if not p.pronta_entro_at %}
   <form method="post" action="{{ url_for('main.scadenza_preparazione', prep_id=p.id) }}" data-una-volta class="azioni" style="align-items:flex-end">
@@ -98,9 +101,9 @@
   {# Elenco a righe (13/11/2026): colore dello stato sul bordo (azzurro nei tempi, rosso aranciato in ritardo),
      i 4 passi in fila, l'orario entro cui deve essere pronta; correzioni nella riga che si apre con "⋯" #}
   {% if preparazioni %}
-  <table class="tabella-stock tabella-prep">
-    <colgroup><col class="c-auto"><col class="c-passi"><col class="c-entro"><col class="c-da"><col class="c-azione"></colgroup>
-    <thead><tr><th>Auto</th><th>Passi</th><th>Pronta entro</th><th>In prep.</th><th><span class="nascosto">Azioni</span></th></tr></thead>
+  <table class="tabella-stock tabella-fasi tabella-prep">
+    <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-avanz"><col class="c-entro"><col class="c-da"><col class="c-azione"></colgroup>
+    <thead><tr><th>Auto</th><th>Passo</th><th>Avanzamento</th><th>Pronta entro</th><th>In preparazione</th><th><span class="nascosto">Azioni</span></th></tr></thead>
     <tbody class="gruppo-stock">
     {% for p in preparazioni|sort(attribute='pronta_entro_at') if p.pronta_entro_at %}{{ riga_prep(p) }}{% endfor %}
     {% for p in preparazioni if not p.pronta_entro_at %}{{ riga_prep(p) }}{% endfor %}

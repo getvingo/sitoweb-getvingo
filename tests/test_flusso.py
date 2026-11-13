@@ -1779,7 +1779,7 @@ class TestRegole0311Sera(Base):
             prep.pronta_entro_at = datetime(2020, 1, 6, 9, 0)  # orario passato: in ritardo
             db.session.commit()
         pagina = self.c.get("/preparazione").get_data(as_text=True)
-        self.assertIn("in ritardo di", pagina)
+        self.assertIn("in ritardo di", pagina.lower())
         self.assertNotIn('name="pronta_entro" value="2020', pagina)  # niente campo per spostarlo
         self.assertIn("in preparazione da", pagina)
         self.assertIn("Volkswagen Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
@@ -3655,11 +3655,13 @@ class TestTelefonoEssenziale(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
-        self.entra("autista")  # mansione Consegne: anche preparazioni e calendario
+        self.entra("autista")  # mansione Consegne: solo ciò che serve (14/11/2026): ritiri e calendario
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Dai fornitori · 1", home)
-        self.assertIn("fine stimata", home)
+        self.assertNotIn("Fornitori in ritardo", home)          # quello è per l'ufficio
         self.assertIn("Quando saranno pronte", home)
+        self.assertIn('"t": "lavorazione"', home)                # la fine lavori sta nel calendario
+        self.entra("admin")
+        self.assertIn("data-cal-tel", self.c.get("/").get_data(as_text=True))
         self.assertNotIn("cerca-veloce", home)  # la ricerca sta nella scheda Cerca
         self.assertIn('class="home-telefono tocco solo-telefono"', home)  # sul computer non si vede
 

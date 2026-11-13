@@ -44,12 +44,13 @@
 {# Elenco a righe (13/11/2026): una riga per auto, colore dello stato sul bordo e sulla pillola, un'azione
    sola (quella che serve adesso); le altre nella riga che si apre con "⋯" #}
 {% if fornitori %}
-<table class="tabella-stock tabella-lavori">
-  <colgroup><col class="c-auto"><col class="c-lavoro"><col class="c-tempo"><col class="c-fine"><col class="c-azione"></colgroup>
-  <thead><tr><th>Auto</th><th>Lavorazione</th><th>Stato</th><th>Fine prevista</th><th><span class="nascosto">Azioni</span></th></tr></thead>
+<table class="tabella-stock tabella-fasi tabella-lavori">
+  {# 14/11/2026: stesse colonne della Preparazione (Auto · Cosa · Avanzamento · Entro · Da) #}
+  <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-avanz"><col class="c-entro"><col class="c-da"><col class="c-azione"></colgroup>
+  <thead><tr><th>Auto</th><th>Lavorazione</th><th>Avanzamento</th><th>Fine prevista</th><th>Dal fornitore</th><th><span class="nascosto">Azioni</span></th></tr></thead>
   {% for sede, voci in fornitori %}
   <tbody class="gruppo-stock">
-    <tr class="riga-gruppo"><th colspan="5">{{ i('chiave', 's') }} {{ sede.nome }} <span class="tenue">· {{ sede.TIPI[sede.tipo] }}</span> <span class="conteggio">{{ voci|length }}</span></th></tr>
+    <tr class="riga-gruppo"><th colspan="6">{{ i('chiave', 's') }} {{ sede.nome }} <span class="tenue">· {{ sede.TIPI[sede.tipo] }}</span> <span class="conteggio">{{ voci|length }}</span></th></tr>
     {% for v, m in voci %}
     {% set stato_m = 'finita' if m.lavorazione_completata_at else ('ritardo' if m.giorni_ritardo else 'corso') %}
     {% set giorno = (adesso() - m.arrivo_at).days + 1 if m.arrivo_at else 0 %}
@@ -58,19 +59,20 @@
         data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.vin, v.targa, sede.nome, m.lavorazione, m.lavorazione_note]|select|join(' ')|lower }}">
       <td class="cella-auto"><div>{{ marchio(v) }}
         <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><b>{{ v.descrizione }}</b></a>
-          <small>{{ badge_condizione(v) }} · <span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
-      <td class="cella-lavoro"><b>{{ m.lavorazione }}</b><small title="{{ m.lavorazione_note }}">{{ m.lavorazione_note or '—' }}</small></td>
-      <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{% if stato_m == 'finita' %}Finita, da ritirare{% elif stato_m == 'ritardo' %}In ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
+          <small>{{ badge_condizione(v) }}{% if v.targa %} <span class="targa-chip">{{ v.targa }}</span>{% endif %} <span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
+      <td class="cella-cosa"><b>{{ m.lavorazione }}</b><small title="{{ m.lavorazione_note }}">{{ m.lavorazione_note or '—' }}</small></td>
+      <td class="cella-avanz"><span class="pillola-stato"><i aria-hidden="true"></i>{% if stato_m == 'finita' %}Finita, da ritirare{% elif stato_m == 'ritardo' %}In ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
         <div class="mini-barra" aria-hidden="true"><span style="width:{{ m.avanzamento_lavorazione }}%"></span></div>
         <small>{% if stato_m == 'finita' %}finita il {{ m.lavorazione_completata_at|data('%d/%m') }}{% if v.movimento_predisposto %} · DDT di rientro {{ v.movimento_predisposto.ddt.sigla }} pronto{% endif %}{% else %}giorno {{ giorno }} di {{ m.stima_giorni }}{% endif %}{% set s = m.ultimo_sollecito %}{% if s and not s.risposta_at %} · sollecitata{% endif %}</small></td>
-      <td class="cella-da">{{ m.lavorazione_prevista_at|data('%d/%m') if not m.lavorazione_completata_at else '—' }}</td>
+      <td class="cella-entro">{{ m.lavorazione_prevista_at|data('%d/%m') if not m.lavorazione_completata_at else '—' }}</td>
+      <td class="cella-da">{{ (m.arrivo_at|da_tempo)|replace('da ', '') }}</td>
       <td class="cella-azione">
         {% if stato_m == 'finita' and not v.movimento_predisposto %}<a class="btn piccolo btn-predisponi" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#predisponi">Predisponi rientro</a>
         {% elif stato_m == 'ritardo' and puo_sollecitare(m) %}<button type="button" class="btn piccolo btn-sollecito" data-apri-riga="dett-{{ m.id }}">Sollecita</button>{% endif %}
         <button type="button" class="btn-icona" data-apri-riga="dett-{{ m.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
       </td>
     </tr>
-    <tr class="riga-dettagli" id="dett-{{ m.id }}" hidden><td colspan="5"><div class="dettagli-lavoro">
+    <tr class="riga-dettagli" id="dett-{{ m.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
       <div>{% if m.ddt %}Arrivata il {{ m.arrivo_at|data('%d/%m') }} con DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}">{{ m.ddt.sigla }}</a>{% else %}Dal fornitore dal {{ m.arrivo_at|data('%d/%m') }} (senza DDT){% endif %}{% if m.lavorazione_note_fine %} · {{ m.lavorazione_note_fine }}{% endif %}</div>
       {{ sollecito_lavoro(m, qui) }}
       {% if not m.lavorazione_completata_at %}{{ cambia_stima(m, qui) }}{% endif %}

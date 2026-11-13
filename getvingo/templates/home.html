@@ -29,7 +29,7 @@
   {% endif %}
 
   {% if in_lavorazione %}
-  <h2 class="sezione-t">Dai fornitori · {{ in_lavorazione|length }}</h2>
+  <h2 class="sezione-t">Fornitori in ritardo · {{ in_lavorazione|length }}</h2>
   <div class="per-te">
     {% for v, m in in_lavorazione %}
     <a class="per-te-voce {{ 'ritardo' if m.giorni_ritardo else 'lavorazione' }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
@@ -50,20 +50,21 @@
   </div>
   {% endif %}
 
-  {% if calendario %}
-  <h2 class="sezione-t">Quando saranno pronte</h2>
-  <div class="agenda">
-    {% for giorno, voci in calendario %}
-    <div class="agenda-giorno"><b>{{ giorno }}</b>
-      {% for e in voci %}
-      <a class="agenda-voce {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ url_for('main.veicolo', veicolo_id=e.v.id) }}">
-        <span class="agenda-ora">{% if e.ritardo %}in ritardo{% elif e.tipo == 'preparazione' %}{{ e.quando|data('%H:%M') }}{% else %}entro sera{% endif %}</span>
-        <span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></span></a>
-      {% endfor %}
+  {# Calendario (14/11/2026): chiuso mostra solo oggi; "Apri il calendario" mostra il mese come un calendario vero,
+     con i pallini (verde acqua preparazioni, senape fine lavori, rosso ritardi); toccando un giorno compaiono le sue auto #}
+  <h2 class="sezione-t">{{ 'Calendario preparazioni' if cal_solo_prep else 'Quando saranno pronte' }}</h2>
+  <section class="cal-tel" data-cal-tel data-oggi="{{ oggi_iso }}">
+    <script type="application/json" data-cal-eventi>{{ eventi_cal|tojson }}</script>
+    <div class="cal-tel-mese" data-cal-mese hidden>
+      <div class="cal-tel-testa"><button type="button" class="cal-tel-freccia" data-cal-prec aria-label="Mese prima">‹</button>
+        <b data-cal-titolo></b><button type="button" class="cal-tel-freccia" data-cal-succ aria-label="Mese dopo">›</button></div>
+      <div class="cal-tel-griglia" data-cal-griglia></div>
+      <div class="cal-tel-legenda">{% if not cal_solo_prep %}<span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori</span>{% endif %}<span class="lg ritardo">In ritardo</span></div>
     </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+    <h3 class="cal-tel-giorno" data-cal-giorno></h3>
+    <div class="per-te" data-cal-voci></div>
+    <button type="button" class="btn pieno cal-tel-apri" data-cal-apri>{{ i('orologio', 's') }} Apri il calendario</button>
+  </section>
 </section>
 <div class="titolo-pagina">
   <div><div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div><h1>Panoramica</h1>
@@ -180,6 +181,61 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 {% endblock %}
 {% block script %}
 <script src="{{ url_for('static', filename='righe.js', v=versione_statici) }}"></script>
+<script>
+  // Calendario dal telefono (14/11/2026): compatto su oggi, espandibile al mese
+  (function () {
+    var box = document.querySelector('[data-cal-tel]');
+    if (!box) return;
+    var eventi = JSON.parse(box.querySelector('[data-cal-eventi]').textContent || '[]');
+    var oggi = box.dataset.oggi, scelto = oggi;
+    var base = new Date(oggi + 'T12:00:00'), mese = new Date(base.getFullYear(), base.getMonth(), 1);
+    var MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+    var GIORNI = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function del(g) { return eventi.filter(function (e) { return e.d === g; }); }
+    function voci() {
+      var lista = del(scelto), d = new Date(scelto + 'T12:00:00');
+      box.querySelector('[data-cal-giorno]').textContent = (scelto === oggi ? 'Oggi · ' : '') + GIORNI[d.getDay()] + ' ' + d.getDate() + ' ' + MESI[d.getMonth()];
+      var dove = box.querySelector('[data-cal-voci]'); dove.innerHTML = '';
+      if (!lista.length) { var p = document.createElement('p'); p.className = 'vuoto-telefono'; p.textContent = 'Nessuna auto in calendario.'; dove.appendChild(p); return; }
+      lista.forEach(function (e) {
+        var a = document.createElement('a'); a.href = e.u;
+        a.className = 'per-te-voce ' + (e.r ? 'ritardo cal-ritardo' : (e.t === 'preparazione' ? 'preparazione' : 'lavorazione'));
+        a.innerHTML = '<span class="per-te-barra" aria-hidden="true"></span><span><b></b><small></small></span>';
+        a.querySelector('b').textContent = e.o + ' · ' + e.n; a.querySelector('small').textContent = e.c;
+        dove.appendChild(a);
+      });
+    }
+    function griglia() {
+      box.querySelector('[data-cal-titolo]').textContent = MESI[mese.getMonth()] + ' ' + mese.getFullYear();
+      var g = box.querySelector('[data-cal-griglia]'); g.innerHTML = '';
+      ['L','M','M','G','V','S','D'].forEach(function (x) { var h = document.createElement('span'); h.className = 'cal-tel-sett'; h.textContent = x; g.appendChild(h); });
+      var primo = (mese.getDay() + 6) % 7;
+      for (var k = 0; k < primo; k++) g.appendChild(document.createElement('span'));
+      var giorni = new Date(mese.getFullYear(), mese.getMonth() + 1, 0).getDate();
+      for (var n = 1; n <= giorni; n++) {
+        var d = new Date(mese.getFullYear(), mese.getMonth(), n), id = iso(d), lista = del(id);
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'cal-tel-cella';
+        if (id === oggi) b.classList.add('oggi'); if (id === scelto) b.classList.add('scelto'); if (id < oggi) b.classList.add('passato');
+        b.innerHTML = '<span>' + n + '</span><i></i>';
+        var punti = b.querySelector('i');
+        ['preparazione', 'lavorazione'].forEach(function (t) { if (lista.some(function (e) { return e.t === t && !e.r; })) { var p = document.createElement('em'); p.className = t; punti.appendChild(p); } });
+        if (lista.some(function (e) { return e.r; })) { var p = document.createElement('em'); p.className = 'ritardo'; punti.appendChild(p); }
+        b.dataset.giorno = id;
+        b.addEventListener('click', function () { scelto = this.dataset.giorno; griglia(); voci(); });
+        g.appendChild(b);
+      }
+    }
+    box.querySelector('[data-cal-apri]').addEventListener('click', function () {
+      var m = box.querySelector('[data-cal-mese]'), apri = m.hidden;
+      m.hidden = !apri; this.innerHTML = apri ? 'Chiudi il calendario' : 'Apri il calendario';
+      if (apri) griglia(); else { scelto = oggi; voci(); }
+    });
+    box.querySelector('[data-cal-prec]').addEventListener('click', function () { mese = new Date(mese.getFullYear(), mese.getMonth() - 1, 1); griglia(); });
+    box.querySelector('[data-cal-succ]').addEventListener('click', function () { mese = new Date(mese.getFullYear(), mese.getMonth() + 1, 1); griglia(); });
+    voci();
+  })();
+</script>
 <script>
   // Trova: risultati mentre si scrive (frecce per scegliere, Invio per aprire, Esc per chiudere)
   (function () {

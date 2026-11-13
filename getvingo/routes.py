@@ -265,34 +265,66 @@ def _calendario_pronte(giorni_lavorativi=10):
     return out
 
 
+def _eventi_pronte(giorni=62, tipi=("preparazione", "lavorazione")):
+    """Eventi del calendario dal telefono (14/11/2026): preparazioni (con l'orario) e fine lavori dei fornitori
+    per i prossimi ~2 mesi; i ritardi stanno su oggi. Lista semplice per il calendario del mese nel browser."""
+    oggi = adesso().date()
+    limite = oggi + timedelta(days=giorni)
+    out = []
+    if "preparazione" in tipi:
+        for p in Preparazione.query.filter(Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at.isnot(None)):
+            rit = p.pronta_entro_at < adesso()
+            giorno = max(p.pronta_entro_at.date(), oggi)
+            if giorno <= limite:
+                out.append({"d": giorno.isoformat(), "t": "preparazione", "n": p.veicolo.descrizione, "r": rit,
+                            "o": p.pronta_entro_at.strftime("%H:%M"),
+                            "c": f"doveva essere pronta {p.pronta_entro_at:%d/%m %H:%M}" if rit else "pronta per la consegna",
+                            "u": url_for("main.veicolo", veicolo_id=p.veicolo_id)})
+    if "lavorazione" in tipi:
+        for _, elenco in servizi.presso_fornitori():
+            for v, m in elenco:
+                if not (m and m.con_lavorazione) or m.lavorazione_completata_at or not m.lavorazione_prevista_at:
+                    continue
+                giorno = max(m.lavorazione_prevista_at.date(), oggi)
+                if giorno <= limite:
+                    out.append({"d": giorno.isoformat(), "t": "lavorazione", "n": v.descrizione, "r": bool(m.giorni_ritardo),
+                                "o": "fine lavori", "u": url_for("main.veicolo", veicolo_id=v.id),
+                                "c": m.sede_arrivo_effettiva.nome + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else "")})
+    out.sort(key=lambda e: (e["d"], not e["r"], e["t"] != "preparazione", e["o"]))
+    return out
+
+
 def _home_telefono():
-    """Home dal telefono (12/11/2026 sera): auto dai fornitori (fine lavori stimata, da andare a prendere) per
-    tutti; preparazioni e calendario di quando saranno pronte per Preparatore, Consegne e amministratore."""
+    """Home dal telefono, solo ciò che serve a chi guarda (14/11/2026):
+    - Consegne: i ritiri da fare (non assegnati ad altri) e il calendario di quando saranno pronte
+    - Preparatore: le auto in preparazione e il calendario delle preparazioni
+    - Backoffice: i ritiri senza DDT di rientro, i fornitori in ritardo, il calendario
+    - Venditore e responsabile commerciale: il calendario (quando le auto saranno pronte)
+    - Amministratore: tutto, in breve
+    "I tuoi lavori" (in home.html) vale per tutti."""
+    ruolo = g.utente.ruolo
     esterne = [(v, m) for _, voci in servizi.presso_fornitori() for v, m in voci if m and m.con_lavorazione]
-    da_prendere = [(v, m) for v, m in esterne if m.lavorazione_completata_at]
-    in_lavorazione = sorted(((v, m) for v, m in esterne if not m.lavorazione_completata_at),
-                            key=lambda x: x[1].lavorazione_prevista_at or adesso())
-    preparazioni, calendario = [], []
-    if g.utente.ruolo in RUOLI_PREPARAZIONE:
+    da_prendere, in_lavorazione, preparazioni = [], [], []
+    if ruolo in ("consegne", "backoffice", "admin"):
+        for v, m in esterne:
+            if not m.lavorazione_completata_at:
+                continue
+            r = v.movimento_predisposto
+            if ruolo == "consegne" and r is not None and r.assegnato_a_id not in (None, g.utente.id):
+                continue  # lo va a prendere un altro
+            if ruolo == "backoffice" and r is not None:
+                continue  # all'ufficio interessa solo dove manca il DDT di rientro
+            da_prendere.append((v, m))
+    if ruolo in ("backoffice", "resp_commerciale", "admin"):
+        in_lavorazione = sorted(((v, m) for v, m in esterne if not m.lavorazione_completata_at and m.giorni_ritardo),
+                                key=lambda x: -x[1].giorni_ritardo)
+    if ruolo in ("preparatore", "admin"):
         preparazioni = (Preparazione.query.filter_by(completata_at=None)
                         .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).all())
-        oggi = adesso().date()
-        eventi = [(p.pronta_entro_at, p.veicolo, "pronta per la consegna", "preparazione", p.pronta_entro_at < adesso())
-                  for p in preparazioni if p.pronta_entro_at]
-        eventi += [(m.lavorazione_prevista_at, v, f"fine lavori · {m.sede_arrivo_effettiva.nome}", "lavorazione",
-                    bool(m.giorni_ritardo)) for v, m in in_lavorazione if m.lavorazione_prevista_at]
-        giorni = {}
-        for quando, v, cosa, tipo, ritardo in sorted(eventi, key=lambda e: e[0]):
-            giorno = max(quando.date(), oggi)  # i ritardi stanno su oggi
-            if (giorno - oggi).days > 13:
-                continue
-            giorni.setdefault(giorno, []).append({"quando": quando, "v": v, "cosa": cosa, "tipo": tipo, "ritardo": ritardo})
-        for giorno, voci in giorni.items():
-            nome = "Oggi" if giorno == oggi else ("Domani" if (giorno - oggi).days == 1 else
-                                                   f"{GIORNI_SETTIMANA[giorno.weekday()].capitalize()} {giorno:%d/%m}")
-            calendario.append((nome, voci))
+    tipi = ("preparazione",) if ruolo == "preparatore" else ("preparazione", "lavorazione")
     return {"da_prendere": da_prendere, "in_lavorazione": in_lavorazione, "preparazioni": preparazioni,
-            "calendario": calendario}
+            "eventi_cal": _eventi_pronte(tipi=tipi), "oggi_iso": adesso().date().isoformat(),
+            "cal_solo_prep": ruolo == "preparatore"}
 
 
 def _da_fare_per_te(quante=5):
