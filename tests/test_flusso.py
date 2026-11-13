@@ -3809,3 +3809,14 @@ class TestDestinazioniOrdinate(Base):
         pagina = self.c.get(f"/veicolo/{vid}/dati").get_data(as_text=True)
         for testo in ("Telaio (VIN)", "Versione", "1.5 eTSI Life", "Alimentazione", "Benzina", "Anno", "2024", "Adesivo NFC"):
             self.assertIn(testo, pagina)
+
+
+class TestCalendarioPanoramica(Base):
+    def test_preparazioni_e_lavorazioni_insieme(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Quando saranno pronte", home)
+        self.assertIn('class="cal-voce lavorazione', home)  # fine lavori del fornitore (senape)
+        self.assertIn("fine lavori", home)

@@ -137,6 +137,23 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 </a>
 {% endif %}
 
+{# Quando saranno pronte (14/11/2026): preparazioni (verde acqua, con l'orario) e fine lavori dei fornitori (senape)
+   per oggi e i prossimi 9 giorni lavorativi; i ritardi stanno su oggi con il bordo rosso che lampeggia #}
+<div class="fare-testa"><h2>Quando saranno pronte</h2>
+  <span class="legenda-pronte"><span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori fornitore</span><span class="lg ritardo">In ritardo</span></span></div>
+<div class="cal-pronte">
+  {% for g_ in calendario_pronte %}
+  <section class="cal-giorno {{ 'oggi' if g_.oggi }} {{ 'vuoto' if not g_.voci }}">
+    <h3>{{ g_.nome }} <small>{{ g_.data.strftime('%d/%m') }}</small>{% if g_.voci %}<span class="conteggio">{{ g_.voci|length }}</span>{% endif %}</h3>
+    {% for e in g_.voci %}
+    <a class="cal-voce {{ e.tipo }} {{ 'ritardo' if e.ritardo }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
+      <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
+    {% else %}<p class="cal-niente">—</p>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+
 <div class="fare-testa"><h2>Da fare{% if totale_da_fare %} <span class="conta-arancio">{{ totale_da_fare }}</span>{% endif %}</h2>
   <a class="btn piccolo" href="{{ url_for('main.preparazione', vista='corso', modo='calendario') }}">{{ i('orologio', 's') }} Calendario preparazioni</a></div>
 {% if not totale_da_fare %}<div class="vuoto">{{ i('check') }}Niente da fare adesso.</div>

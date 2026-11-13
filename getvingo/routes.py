@@ -233,6 +233,38 @@ CHIAVI_FILTRO = ("tipologia", "marca", "modello", "colore", "fase", "sede")
 RUOLI_PREPARAZIONE = ("preparatore", "consegne", "admin")  # vedono preparazioni e calendario dal telefono
 
 
+def _calendario_pronte(giorni_lavorativi=10):
+    """Quando saranno pronte (Panoramica da computer, 14/11/2026): per oggi e i prossimi giorni lavorativi le
+    preparazioni (con l'orario) e le fine lavori dei fornitori, per organizzare gli spostamenti.
+    I ritardi (preparazioni oltre l'orario, lavorazioni oltre la stima) stanno su oggi."""
+    oggi = adesso().date()
+    giorni = [oggi] + [servizi.giorno_lavorativo(k) for k in range(1, giorni_lavorativi)]
+    voci = {g_: [] for g_ in giorni}
+    for p in Preparazione.query.filter(Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at.isnot(None)):
+        rit = p.pronta_entro_at < adesso()
+        if max(p.pronta_entro_at.date(), oggi) in giorni:
+            voci[max(p.pronta_entro_at.date(), oggi)].append(
+                {"tipo": "preparazione", "v": p.veicolo, "quando": p.pronta_entro_at, "ritardo": rit,
+                 "ora": p.pronta_entro_at.strftime("%H:%M"), "cosa": "pronta" if not rit else
+                 f"doveva essere pronta {p.pronta_entro_at:%d/%m %H:%M}", "url": url_for("main.veicolo", veicolo_id=p.veicolo_id) + "#preparazione"})
+    for _, elenco in servizi.presso_fornitori():
+        for v, m in elenco:
+            if not (m and m.con_lavorazione) or m.lavorazione_completata_at or not m.lavorazione_prevista_at:
+                continue
+            giorno = max(m.lavorazione_prevista_at.date(), oggi)
+            if giorno in giorni:
+                voci[giorno].append({"tipo": "lavorazione", "v": v, "quando": m.lavorazione_prevista_at,
+                                     "ritardo": bool(m.giorni_ritardo), "ora": "fine lavori",
+                                     "cosa": f"{m.sede_arrivo_effettiva.nome}" + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else ""),
+                                     "url": url_for("main.veicolo", veicolo_id=v.id)})
+    out = []
+    for g_ in giorni:
+        nome = "Oggi" if g_ == oggi else ("Domani" if (g_ - oggi).days == 1 else GIORNI_SETTIMANA[g_.weekday()][:3].capitalize())
+        out.append({"data": g_, "nome": nome, "oggi": g_ == oggi,
+                    "voci": sorted(voci[g_], key=lambda e: (not e["ritardo"], e["tipo"] != "preparazione", e["quando"]))})
+    return out
+
+
 def _home_telefono():
     """Home dal telefono (12/11/2026 sera): auto dai fornitori (fine lavori stimata, da andare a prendere) per
     tutti; preparazioni e calendario di quando saranno pronte per Preparatore, Consegne e amministratore."""
@@ -380,6 +412,7 @@ def home():
                ("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
                ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
     return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni, per_te=_da_fare_per_te(),
+                           calendario_pronte=_calendario_pronte(),
                            **_home_telefono(),
                            conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
                            ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())

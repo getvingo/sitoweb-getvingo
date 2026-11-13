@@ -27,7 +27,9 @@
 {% if piazzali %}
 <nav class="pillole-sedi" id="scegli-piazzale" aria-label="Scegli la sede">
   <a href="#" data-sede="" class="attivo" title="Tutte le sedi">{{ i('piazzale') }} <span class="nome" data-corto="Tutte">Tutte le sedi</span> <span class="n">{{ totale }}</span></a>
-  {% for p in piazzali %}<a href="#" data-sede="{{ p.id }}" title="{{ p.nome }}" class="{{ 'zero' if not p.n }} {{ 'esterna' if p.esterna }}">{% if p.esterna %}{{ i('chiave', 's') }} {% endif %}<span class="nome">{{ p.nome }}</span> <span class="n">{{ p.n }}</span></a>{% endfor %}
+  {% for p in piazzali|sort(attribute='n', reverse=True) %}<a href="#" data-sede="{{ p.id }}" title="{{ p.nome }}" class="{{ 'zero' if not p.n }} {{ 'esterna' if p.esterna }}" {{ 'data-senza-auto hidden' if not p.n }}>{% if p.esterna %}{{ i('chiave', 's') }} {% endif %}<span class="nome">{{ p.nome }}</span> <span class="n">{{ p.n }}</span></a>{% endfor %}
+  {# 14/11/2026: con tante sedi quelle senza auto si raccolgono qui, per lasciare spazio a quelle che servono #}
+  {% set vuote = piazzali|rejectattr('n')|list %}{% if vuote %}<button type="button" class="altre-sedi" data-mostra-sedi>+ {{ vuote|length }} senza auto</button>{% endif %}
 </nav>
 {% endif %}
 <div class="stock-layout">
@@ -60,9 +62,9 @@
         <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" title="{{ v.descrizione }}{{ ' · ' ~ v.versione if v.versione }}"><b>{{ v.descrizione }}</b></a>
           <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %}<span class="badge-comm">{{ i('camion', 's') }} Commerciale</span>{% endif %}</small></span></div></td>
       <td class="cella-telaio">{% if v.targa %}<span class="targa-chip">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></td>
-      <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
+      <td class="cella-stato"><div class="stato-in-linea"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
         {% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}
-        {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</td>
+        {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</div></td>
       <td class="cella-da">{% if k != 'in_sede' %}{{ (v.stato_dal|da_tempo)|replace('da ', '') }}{% endif %}</td>
       <td class="cella-mappa">{% if v.lat is not none %}<button type="button" class="btn-icona" data-sulla-mappa="{{ v.id }}" title="Mostra sulla mappa" aria-label="Mostra {{ v.descrizione }} sulla mappa">{{ i('pin', 's') }}</button>{% endif %}</td>
     </tr>
@@ -166,6 +168,10 @@
     mappa.on('zoomend', aggiornaStrati);
 
     var chip = document.querySelectorAll('#scegli-piazzale a');
+    var altre = document.querySelector('[data-mostra-sedi]');
+    if (altre) altre.addEventListener('click', function () {
+      document.querySelectorAll('[data-senza-auto]').forEach(function (x) { x.hidden = false; }); altre.remove();
+    });
     // passando sulla riga l'auto si evidenzia sulla mappa (se la si vede da vicino)
     document.querySelectorAll('.riga-stock[data-id]').forEach(function (r) {
       var m = marcatori[r.dataset.id];

@@ -225,11 +225,13 @@
    La sottile barra in alto mostra le proporzioni del lavoro aperto; ogni voce è un filtro (icona + numero +
    stato a parole). Toccando di nuovo quella attiva si torna a tutte (la ✕ lo ricorda).
    voci: (chiave, numero, testo, icona, url, nella_barra) #}
-{% macro filtri_stato(voci, attivo, etichetta='Filtra per stato') %}
+{% macro filtri_stato(voci, attivo, etichetta='Filtra per stato', tutte=none) %}
 {% set ns = namespace(tot=0) %}{% for v in voci if v[5] %}{% set ns.tot = ns.tot + v[1] %}{% endfor %}
 <nav class="stato-filtri" aria-label="{{ etichetta }}" style="--voci:{{ voci|length }}">
   {% if ns.tot %}<div class="stato-quota" aria-hidden="true">{% for v in voci if v[5] and v[1] %}<span class="{{ v[0] }}" style="flex-grow:{{ v[1] }}"></span>{% endfor %}</div>{% endif %}
   <div class="stato-voci">
+  {# 14/11/2026: prima pillola "Tutte" con il totale, come "Tutte le sedi" nello Stock #}
+  {% if tutte %}<a href="{{ tutte[1] }}" class="stato-voce tutte {{ 'attivo' if not attivo }}"><span class="stato-riga"><span class="stato-icona">{{ i('auto', 's') }}</span><b>{{ tutte[0] }}</b></span><span class="stato-nome">{{ tutte[2] if tutte|length > 2 else 'Tutte' }}</span></a>{% endif %}
   {% for k, n, testo, icona, url, _ in voci %}
     <a href="{{ url }}" class="stato-voce {{ k }} {{ 'attivo' if k == attivo }} {{ 'zero' if not n }}"
        {% if k == attivo %}aria-current="true" title="Filtro attivo: tocca per vederle tutte"{% else %}title="Mostra solo: {{ testo|lower }}"{% endif %}>

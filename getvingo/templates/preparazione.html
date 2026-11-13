@@ -75,7 +75,7 @@
   ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', corso if attivo == 'ritardo' else url_for('main.preparazione', vista='corso', stato='ritardo', tipologia=tipologia), True),
   ('pronte', conteggi.pronte, 'Pronte', 'bandiera', corso if attivo == 'pronte' else url_for('main.preparazione', vista='pronte', tipologia=tipologia), True),
   ('consegnate', conteggi.consegnate, 'Consegnate', 'archivio', corso if attivo == 'consegnate' else url_for('main.preparazione', vista='consegnate', tipologia=tipologia), False),
-], attivo) }}
+], attivo if vista != 'corso' or stato_prep else none, tutte=(conteggi.corso, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo if modo == 'calendario' else none), 'In preparazione')) }}
 {# 13/11/2026: ricerca che filtra mentre si scrive + Filtri chiuso (tipo di veicolo), come Stock e Lavorazioni #}
 {% if not (vista == 'consegnate') %}
 <form class="stock-cerca" method="get">
@@ -87,7 +87,7 @@
 {% if vista == 'corso' %}
   {% set st = stato_prep %}
   {{ interruttore_modo(modo, url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='elenco'), url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='calendario'),
-                       preparazioni|length ~ ({'ritardo': ' in ritardo', 'tempo': ' in tempo'}.get(stato_prep) or ' auto in preparazione'),
+                       '',
                        url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo) if stato_prep else none,
                        sinistra=filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato=stato_prep)) }}
   {% if modo == 'calendario' %}

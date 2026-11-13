@@ -2420,7 +2420,7 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .stock-cerca { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .stock-cerca .ricerca { flex: 1 1 420px; margin: 0; }
 .stock-cerca .filtri-stock { flex: 0 0 auto; margin: 0; }
-.stock-cerca .filtri-stock[open] { flex-basis: 100%; }
+.stock-cerca .filtri-stock { position: relative; }
 .stock-cerca .filtri-stock .barra-filtri { margin-top: 10px; }
 .tabella-stock { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: var(--fs-15); }
 .tabella-stock thead th { text-align: left; font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -2689,3 +2689,65 @@ a.auto-breve-link::after { content: "Dati ›"; position: absolute; right: 12px;
 .cella-telaio .targa-chip + .vin { font-size: var(--fs-12); }
 .scelta-orario-voce input[type=radio] { width: 20px; height: 20px; min-height: 0; flex: none; padding: 0; margin: 2px 0 0; }
 .scelta-orario-voce > span { flex: 1; min-width: 0; text-align: left; }
+/* ---- Panoramica: quando saranno pronte (14/11/2026) — preparazioni verde acqua, fine lavori senape, ritardi rossi lampeggianti ---- */
+.cal-pronte { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 6px 0 20px; }
+.cal-giorno { background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 96px; }
+.cal-giorno.oggi { border-color: var(--segnale); box-shadow: 0 0 0 1px var(--segnale); }
+.cal-giorno.vuoto { opacity: .7; }
+.cal-giorno h3 { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-14); margin: 0 0 2px; }
+.cal-giorno h3 small { color: var(--testo-2); font-weight: 600; }
+.cal-giorno h3 .conteggio { margin-left: auto; }
+.cal-voce { display: grid; gap: 0; padding: 5px 8px; border-radius: var(--r-s); color: var(--testo); font-size: var(--fs-13);
+  border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 12%, var(--carta)); }
+.cal-voce:hover { text-decoration: none; background: color-mix(in srgb, var(--c) 22%, var(--carta)); }
+.cal-voce.preparazione { --c: var(--st-prep); } .cal-voce.lavorazione { --c: var(--st-lavoro); }
+.cal-voce b, .cal-voce small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-voce small { color: var(--testo-2); font-size: var(--fs-12); }
+.cal-ora { font-size: var(--fs-12); font-weight: 700; color: color-mix(in srgb, var(--c) 70%, var(--testo)); }
+.cal-voce.ritardo { outline: 2px solid var(--danno); outline-offset: -1px; animation: cal-lampeggia 1.4s ease-in-out infinite; }
+.cal-voce.ritardo small { color: var(--danno-scuro); font-weight: 650; }
+@keyframes cal-lampeggia { 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .cal-voce.ritardo { animation: none; } }
+.cal-niente { margin: 0; color: var(--testo-2); font-size: var(--fs-13); }
+.legenda-pronte { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--fs-13); color: var(--testo-2); }
+.legenda-pronte .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.legenda-pronte .preparazione { --c: var(--st-prep); } .legenda-pronte .lavorazione { --c: var(--st-lavoro); }
+.legenda-pronte .ritardo::before { background: none; outline: 2px solid var(--danno); outline-offset: -2px; }
+/* "Tutte": come "Tutte le sedi" nello Stock, viola pieno quando nessun filtro di stato è attivo */
+.stato-filtri .tutte { --c: var(--inchiostro); --c-testo: var(--testo); }
+.stato-voce.tutte .stato-icona { background: var(--superficie); color: var(--inchiostro); }
+.stato-voce.tutte.attivo { background: var(--inchiostro); border-color: var(--inchiostro); }
+.barra-modo-sx .tenue.piccolo:empty { display: none; }
+/* ---- "Filtri" è un pulsante vero, alto come la ricerca e sulla stessa riga (14/11/2026) ---- */
+details.filtri-stock > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px;
+  padding: 0 18px; border: 1.5px solid var(--bordo-forte); border-radius: var(--r); background: var(--carta); color: var(--testo);
+  font-weight: 700; font-size: var(--fs-15); cursor: pointer; white-space: nowrap; }
+details.filtri-stock > summary::-webkit-details-marker { display: none; }
+details.filtri-stock > summary:hover { border-color: var(--segnale); }
+details.filtri-stock[open] > summary { border-color: var(--segnale); background: var(--segnale-tenue); color: var(--segnale); }
+details.filtri-stock > summary .icona { color: var(--segnale); }
+.stock-cerca { align-items: flex-start; }
+.stock-cerca .filtri-stock[open] > :not(summary) { margin-top: 10px; }
+.stock-cerca .pillole-tipi { margin: 0; }
+#filtri.stock-cerca .scheda { margin: 0; }
+/* ---- Stock (14/11/2026): sedi senza auto raccolte, intestazione vicina alle righe, stato su una riga più al centro ---- */
+.altre-sedi { min-height: 38px; padding: 0 14px; border-radius: var(--r-pillola); border: 1.5px dashed var(--bordo-forte); background: none;
+  color: var(--testo-2); font: inherit; font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
+.altre-sedi:hover { border-color: var(--segnale); color: var(--segnale); }
+.tabella-stock thead th { padding-bottom: 0; }
+.tabella-stock .riga-gruppo th { padding: 6px 4px 0; }
+.tabella-stock .c-auto { width: 31%; } .tabella-stock .c-telaio { width: 12%; } .tabella-stock .c-stato { width: 42%; } .tabella-stock .c-da { width: 9%; }
+.stato-in-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.stato-in-linea .badge { margin: 0; }
+.tabella-stock .cella-stato small { font-weight: 600; }
+.riga-stock:not(.in_sede) .cella-stato small:not(.testo-ritardo) { color: color-mix(in srgb, var(--fase) 75%, var(--testo)); }
+.cella-auto small { margin-top: 4px; }
+
+/* pannello dei Filtri: si apre come menu sotto il pulsante, senza spostare la ricerca (14/11/2026) */
+.stock-cerca .filtri-stock[open] > :not(summary) { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; margin: 0;
+  width: min(680px, 92vw); background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); padding: 14px;
+  box-shadow: 0 12px 32px rgba(28,21,51,.16); }
+.stock-cerca .filtri-stock > .chiudi-pannello { display: none !important; }
+.stock-cerca .filtri-stock .barra-filtri { margin: 0; }
+.tabella-stock .c-auto { width: 34%; } .tabella-stock .c-stato { width: 39%; }
+.tabella-stock .cella-auto small { text-overflow: clip; }

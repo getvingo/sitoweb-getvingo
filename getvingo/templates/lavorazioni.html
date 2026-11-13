@@ -14,25 +14,25 @@
   ('corso', riepilogo.corso, 'Nei tempi', 'orologio', url_for('main.lavorazioni', stato=none if stato == 'corso' else 'corso', lavorazione=tp, tipologia=tl, modo=md), True),
   ('ritardo', riepilogo.ritardo, 'In ritardo', 'attenzione', url_for('main.lavorazioni', stato=none if stato == 'ritardo' else 'ritardo', lavorazione=tp, tipologia=tl, modo=md), True),
   ('finita', riepilogo.finita, 'Da ritirare', 'ritiro', url_for('main.lavorazioni', stato=none if stato == 'finita' else 'finita', lavorazione=tp, tipologia=tl, modo=md), True),
-], stato) }}
+], stato, tutte=(riepilogo.corso + riepilogo.ritardo + riepilogo.finita, url_for('main.lavorazioni', lavorazione=tp, tipologia=tl, modo=md), 'Tutte')) }}
 
-{# 13/11/2026: ricerca che filtra mentre si scrive + Filtri chiuso (tipo di veicolo e di lavorazione), come lo Stock #}
-<form class="stock-cerca" method="get">
-  {% if st %}<input type="hidden" name="stato" value="{{ st }}">{% endif %}{% if md %}<input type="hidden" name="modo" value="{{ md }}">{% endif %}
+{# Ricerca che filtra mentre si scrive; i tipi di lavorazione stanno nel pulsante "Filtri" (14/11/2026) #}
+<div class="stock-cerca">
   <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, fornitore, lavorazione…" aria-label="Cerca tra le lavorazioni"></div>
-</form>
-
-{# Tipi di lavorazione a pillole (14/11/2026): ritoccando quella attiva si torna a tutte #}
-{% if tipi %}
-<nav class="pillole-tipi" aria-label="Tipo di lavorazione">
-  {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=none if tipo == l else l, tipologia=tl, stato=st, modo=md) }}" class="pillola-tipo {{ 'attivo' if tipo == l }}">{{ i('chiave', 's') }} {{ l }} <b>{{ n }}</b>{% if tipo == l %}<span class="pillola-togli" aria-hidden="true">✕</span>{% endif %}</a>{% endfor %}
-</nav>
-{% endif %}
+  {% if tipi %}
+  <details class="ripiega filtri-stock" {{ 'open' if tipo }}>
+    <summary>{{ i('gestione', 's') }} Filtri{% if tipo %} · 1 attivo{% endif %}</summary>
+    <nav class="pillole-tipi" aria-label="Tipo di lavorazione">
+      {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=none if tipo == l else l, tipologia=tl, stato=st, modo=md) }}" class="pillola-tipo {{ 'attivo' if tipo == l }}">{{ i('chiave', 's') }} {{ l }} <b>{{ n }}</b>{% if tipo == l %}<span class="pillola-togli" aria-hidden="true">✕</span>{% endif %}</a>{% endfor %}
+    </nav>
+  </details>
+  {% endif %}
+</div>
 
 {# Elenco per fornitore oppure Calendario: il giorno in cui ogni lavorazione deve essere finita #}
 {{ interruttore_modo(modo, url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl),
                      url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario'),
-                     totale_visibili ~ (' auto dai fornitori' if totale_visibili != 1 else ' auto dal fornitore'),
+                     '',
                      url_for('main.lavorazioni', modo=md) if (stato or tipo or tipologia) else none,
                      sinistra=filtro_tipologia(tipologia, 'main.lavorazioni', lavorazione=tp, stato=st, modo=md)) }}
 {% if modo == 'calendario' %}

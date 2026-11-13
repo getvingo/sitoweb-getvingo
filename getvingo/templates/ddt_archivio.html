@@ -7,10 +7,10 @@
   <p class="descrizione-pagina">Tutti i documenti di trasporto: cerca, filtra per stato, apri o scarica il PDF.</p></div>
   <a class="btn piccolo primario" href="{{ url_for('main.ddt_multiplo') }}">{{ i('camion', 's') }} DDT multiplo</a></div>
 
-<form id="filtri">
+<form id="filtri" class="stock-cerca">
   <input type="hidden" name="stato" value="{{ stato }}">
   <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" id="cerca-righe" autocomplete="off" placeholder="Cerca: numero, auto, telaio, targa, luogo, autista…" aria-label="Cerca DDT"></div>
-  <details class="ripiega" style="margin-top:10px" {{ 'open' if avanzati }}>
+  <details class="ripiega filtri-stock" {{ 'open' if avanzati }}>
     <summary>{{ i('gestione', 's') }} Filtri{% if avanzati %} · {{ avanzati|length }} attivi{% endif %}</summary>
     <div class="scheda">
       <div class="filtri-avanzati">
