@@ -1205,10 +1205,41 @@ def primo_slot_libero(da, escludi=None):
     raise Vietato("Calendario della preparazione pieno per il prossimo anno.")
 
 
+def giorno_lavorativo(n, da=None):
+    """L'n-esimo giorno lavorativo dopo oggi (weekend, feste e giorni chiusi saltati): 1 = il prossimo."""
+    giorno = (da or adesso()).date()
+    chiusi = giorni_chiusi(giorno, giorno + timedelta(days=120))
+    contati = 0
+    while contati < n:
+        giorno += timedelta(days=1)
+        if _slot_del_giorno(giorno, chiusi):
+            contati += 1
+    return giorno
+
+
+def intervallo_slot_scelta(da=None):
+    """Slot sceglibili a mano (14/11/2026): dal prossimo giorno lavorativo al decimo."""
+    return (datetime.combine(giorno_lavorativo(1, da), time(0)),
+            datetime.combine(giorno_lavorativo(GIORNI_PER_PREPARARE, da), time(23, 59)))
+
+
+def slot_automatico(da=None, escludi=None):
+    """Orario automatico (14/11/2026): primo slot libero dal decimo giorno lavorativo."""
+    return primo_slot_libero(datetime.combine(giorno_lavorativo(GIORNI_PER_PREPARARE, da), time(0)), escludi=escludi)
+
+
+def controlla_slot_scelto(pronta_entro, da=None):
+    """L'orario scelto a mano deve stare tra il prossimo giorno lavorativo e il decimo."""
+    inizio, fine = intervallo_slot_scelta(da)
+    if pronta_entro is None or not (inizio <= pronta_entro <= fine):
+        raise Vietato(f"Scegli un orario tra {inizio:%d/%m} e {fine:%d/%m} (da 1 a {GIORNI_PER_PREPARARE} giorni lavorativi), "
+                      "oppure lascia l'orario automatico.")
+
+
 def calendarizza(prep, da=None):
-    """Preparazione avviata: in calendario entro 10 giorni, nel primo slot utile (se quel giorno non è
-    lavorativo si va al primo successivo; se lo slot è preso, al successivo libero)."""
-    prep.pronta_entro_at = primo_slot_libero((da or adesso()) + timedelta(days=GIORNI_PER_PREPARARE), escludi=prep)
+    """Preparazione avviata: in calendario a 10 giorni lavorativi, nel primo slot libero (14/11/2026: prima
+    erano 10 giorni di calendario)."""
+    prep.pronta_entro_at = slot_automatico(da, escludi=prep)
     return prep.pronta_entro_at
 
 
@@ -1552,6 +1583,19 @@ def metti_in_preparazione(v, utente, pronta_entro=None):
             raise Vietato(f"Lo slot {pronta_entro:%d/%m %H:%M} è già preso da un'altra preparazione: scegline un altro.")
         prep.pronta_entro_at = pronta_entro  # data scelta a mano dall'ufficio
     return prep
+
+
+def elimina_preparazione(prep, utente):
+    """Solo l'amministratore (14/11/2026): la preparazione sparisce con i suoi passi e le loro azioni;
+    l'auto torna in sede (o "da preparare" di nuovo)."""
+    if utente is None or utente.ruolo != "admin":
+        raise Vietato("Solo l'amministratore può eliminare una preparazione.")
+    for f in list(prep.fasi):
+        db.session.delete(f)
+    for a in Azione.query.filter_by(veicolo_id=prep.veicolo_id, tipo="preparazione_fase").all():
+        if (a.dati or {}).get("prep_id") == prep.id:
+            db.session.delete(a)
+    db.session.delete(prep)
 
 
 def fissa_scadenza(prep, pronta_entro):

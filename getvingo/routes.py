@@ -158,13 +158,20 @@ def _da_consegnare():
     return [v for v in attive if v.da_consegnare]
 
 
-def _scelta_slot(occupati, giorni_lavorativi=15):
+def _scelta_prep():
+    """Slot sceglibili per la preparazione (14/11/2026): dal prossimo giorno lavorativo al decimo."""
+    inizio, _ = servizi.intervallo_slot_scelta()
+    return _scelta_slot({s: p.veicolo.descrizione for s, p in servizi.slot_occupati_preparazione().items()},
+                        servizi.GIORNI_PER_PREPARARE, da=inizio)
+
+
+def _scelta_slot(occupati, giorni_lavorativi=15, da=None):
     """Giorni e slot di 30 minuti per scegliere un orario. occupati = {inizio: chi lo occupa}, oppure
     {inizio: {sede_id: chi}} quando l'occupazione dipende dalla sede scelta (consegne)."""
     return [{"data": giorno, "breve": GIORNI_SETTIMANA[giorno.weekday()][:3], "mese": MESI[giorno.month - 1][:3],
              "lungo": f"{GIORNI_SETTIMANA[giorno.weekday()]} {giorno.day} {MESI[giorno.month - 1]}",
              "slot": [{"at": s, "occupato": occupati.get(s)} for s in slot]}
-            for giorno, slot in servizi.giorni_con_slot(giorni_lavorativi=giorni_lavorativi)]
+            for giorno, slot in servizi.giorni_con_slot(da=da, giorni_lavorativi=giorni_lavorativi)]
 
 
 def _per_fase(*fasi):
@@ -682,8 +689,7 @@ def preparazione():
     return render_template("preparazione.html", vista=vista, conteggi=conteggi,
                            preparazioni={"ritardo": in_ritardo, "tempo": in_tempo}.get(stato_prep, preparazioni),
                            solo_ritardo=solo_ritardo, stato_prep=stato_prep,
-                           slot_prep=_scelta_slot({s: p.veicolo.descrizione for s, p in
-                                                   servizi.slot_occupati_preparazione().items()}, 20),
+                           slot_prep=_scelta_prep(), slot_auto=servizi.slot_automatico(),
                            da_preparare=da_preparare, pronte=pronte, consegnate=consegnate[:500], fc=fc, modo=modo,
                            calendario=calendario, tipi_evento=TIPI_EVENTO, tipologia=tipologia,
                            sedi_consegnate=sorted({(str(v.sede_id), v.sede.nome) for v in tutte_consegnate if v.sede},
@@ -849,7 +855,12 @@ def avvia_preparazione(veicolo_id):
     v = db.get_or_404(Veicolo, veicolo_id)
     session.pop("ultimo_tocco", None)  # il tocco è servito ad avviarla: il primo passo vuole un nuovo tocco
     try:
-        prep = servizi.metti_in_preparazione(v, g.utente, _data_ora("pronta_entro"))
+        # 14/11/2026: orario automatico (primo slot libero a 10 giorni lavorativi) o scelto tra 1 e 10 giorni lavorativi
+        modo = request.form.get("modo_orario", "")
+        pronta = None if modo == "auto" else _data_ora("pronta_entro")
+        if modo == "scelgo" or pronta is not None:
+            servizi.controlla_slot_scelto(pronta)
+        prep = servizi.metti_in_preparazione(v, g.utente, pronta)
         db.session.commit()
         slot = prep.pronta_entro_at if prep else None
         flash(f"{v.descrizione} è in preparazione per la consegna"
@@ -868,12 +879,29 @@ def _data_ora(campo):
         return None
 
 
+@bp.route("/preparazione/<int:prep_id>/elimina", methods=["POST"])
+@solo_interni
+def elimina_preparazione(prep_id):
+    """Solo amministratore (14/11/2026): toglie la preparazione, l'auto torna in sede."""
+    prep = db.get_or_404(Preparazione, prep_id)
+    nome = prep.veicolo.descrizione
+    try:
+        servizi.elimina_preparazione(prep, g.utente)
+        db.session.commit()
+        flash(f"Preparazione di {nome} eliminata: l'auto torna in sede.", "ok")
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+    return redirect(request.form.get("torna") or url_for("main.preparazione"))
+
+
 @bp.route("/preparazione/<int:prep_id>/scadenza", methods=["POST"])
 @solo_interni
 def scadenza_preparazione(prep_id):
     """Quando l'auto deve essere pronta: si fissa una volta sola (se manca), poi non si sposta."""
     prep = db.get_or_404(Preparazione, prep_id)
     try:
+        servizi.controlla_slot_scelto(_data_ora("pronta_entro"))
         servizi.fissa_scadenza(prep, _data_ora("pronta_entro"))
         db.session.commit()
         flash(f"{prep.veicolo.descrizione}: in calendario il {prep.pronta_entro_at:%d/%m alle %H:%M}.", "ok")
@@ -1649,6 +1677,7 @@ def veicolo(veicolo_id):
                                   Veicolo.id != v.id, Veicolo.stato != "consegnato").count()
     return render_template(
         "veicolo.html", v=v, mov=mov, predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
+        slot_prep=_scelta_prep(), slot_auto=servizi.slot_automatico(),
         preparazione=v.preparazione_attiva, ultima_prep=v.ultima_preparazione, simili=simili,
         puo_emettere=servizi.puo_emettere(v, g.utente),
         assegnabili=servizi.assegnabili(v), lavorazione_in_corso=servizi.lavorazione_in_corso(v),

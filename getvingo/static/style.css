@@ -2646,3 +2646,46 @@ a.auto-breve-link::after { content: "Dati ›"; position: absolute; right: 12px;
 .riga-stock.fare-preparazione.fare-l3 { --fase: var(--st-prep); }
 .riga-stock.fare-l1 .pillola-stato { background: var(--fase); color: #fff; } .riga-stock.fare-l1 .pillola-stato i { background: #fff; }
 .panoramica-righe { margin-top: 12px; }
+
+/* Orario della preparazione: automatico o a scelta (14/11/2026) */
+.scelta-orario { border: 0; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.scelta-orario legend { margin-bottom: 6px; }
+.scelta-orario-voce { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1.5px solid var(--bordo); border-radius: var(--r-s);
+  background: var(--carta); cursor: pointer; }
+.scelta-orario-voce:has(input:checked) { border-color: var(--prep); background: var(--prep-tenue); }
+.scelta-orario-voce input { margin-top: 3px; accent-color: var(--prep); }
+.scelta-orario-voce b { display: block; } .scelta-orario-voce small { color: var(--testo-2); font-size: var(--fs-13); }
+.azione-prepara > summary { list-style: none; cursor: pointer; }
+.azione-prepara > summary::-webkit-details-marker { display: none; }
+.azione-prepara[open] > summary { background: var(--prep); color: #fff; }
+.azione-prepara > .scheda { margin-top: 10px; }
+@media (min-width: 560px) {
+  .azioni-auto.con-prepara .predisponi, .azioni-auto.con-prepara .azione-prepara { align-self: start; }
+  .azioni-auto.con-prepara .azione-prepara[open] { grid-column: 1 / -1; grid-row: 1; }
+  .azioni-auto.con-prepara .azione-prepara[open] > summary { display: flex; width: calc(50% - 5px); margin-left: auto; }
+  .azioni-auto.con-prepara .predisponi { position: relative; z-index: 1; }
+}
+/* ---- 14/11/2026: selettori a sinistra di Elenco/Calendario, tipi di lavorazione e sedi a pillole ---- */
+.barra-modo-sx { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.barra-modo-sx .filtro-tipologia { margin: 0; }
+.pillole-tipi { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.pillola-tipo, .pillole-sedi a { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border: 1.5px solid var(--bordo);
+  border-radius: var(--r-pillola); background: var(--carta); color: var(--testo); font-size: var(--fs-14); font-weight: 600; white-space: nowrap; }
+.pillola-tipo:hover, .pillole-sedi a:hover { text-decoration: none; border-color: var(--segnale); }
+.pillola-tipo .icona { color: var(--st-lavoro-pieno); }
+.pillola-tipo b, .pillole-sedi a .n { font-variant-numeric: tabular-nums; color: var(--testo-2); font-weight: 700; }
+.pillola-tipo.attivo { background: var(--st-lavoro-pieno); border-color: var(--st-lavoro-pieno); color: #fff; }
+.pillola-tipo.attivo .icona, .pillola-tipo.attivo b { color: #fff; }
+.pillola-togli { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 11px; }
+.pillole-sedi { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.pillole-sedi a .icona { width: 16px; height: 16px; color: var(--testo-2); }
+.pillole-sedi a.attivo { background: var(--inchiostro); border-color: var(--inchiostro); color: #fff; }
+.pillole-sedi a.attivo .n, .pillole-sedi a.attivo .icona { color: #fff; }
+.pillole-sedi a.zero { opacity: .55; }
+.testo-pericolo { color: var(--danno-scuro); }
+/* targa e telaio allineati: stessa rientranza per tutti e due */
+.cella-telaio .targa-chip, .cella-telaio .vin { display: block; width: max-content; padding: 0 7px; border: 1px solid transparent; line-height: 20px; }
+.cella-telaio .targa-chip { border-color: var(--bordo-forte); margin-bottom: 3px; }
+.cella-telaio .targa-chip + .vin { font-size: var(--fs-12); }
+.scelta-orario-voce input[type=radio] { width: 20px; height: 20px; min-height: 0; flex: none; padding: 0; margin: 2px 0 0; }
+.scelta-orario-voce > span { flex: 1; min-width: 0; text-align: left; }

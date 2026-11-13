@@ -25,9 +25,9 @@
 </form>
 
 {% if piazzali %}
-<nav class="interruttore filtro-gruppo in-riga tutta-larghezza" id="scegli-piazzale" style="margin-top:14px" aria-label="Scegli la sede">
+<nav class="pillole-sedi" id="scegli-piazzale" aria-label="Scegli la sede">
   <a href="#" data-sede="" class="attivo" title="Tutte le sedi">{{ i('piazzale') }} <span class="nome" data-corto="Tutte">Tutte le sedi</span> <span class="n">{{ totale }}</span></a>
-  {% for p in piazzali %}<a href="#" data-sede="{{ p.id }}" title="{{ p.nome }}">{% if p.esterna %}{{ i('chiave', 's') }} {% endif %}<span class="nome">{{ p.nome }}</span> <span class="n">{{ p.n }}</span></a>{% endfor %}
+  {% for p in piazzali %}<a href="#" data-sede="{{ p.id }}" title="{{ p.nome }}" class="{{ 'zero' if not p.n }} {{ 'esterna' if p.esterna }}">{% if p.esterna %}{{ i('chiave', 's') }} {% endif %}<span class="nome">{{ p.nome }}</span> <span class="n">{{ p.n }}</span></a>{% endfor %}
 </nav>
 {% endif %}
 <div class="stock-layout">
@@ -188,7 +188,8 @@
         history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
       } catch (e) {}
     }
-    chip.forEach(function (c) { c.addEventListener('click', function (e) { e.preventDefault(); scegli(c.dataset.sede); }); });
+    // ritoccando la sede già scelta si torna a tutte le sedi (14/11/2026)
+    chip.forEach(function (c) { c.addEventListener('click', function (e) { e.preventDefault(); scegli(c.dataset.sede && c.classList.contains('attivo') ? '' : c.dataset.sede); }); });
 
     // vista iniziale: tutti i piazzali, oppure quello indicato nell'indirizzo
     var iniziale = '{{ f.sede }}';

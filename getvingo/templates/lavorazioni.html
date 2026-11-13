@@ -20,22 +20,21 @@
 <form class="stock-cerca" method="get">
   {% if st %}<input type="hidden" name="stato" value="{{ st }}">{% endif %}{% if md %}<input type="hidden" name="modo" value="{{ md }}">{% endif %}
   <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, fornitore, lavorazione…" aria-label="Cerca tra le lavorazioni"></div>
-  <details class="ripiega filtri-stock" {{ 'open' if tipo or tipologia }}>
-    <summary>{{ i('gestione', 's') }} Filtri{% if tipo or tipologia %} · {{ [tipo, tipologia]|select|list|length }} attivi{% endif %}</summary>
-    <div class="barra-filtri">
-      <label class="campo"><span>Lavorazione</span><select name="lavorazione" onchange="this.form.submit()"><option value="">Tutte ({{ totale }})</option>
-        {% for l, n in tipi %}<option value="{{ l }}" {{ 'selected' if tipo == l }}>{{ l }} ({{ n }})</option>{% endfor %}</select></label>
-      <label class="campo"><span>Tipo di veicolo</span><select name="tipologia" onchange="this.form.submit()"><option value="">Tutti</option>
-        <option value="vettura" {{ 'selected' if tipologia == 'vettura' }}>Vetture</option><option value="commerciale" {{ 'selected' if tipologia == 'commerciale' }}>Commerciali</option></select></label>
-    </div>
-  </details>
 </form>
+
+{# Tipi di lavorazione a pillole (14/11/2026): ritoccando quella attiva si torna a tutte #}
+{% if tipi %}
+<nav class="pillole-tipi" aria-label="Tipo di lavorazione">
+  {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=none if tipo == l else l, tipologia=tl, stato=st, modo=md) }}" class="pillola-tipo {{ 'attivo' if tipo == l }}">{{ i('chiave', 's') }} {{ l }} <b>{{ n }}</b>{% if tipo == l %}<span class="pillola-togli" aria-hidden="true">✕</span>{% endif %}</a>{% endfor %}
+</nav>
+{% endif %}
 
 {# Elenco per fornitore oppure Calendario: il giorno in cui ogni lavorazione deve essere finita #}
 {{ interruttore_modo(modo, url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl),
                      url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario'),
                      totale_visibili ~ (' auto dai fornitori' if totale_visibili != 1 else ' auto dal fornitore'),
-                     url_for('main.lavorazioni', modo=md) if (stato or tipo or tipologia) else none) }}
+                     url_for('main.lavorazioni', modo=md) if (stato or tipo or tipologia) else none,
+                     sinistra=filtro_tipologia(tipologia, 'main.lavorazioni', lavorazione=tp, stato=st, modo=md)) }}
 {% if modo == 'calendario' %}
 <p class="legenda-calendario"><span class="ev fine_prevista">Da finire</span> <span class="ev ritardo">In ritardo</span> <span class="ev lavoro_finita">Finita</span></p>
 {{ calendario_mese(calendario, url_for('main.lavorazioni', stato=st, lavorazione=tp, tipologia=tl, modo='calendario', mese=calendario.prec),

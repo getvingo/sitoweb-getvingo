@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot %}
+{% from "_macro.html" import i, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot, scelta_orario_prep %}
 {% from "_danno.html" import scheda_danno %}
 {% from "_auto.html" import carta_auto, info_auto, ddt_mini, in_viaggio_da, avanzamento_prep, avanzamento_lavoro, sollecito_lavoro, cambia_stima, rientro_lavoro %}
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
@@ -197,10 +197,14 @@
   </details>
   {% endif %}
   {% if puo_preparare %}
-  <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="azione-prepara">
-    {{ csrf_input() }}
-    <button class="btn pieno btn-prepara">{{ i('brilla') }} Metti in preparazione</button>
-  </form>
+  <details class="azione-prepara">
+    <summary class="btn pieno btn-prepara">{{ i('brilla') }} Metti in preparazione</summary>
+    <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="scheda">
+      {{ csrf_input() }}
+      {{ scelta_orario_prep(slot_prep, slot_auto) }}
+      <button class="btn primario pieno">{{ i('brilla') }} Metti in preparazione</button>
+    </form>
+  </details>
   {% endif %}
 </section>
 

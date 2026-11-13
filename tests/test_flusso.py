@@ -1809,13 +1809,13 @@ class TestRegole0311Sera(Base):
         self.assertIn("Nessuna auto in ritardo", vuota)
         self.assertIn('class="stato-voce ritardo attivo', vuota)
         self.assertNotIn("dai fornitori</span>", vuota)  # il totale non c'è più: solo i 3 stati
-        self.assertIn('<select name="lavorazione"', vuota)  # tipi di lavorazione nel pannello Filtri (13/11/2026)
+        self.assertIn('class="pillole-tipi"', vuota)  # tipi di lavorazione a pillole (14/11/2026)
         self.assertNotIn("<span>in preparazione</span>", self.c.get("/preparazione").get_data(as_text=True))
 
     def test_stock_sedi_a_pulsanti_filtri_a_menu(self):
         self.abbina()
         stock = self.c.get("/stock").get_data(as_text=True)
-        self.assertIn('class="interruttore filtro-gruppo in-riga tutta-larghezza" id="scegli-piazzale"', stock)
+        self.assertIn('class="pillole-sedi" id="scegli-piazzale"', stock)  # sedi a pillole (14/11/2026)
         self.assertNotIn('<select name="marca"', stock)  # 13/11/2026: marca, modello, colore si cercano
         self.assertIn('id="cerca-stock"', stock)
 
@@ -1882,21 +1882,36 @@ class TestRegoleLavorazioneECalendario(Base):
 
     def test_preparazione_solo_negli_slot_di_30_minuti(self):
         vid = self.abbina()
-        for fuori in ("2030-01-07T08:00", "2030-01-07T12:30", "2030-01-07T13:00", "2030-01-07T09:15",
-                      "2030-01-07T18:30", "2030-01-05T09:00"):  # prima delle 8:30, pausa, non a mezz'ora, sabato
-            self.c.post(f"/veicolo/{vid}/preparazione", data={"pronta_entro": fuori})
+        with self.app.app_context():
+            giorno = servizi.giorno_lavorativo(3)  # 14/11/2026: si sceglie tra 1 e 10 giorni lavorativi
+            lontano = servizi.giorno_lavorativo(15)
+        g_ = giorno.isoformat()
+        for fuori in (g_ + "T08:00", g_ + "T12:30", g_ + "T13:00", g_ + "T09:15", g_ + "T18:30",  # fuori dagli slot
+                      lontano.isoformat() + "T09:00"):                                          # oltre 10 giorni lavorativi
+            self.c.post(f"/veicolo/{vid}/preparazione", data={"modo_orario": "scelgo", "pronta_entro": fuori})
             with self.app.app_context():
                 self.assertEqual(Preparazione.query.count(), 0, fuori)
         with self.app.app_context():
-            giorno = datetime(2030, 1, 7).date()  # lunedì
-            slot = servizi._slot_del_giorno(giorno)
+            slot = servizi._slot_del_giorno(datetime(2030, 1, 7).date())  # un lunedì
             self.assertEqual(len(slot), 16)  # 8 la mattina e 8 il pomeriggio
             self.assertEqual((slot[0].time(), slot[7].time(), slot[8].time(), slot[15].time()),
                              (datetime(1, 1, 1, 8, 30).time(), datetime(1, 1, 1, 12, 0).time(),
                               datetime(1, 1, 1, 14, 30).time(), datetime(1, 1, 1, 18, 0).time()))
-        self.c.post(f"/veicolo/{vid}/preparazione", data={"pronta_entro": "2030-01-07T18:00"})  # ultimo slot
+        self.c.post(f"/veicolo/{vid}/preparazione", data={"modo_orario": "scelgo", "pronta_entro": g_ + "T18:00"})  # ultimo slot
         with self.app.app_context():
-            self.assertEqual(Preparazione.query.one().pronta_entro_at, datetime(2030, 1, 7, 18, 0))
+            self.assertEqual(Preparazione.query.one().pronta_entro_at, datetime.combine(giorno, datetime(1, 1, 1, 18, 0).time()))
+
+    def test_orario_automatico_a_10_giorni_lavorativi_ed_elimina(self):
+        vid = self.abbina()
+        self.c.post(f"/veicolo/{vid}/preparazione", data={"modo_orario": "auto"})
+        with self.app.app_context():
+            p = Preparazione.query.one()
+            self.assertEqual(p.pronta_entro_at.date(), servizi.giorno_lavorativo(10))
+            pid = p.id
+        self.c.post(f"/preparazione/{pid}/elimina")  # amministratore: la preparazione sparisce
+        with self.app.app_context():
+            self.assertEqual(Preparazione.query.count(), 0)
+            self.assertEqual(db.session.get(Veicolo, vid).fase, "in_sede")
 
 
 class TestLoghiMarche(Base):

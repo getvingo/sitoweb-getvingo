@@ -191,9 +191,9 @@
 {% macro marchio(v) %}{% set logo = v.marca|marchio %}{% if logo %}<span class="logo-marca" title="{{ v.marca }}"><img src="{{ logo }}" alt="{{ v.marca }}" loading="lazy"></span>{% else %}<span class="logo-marca sigla" title="{{ v.marca or 'Marca non indicata' }}">{{ (v.marca or '?')|iniziali }}</span>{% endif %}{% endmacro %}
 
 {# Elenco / Calendario, con il conteggio a sinistra (e "azzera filtri" se serve) #}
-{% macro interruttore_modo(modo, url_elenco, url_calendario, conteggio, url_azzera=none) %}
+{% macro interruttore_modo(modo, url_elenco, url_calendario, conteggio, url_azzera=none, sinistra=none) %}
 <div class="barra-modo">
-  <span class="tenue piccolo">{{ conteggio }}{% if url_azzera %} · <a href="{{ url_azzera }}">azzera filtri</a>{% endif %}</span>
+  <span class="barra-modo-sx">{% if sinistra %}{{ sinistra }}{% endif %}<span class="tenue piccolo">{{ conteggio }}{% if url_azzera %} · <a href="{{ url_azzera }}">azzera filtri</a>{% endif %}</span></span>
   <div class="interruttore" role="group" aria-label="Come vedere">
     <a href="{{ url_elenco }}" class="{{ 'attivo' if modo == 'elenco' }}">{{ i('doc', 's') }} Elenco</a>
     <a href="{{ url_calendario }}" class="{{ 'attivo' if modo == 'calendario' }}">{{ i('orologio', 's') }} Calendario</a>
@@ -267,6 +267,19 @@
 {# Scelta dell'orario a slot di 30 minuti: prima il giorno (con quanti slot liberi), poi l'orario.
    Gli slot già presi si vedono con il nome dell'auto e non si scelgono. per_sede = nome del menu della sede
    da cui dipende l'occupazione (consegne: uno slot per sede). #}
+{# Orario della preparazione (14/11/2026): automatico (primo slot libero a 10 giorni lavorativi) oppure scelto
+   a mano tra il prossimo giorno lavorativo e il decimo #}
+{% macro scelta_orario_prep(giorni, automatico) %}
+<fieldset class="scelta-orario" data-scelta-orario>
+  <legend class="etichetta-campo">Entro quando deve essere pronta <span class="tenue">(poi non si sposta)</span></legend>
+  <label class="scelta-orario-voce"><input type="radio" name="modo_orario" value="auto" checked>
+    <span><b>Automatico</b><small>primo slot libero tra 10 giorni lavorativi{% if automatico %}: {{ automatico|slot }}{% endif %}</small></span></label>
+  <label class="scelta-orario-voce"><input type="radio" name="modo_orario" value="scelgo">
+    <span><b>Scelgo io giorno e ora</b><small>da 1 a 10 giorni lavorativi</small></span></label>
+  <div data-se-scelgo hidden>{{ scegli_slot('pronta_entro', giorni, vuoto='Tocca un giorno, poi l\'orario') }}</div>
+</fieldset>
+{% endmacro %}
+
 {% macro scegli_slot(nome, giorni, attuale=none, per_sede=none, vuoto='Nessun orario scelto') %}
 <div class="scegli-slot" data-scegli-slot {% if per_sede %}data-per-sede="{{ per_sede }}"{% endif %} data-vuoto="{{ vuoto }}">
   <input type="hidden" name="{{ nome }}" value="{{ attuale.strftime('%Y-%m-%dT%H:%M') if attuale else '' }}">

@@ -394,6 +394,16 @@
 
   // Scelta dell'orario a slot: giorno -> orario libero. Gli slot presi (per la sede scelta) non si toccano.
   var GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  // Orario della preparazione: automatico o scelto a mano (14/11/2026)
+  document.querySelectorAll('[data-scelta-orario]').forEach(function (box) {
+    var scelgo = box.querySelector('[data-se-scelgo]');
+    box.querySelectorAll('input[name=modo_orario]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        scelgo.hidden = r.value !== 'scelgo' || !r.checked;
+        if (r.value === 'auto' && r.checked) { var h = scelgo.querySelector('input[type=hidden]'); if (h) h.value = ''; }
+      });
+    });
+  });
   document.querySelectorAll('[data-scegli-slot]').forEach(function (box) {
     var campo = box.querySelector('input[type=hidden]'), testo = box.querySelector('[data-slot-testo]');
     var togli = box.querySelector('[data-slot-togli]'), form = box.closest('form');
