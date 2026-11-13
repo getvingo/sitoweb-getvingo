@@ -138,10 +138,20 @@
         .bindPopup(popup(a.titolo, a.sotto + ' · ' + a.stato, a.url, 'Apri scheda →')).addTo(strato_auto);
     });
     // "Sulla mappa" dall'elenco: la mappa va sull'auto e la evidenzia
+    // 13/11/2026: ricliccando lo stesso pulsante la mappa torna com'era all'inizio (tutte le sedi)
+    var mostrata = null;
     document.querySelectorAll('[data-sulla-mappa]').forEach(function (b) {
       b.addEventListener('click', function () {
         var a = auto.filter(function (x) { return String(x.id) === b.dataset.sullaMappa; })[0];
         if (!a) return;
+        document.querySelectorAll('[data-sulla-mappa]').forEach(function (x) { x.classList.remove('attivo'); x.setAttribute('aria-pressed', 'false'); });
+        if (mostrata === a.id) {
+          mostrata = null; mappa.closePopup();
+          chip.forEach(function (c) { c.classList.toggle('attivo', c.dataset.sede === (window.sedeStock || '')); });
+          if (window.sedeStock) scegli(window.sedeStock); else mappa.flyToBounds(tutti, { maxZoom: 14, duration: 0.8 });
+          return;
+        }
+        mostrata = a.id; b.classList.add('attivo'); b.setAttribute('aria-pressed', 'true');
         chip.forEach(function (c) { c.classList.toggle('attivo', c.dataset.sede === String(a.sede)); });
         mappa.flyTo([a.lat, a.lon], 19, { duration: 0.8 });
         mappa.once('moveend', function () { marcatori[a.id].openPopup(); });

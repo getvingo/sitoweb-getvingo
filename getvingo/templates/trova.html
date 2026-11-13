@@ -1,25 +1,38 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i %}
-{% from "_auto.html" import auto_breve %}
 {% block titolo %}Trova {{ v.descrizione }} · Getvingo{% endblock %}
 {% block contenuto %}
-{# Trova l'auto in piazzale: la freccia punta verso l'ultima posizione nota (GPS del telefono + bussola).
-   Vicino all'auto (entro 15 m) diventa verde: si tocca l'adesivo. #}
+{# Trova l'auto in piazzale, nello stile di "Dov'è" per gli AirTag (13/11/2026): schermo intero, freccia grande che
+   punta verso l'ultima posizione nota (GPS + bussola del telefono), distanza grande e direzione a parole;
+   vicino all'auto lo schermo diventa verde e il telefono vibra sempre più spesso.
+   Limite: il GPS del telefono sbaglia di 3–5 m (gli AirTag usano la banda ultralarga, che un sito non può usare):
+   negli ultimi metri si cerca l'adesivo a vista. #}
 {% set pos = v.ultima_posizione %}
-<div class="tocco trova-auto" data-trova data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">
-  {{ auto_breve(v, stato=False) }}
-  {% if v.lat is none %}
-  <p class="vuoto-telefono">Posizione dell'auto non ancora nota: si registra al primo tocco dell'adesivo.{% if v.sede %} Ultimo luogo: <b>{{ v.sede.nome }}</b>.{% endif %}</p>
-  {% else %}
-  <div class="bussola" aria-hidden="true">
-    <span class="bussola-nord" data-nord>N</span>
-    <svg class="bussola-freccia" data-freccia viewBox="0 0 24 24"><path d="M12 2 L19 21 L12 17 L5 21 Z" fill="currentColor"/></svg>
+<div class="trova-schermo" data-trova data-lat="{{ v.lat if v.lat is not none else '' }}" data-lon="{{ v.lon if v.lon is not none else '' }}">
+  <div class="trova-testa">
+    <a class="trova-chiudi" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" aria-label="Chiudi">✕</a>
+    <div class="trova-nome"><b>{{ v.descrizione }}</b><small>{% if v.colore %}{{ v.colore }} · {% endif %}<span class="vin">{{ v.vin[-8:] }}</span>{% if v.targa %} · {{ v.targa }}{% endif %}</small></div>
+    <span class="trova-spazio"></span>
   </div>
-  <div class="trova-distanza" data-distanza role="status">…</div>
-  <p class="istruzione" data-istruzione>Cerco la tua posizione…</p>
-  <button type="button" class="btn piccolo" data-bussola hidden>{{ i('pin', 's') }} Attiva la bussola</button>
-  {% if pos %}<p class="suggerimento">Ultima posizione {{ pos.at|da_quanto }}{{ ' · ' ~ v.sede.nome if v.sede }}</p>{% endif %}
-  <a class="btn pieno" href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}&travelmode=walking" target="_blank" rel="noopener">{{ i('freccia') }} Apri nelle mappe</a>
+  {% if v.lat is none %}
+  <div class="trova-centro"><p class="trova-messaggio">Posizione dell'auto non ancora nota: si registra al primo tocco dell'adesivo.{% if v.sede %}<br>Ultimo luogo: <b>{{ v.sede.nome }}</b>.{% endif %}</p></div>
+  {% else %}
+  <div class="trova-centro">
+    <div class="trova-freccia-box" aria-hidden="true">
+      <svg class="trova-freccia" data-freccia viewBox="0 0 100 100"><path d="M50 6 L80 78 Q50 64 20 78 Z" fill="currentColor"/></svg>
+      <span class="trova-cerchio" data-cerchio></span>
+    </div>
+  </div>
+  <div class="trova-piede">
+    <div class="trova-distanza" data-distanza role="status">…</div>
+    <div class="trova-direzione" data-direzione>Cerco la tua posizione…</div>
+    <div class="trova-precisione" data-precisione></div>
+    <button type="button" class="trova-btn" data-bussola hidden>Attiva la bussola</button>
+    <div class="trova-link">
+      {% if pos %}<span>Ultima posizione {{ pos.at|da_quanto }}{{ ' · ' ~ v.sede.nome if v.sede }}</span>{% endif %}
+      <a href="https://www.google.com/maps/dir/?api=1&destination={{ v.lat }},{{ v.lon }}&travelmode=walking" target="_blank" rel="noopener">Apri nelle mappe</a>
+    </div>
+  </div>
   {% endif %}
 </div>
 {% endblock %}
@@ -27,11 +40,13 @@
 <script>
   (function () {
     var box = document.querySelector('[data-trova]');
-    if (!box || !box.dataset.lat || box.dataset.lat === 'None') return;
-    var LAT = parseFloat(box.dataset.lat), LON = parseFloat(box.dataset.lon);
+    if (!box || !box.dataset.lat) return;
+    document.body.classList.add('con-trova');
+    var LAT = parseFloat(box.dataset.lat), LON = parseFloat(box.dataset.lon), VICINO = 8;
     var freccia = box.querySelector('[data-freccia]'), dist = box.querySelector('[data-distanza]');
-    var istr = box.querySelector('[data-istruzione]'), btnBussola = box.querySelector('[data-bussola]');
-    var rotta = null, direzione = null;  // rotta verso l'auto (gradi dal nord), direzione del telefono
+    var dir = box.querySelector('[data-direzione]'), prec = box.querySelector('[data-precisione]');
+    var btnBussola = box.querySelector('[data-bussola]');
+    var rotta = null, direzione = null, mostrato = 0, metriOra = null, timerVibra = null;
     function rad(g) { return g * Math.PI / 180; }
     function metri(a, b, c, d) {
       var R = 6371000, x = rad(c - a), y = rad(d - b);
@@ -43,27 +58,42 @@
       var x = Math.cos(rad(a)) * Math.sin(rad(c)) - Math.sin(rad(a)) * Math.cos(rad(c)) * Math.cos(rad(d - b));
       return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
     }
+    // la freccia gira dal lato più corto, senza scatti (rotazione cumulata)
     function ruota() {
       if (rotta === null) return;
-      var r = direzione === null ? rotta : rotta - direzione;  // senza bussola: la freccia è rispetto al nord
-      freccia.style.transform = 'rotate(' + r + 'deg)';
+      var obiettivo = direzione === null ? rotta : rotta - direzione;
+      var delta = ((obiettivo - mostrato) % 360 + 540) % 360 - 180;
+      mostrato += delta;
+      freccia.style.transform = 'rotate(' + mostrato + 'deg)';
+      if (metriOra !== null && metriOra <= VICINO) { dir.textContent = 'Qui vicino: cerca l’adesivo sul parabrezza'; return; }
+      if (direzione === null) { dir.textContent = 'Senza bussola la freccia indica il nord in alto'; return; }
+      var a = ((obiettivo % 360) + 360) % 360;
+      dir.textContent = a < 25 || a > 335 ? 'Davanti a te' : a < 70 ? 'Avanti, a destra' : a < 110 ? 'A destra'
+        : a < 160 ? 'Dietro, a destra' : a <= 200 ? 'Dietro di te' : a < 250 ? 'Dietro, a sinistra' : a < 290 ? 'A sinistra' : 'Avanti, a sinistra';
     }
-    if (!navigator.geolocation) { istr.textContent = 'Il telefono non dà la posizione: usa “Apri nelle mappe”.'; return; }
+    // vibrazione sempre più fitta avvicinandosi (dove il telefono la permette: Android)
+    function vibra() {
+      clearTimeout(timerVibra);
+      if (!navigator.vibrate || metriOra === null || metriOra > 40) return;
+      navigator.vibrate(metriOra <= VICINO ? [60, 80, 60] : 25);
+      timerVibra = setTimeout(vibra, metriOra <= VICINO ? 2500 : Math.max(400, metriOra * 45));
+    }
+    if (!navigator.geolocation) { dir.textContent = 'Il telefono non dà la posizione: usa “Apri nelle mappe”.'; return; }
     navigator.geolocation.watchPosition(function (p) {
       var m = metri(p.coords.latitude, p.coords.longitude, LAT, LON);
       rotta = verso(p.coords.latitude, p.coords.longitude, LAT, LON);
+      metriOra = m;
       dist.textContent = m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km';
-      var vicino = m <= 15;
-      box.classList.toggle('trova-vicino', vicino);
-      istr.textContent = vicino ? 'Sei vicino all’auto: tocca l’adesivo sul parabrezza.'
-        : (direzione === null ? 'Segui la freccia (la N indica il nord).' : 'Cammina nella direzione della freccia.');
-      ruota();
-    }, function () { istr.textContent = 'Consenti la posizione per vedere la freccia, oppure usa “Apri nelle mappe”.'; },
-    { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+      box.classList.toggle('trova-vicino', m <= VICINO);
+      var acc = Math.round(p.coords.accuracy || 0);
+      prec.textContent = acc > 25 ? 'Posizione poco precisa (±' + acc + ' m): spostati all’aperto' : acc ? 'precisione ±' + acc + ' m' : '';
+      ruota(); vibra();
+    }, function () { dir.textContent = 'Consenti la posizione per vedere la freccia, oppure usa “Apri nelle mappe”.'; },
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     function bussola(e) {
       var h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
       if (h == null) return;
-      direzione = h; box.querySelector('[data-nord]').hidden = true; ruota();
+      direzione = h; ruota();
     }
     function avviaBussola() {
       window.addEventListener('deviceorientationabsolute', bussola);

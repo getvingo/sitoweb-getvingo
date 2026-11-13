@@ -1615,12 +1615,18 @@ class TestLavorazioniStimaESolleciti(Base):
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
             self.assertEqual((m.stima_giorni, m.avanzamento_lavorazione, m.giorni_ritardo), (5, 40, 0))
+        # stima uguale ai giorni passati: tutto il tempo è trascorso ma non è ancora in ritardo
+        # (13/11/2026: con la fine prevista esattamente "adesso" il test dipendeva dai millisecondi)
+        with self.app.app_context():
+            m = db.session.get(Movimento, mid)
+            m.arrivo_at = adesso() - timedelta(days=2) + timedelta(minutes=10)
+            db.session.commit()
         self.c.post(f"/movimento/{mid}/stima", data={"giorni": "2"})
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
             self.assertEqual((m.avanzamento_lavorazione, m.giorni_ritardo), (100, 0))
         stock = self.c.get("/stock").get_data(as_text=True)
-        self.assertIn("barra-lavoro", stock)
+        self.assertIn("lavoro-corso", self.c.get("/lavorazioni").get_data(as_text=True))  # riga nei tempi (13/11/2026)
         self.assertIn("lavoro-breve", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))  # dal 12/11/2026 barra compatta
 
     def test_sollecito_solo_in_ritardo_e_risposta_del_fornitore(self):
@@ -1688,7 +1694,7 @@ class TestCalendarioPreparazione(Base):
             self.assertLess(a.weekday(), 5)
             self.assertIn((a.hour, a.minute), [(t.hour, t.minute) for t in servizi._slot_del_giorno(a.date())])
             self.assertGreater(b, a)  # stesso momento: la seconda scala allo slot libero successivo
-        self.assertIn("In calendario", self.c.get("/preparazione").get_data(as_text=True))
+        self.assertRegex(self.c.get("/preparazione").get_data(as_text=True), r"\d{2}:\d{2}–\d{2}:\d{2}")  # orario in calendario
 
 
 class TestConsegna(Base):
@@ -3748,5 +3754,5 @@ class TestRientroDaComputer(Base):
         for url in (f"/veicolo/{vid}", "/lavorazioni"):
             pagina = self.c.get(url).get_data(as_text=True)
             self.assertNotIn("Crea DDT di rientro", pagina, url)  # vale solo sul posto: da computer no
-        self.assertIn("Predisponi il DDT di rientro", self.c.get("/lavorazioni").get_data(as_text=True))
+        self.assertIn("Predisponi rientro", self.c.get("/lavorazioni").get_data(as_text=True))
         self.assertIn('id="predisponi"', self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
