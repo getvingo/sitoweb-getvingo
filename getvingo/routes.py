@@ -1304,6 +1304,7 @@ def abbina(codice):
             if valore:
                 setattr(veicolo, campo, valore)
         veicolo.anno = _anno_scelto() or veicolo.anno
+        veicolo.alimentazione = _alimentazione() or veicolo.alimentazione
         vin_mod.completa(veicolo)  # marca, modello e anno non scritti: quelli che il VIN dice con certezza
         uniforma.auto(veicolo)  # scritte tutte allo stesso modo
         if _manca_dato_auto(veicolo):
@@ -1349,8 +1350,13 @@ def _anno_scelto():
 def _manca_dato_auto(v):
     """Dal 13/11/2026 versione, anno e colore sono obbligatori come marca e modello."""
     mancano = [n for n, val in (("marca", v.marca), ("modello", v.modello), ("versione", v.versione),
-                                ("anno", v.anno), ("colore", v.colore)) if not val]
+                                ("anno", v.anno), ("alimentazione", v.alimentazione), ("colore", v.colore)) if not val]
     return f"Completa i dati dell'auto: manca {', '.join(mancano)}." if mancano else None
+
+
+def _alimentazione():
+    a = request.form.get("alimentazione", "")
+    return a if a in Veicolo.ALIMENTAZIONI else ""
 
 
 def _targa():
@@ -1407,6 +1413,7 @@ def nuova_auto():
                 if request.form.get(k, "").strip():
                     setattr(v, k, " ".join(request.form[k].split()))
             v.anno = _anno_scelto() or v.anno
+            v.alimentazione = _alimentazione() or v.alimentazione
             vin_mod.completa(v)  # marca, modello e anno non scritti: quelli che il VIN dice con certezza
             uniforma.auto(v)
             if _manca_dato_auto(v):
@@ -1446,7 +1453,7 @@ def modifica_auto(veicolo_id):
         form = {"sede_id": v.sede_id, "lat": v.lat if v.lat is not None else "",
                 "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
                 "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
-                "colore": v.colore or "", "anno": v.anno or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
+                "colore": v.colore or "", "anno": v.anno or "", "alimentazione": v.alimentazione or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
                 "lavorazione": qui.lavorazione if qui and qui.senza_ddt else "",
                 "lavorazione_note": qui.lavorazione_note if qui and qui.senza_ddt else ""}
         return pagina(form)
@@ -1464,8 +1471,8 @@ def modifica_auto(veicolo_id):
         errore = "Questo VIN è già di un'altra auto in Getvingo."
     elif f.get("condizione") not in Veicolo.CONDIZIONI:
         errore = "Indica se l'auto è nuova o usata."
-    elif not all(pulito.values()) or not _anno_scelto():
-        errore = "Marca, modello, versione, anno e colore sono obbligatori."
+    elif not all(pulito.values()) or not _anno_scelto() or not _alimentazione():
+        errore = "Marca, modello, versione, anno, alimentazione e colore sono obbligatori."
     elif giorno is None or giorno > adesso().date():
         errore = "In stock dal: scegli una data valida, non nel futuro."
     elif _targa_insolita():
@@ -1495,7 +1502,7 @@ def modifica_auto(veicolo_id):
         v.tipologia = f["tipologia"]
     v.marca, v.modello = pulito["marca"], pulito["modello"]
     v.versione, v.colore = pulito["versione"][:120], pulito["colore"][:80]
-    v.anno = _anno_scelto()
+    v.anno, v.alimentazione = _anno_scelto(), _alimentazione()
     uniforma.auto(v)
     if v.creato_at is None or giorno != v.creato_at.date():
         v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
@@ -1548,9 +1555,13 @@ def api_veicolo():
             dati["tipologia"], fonti["tipologia"] = v.tipologia, "GESTIONALE"
         if v.anno:
             dati["anno"], fonti["anno"] = v.anno, "GESTIONALE"
+        if v.alimentazione:
+            dati["alimentazione"], fonti["alimentazione"] = v.alimentazione, "GESTIONALE"
     for k in ("marca", "modello", "tipologia"):
         if k not in dati and d[k] and (k != "tipologia" or d[k] in Veicolo.TIPOLOGIE):
             dati[k], fonti[k] = d[k], "DAL VIN"
+    if "alimentazione" not in dati and d["alimentazione"]:
+        dati["alimentazione"], fonti["alimentazione"] = d["alimentazione"], "DAL VIN"
     if "anno" not in dati and d["anno_modello"]:
         dati["anno"], fonti["anno"] = d["anno_modello"], "DAL VIN"
     if not dati and not d["avvisi"]:

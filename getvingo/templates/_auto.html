@@ -16,6 +16,7 @@
   <div class="carta-auto-chip">
     {{ badge_condizione(v) }}
     {% if v.colore %}<span class="chip-dato">{{ v.colore }}</span>{% endif %}
+    {% if v.alimentazione %}<span class="chip-dato">{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}</span>{% elif v.anno %}<span class="chip-dato">{{ v.anno }}</span>{% endif %}
     {% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="chip-dato tenue">Senza targa</span>{% endif %}
     {% if v.tag %}<span class="chip-dato">{{ i('nfc', 's') }} {{ v.tag.codice }}</span>{% endif %}
   </div>

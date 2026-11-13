@@ -620,6 +620,10 @@ def importa():
             for campo in ("marca", "modello", "versione", "colore"):
                 if riga.get(campo):
                     setattr(veicolo, campo, riga[campo])
+            alim = (riga.get("alimentazione") or riga.get("carburante") or "").strip().lower()
+            for a in Veicolo.ALIMENTAZIONI:  # colonna facoltativa, scritta come si vuole: "benzina", "ELETTRICA"
+                if alim == a.lower():
+                    veicolo.alimentazione = a
             vin_mod.completa(veicolo, tipologia=nuovo and not (riga.get("tipologia") or riga.get("tipo")))  # dal VIN ciò che manca
             uniforma.auto(veicolo)
             cond = (riga.get("condizione") or riga.get("nuovo/usato") or riga.get("stato") or "").strip().lower()

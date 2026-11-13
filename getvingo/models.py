@@ -246,6 +246,9 @@ class Veicolo(PerOrganizzazione, db.Model):
     STATI = {"in_sede": "In sede", "in_viaggio": "In viaggio", "consegnato": "Consegnato"}
     TIPOLOGIE = {"vettura": "Vettura", "commerciale": "Veicolo commerciale"}
     CONDIZIONI = {"nuovo": "Nuovo", "usato": "Usato"}
+    # alimentazione (13/11/2026): come sul libretto (campo P.3), con le ibride distinte
+    ALIMENTAZIONI = ("Benzina", "Diesel", "Ibrida benzina", "Ibrida diesel", "Ibrida plug-in", "Elettrica", "GPL", "Metano",
+                     "Idrogeno")
 
     __table_args__ = (db.UniqueConstraint("org_id", "vin"),)
 
@@ -254,6 +257,7 @@ class Veicolo(PerOrganizzazione, db.Model):
     marca = db.Column(db.String(80), default="")
     modello = db.Column(db.String(120), default="")
     versione = db.Column(db.String(120), default="")  # allestimento / motorizzazione (obbligatoria dal 13/11/2026)
+    alimentazione = db.Column(db.String(30), default="")  # una di ALIMENTAZIONI (obbligatoria dal 13/11/2026)
     anno = db.Column(db.Integer)  # anno modello: dal VIN quando lo codifica, altrimenti scelto (obbligatorio dal 13/11/2026)
     colore = db.Column(db.String(80), default="")
     targa = db.Column(db.String(12), default="")  # facoltativa: le auto nuove di solito non l'hanno

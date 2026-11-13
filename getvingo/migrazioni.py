@@ -175,7 +175,8 @@ def aggiungi_colonne():
              # 11/11/2026 sera: DDT da ritirare assegnato a una persona (solo lei lo prende in carico)
              ("movimento", "assegnato_a_id", "INTEGER REFERENCES utente(id)"),
              # 13/11/2026: anno modello dell'auto (dal VIN o scelto all'ingresso in stock)
-             ("veicolo", "anno", "INTEGER")]
+             ("veicolo", "anno", "INTEGER"),
+             ("veicolo", "alimentazione", "VARCHAR(30) DEFAULT ''")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:

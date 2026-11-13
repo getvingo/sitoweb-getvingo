@@ -36,6 +36,7 @@
     <div><span>Marca</span><b><span data-letto="marca"></span><em data-fonte="marca"></em></b></div>
     <div><span>Modello · versione</span><b><span data-letto="modello"></span><em data-fonte="modello"></em></b></div>
     <div><span>Anno</span><b><span data-letto="anno"></span><em data-fonte="anno"></em></b></div>
+    <div><span>Alimentazione</span><b><span data-letto="alimentazione"></span><em data-fonte="alimentazione"></em></b></div>
     <div><span>Colore</span><b><span data-letto="colore"></span><em data-fonte="colore"></em></b></div>
     <div><span>Tipo</span><b><span data-letto="tipologia"></span><em data-fonte="tipologia"></em></b></div>
     <div data-riga-origine hidden><span>Costruita</span><b><span data-origine></span><em>DAL VIN</em></b></div>
@@ -100,6 +101,7 @@
       scrivi('modello', [val('modello'), val('versione')].filter(Boolean).join(' · '));
       scrivi('colore', val('colore'));
       scrivi('anno', val('anno'));
+      scrivi('alimentazione', val('alimentazione'));
       var tipo = form.querySelector('[name=tipologia]:checked');
       scrivi('tipologia', tipo && tipo.value === 'commerciale' ? 'Veicolo commerciale' : 'Vettura');
       var sede = form.sede_id.options[form.sede_id.selectedIndex];
@@ -110,14 +112,14 @@
     document.addEventListener('vin-precompilato', function (e) {
       var d = e.detail || {};
       var f = d.fonti || {};
-      fonte('marca', f.marca || ''); fonte('modello', f.modello || ''); fonte('tipologia', f.tipologia || ''); fonte('colore', f.colore || ''); fonte('anno', f.anno || '');
+      fonte('marca', f.marca || ''); fonte('modello', f.modello || ''); fonte('tipologia', f.tipologia || ''); fonte('colore', f.colore || ''); fonte('anno', f.anno || ''); fonte('alimentazione', f.alimentazione || '');
       // solo informativi (non si salvano): dove è stata costruita e anno modello, se il VIN li codifica
       var origine = [d.paese, d.anno_modello ? 'anno modello ' + d.anno_modello : ''].filter(Boolean).join(' · ');
       form.querySelector('[data-origine]').textContent = origine;
       form.querySelector('[data-riga-origine]').hidden = !origine;
       aggiorna();
       // manca qualcosa (marca, modello, versione, anno o colore): si aprono i campi per completarlo
-      if (['marca', 'modello', 'versione', 'anno', 'colore'].some(function (n) { return !val(n); })) form.classList.add('a-mano');
+      if (['marca', 'modello', 'versione', 'anno', 'alimentazione', 'colore'].some(function (n) { return !val(n); })) form.classList.add('a-mano');
     });
     form.querySelector('[data-a-mano]').addEventListener('click', function () { form.classList.add('a-mano'); form.vin.focus(); });
     form.querySelector('[data-correggi]').addEventListener('click', function () { form.classList.add('a-mano'); });

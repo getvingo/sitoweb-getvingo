@@ -71,6 +71,8 @@
       if (targa && !targa.value && d.targa) targa.value = d.targa;
       var anno = document.querySelector('select[name=anno]');
       if (anno && !anno.value && d.anno) anno.value = String(d.anno);  // anno modello dal VIN o dal gestionale
+      var alim = document.querySelector('select[name=alimentazione]');
+      if (alim && !alim.value && d.alimentazione) alim.value = d.alimentazione;
       var tipo = d.tipologia && document.querySelector('[name=tipologia][value=' + d.tipologia + ']');
       if (tipo) tipo.checked = true;
       // cosa dice il VIN; se la cifra di controllo non torna, l'avviso (e la proposta da confermare a vista)

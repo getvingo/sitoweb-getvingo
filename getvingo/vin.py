@@ -226,6 +226,9 @@ def _modello(vin):
     return None, None, None
 
 
+SOLO_ELETTRICHE = {"Tesla", "Polestar"}  # le altre marche hanno più alimentazioni: dal VIN non si sa
+
+
 def decodifica(vin, oggi=None):
     """Quello che il VIN dice con certezza, con fonte e affidabilità di ogni dato (mai inventato).
 
@@ -234,7 +237,7 @@ def decodifica(vin, oggi=None):
     continente, seriale, cifra_controllo {obbligatoria, ok}, affidabilita {campo: alta|media}, avvisi [testo].
     Il VIN non si cambia mai da solo: la correzione resta una proposta che l'operatore accetta a vista."""
     vin = normalizza(vin)
-    d = {"vin": vin, "valido": valido(vin), "proposta": None, "marca": "", "tipologia": "", "modello": "",
+    d = {"vin": vin, "valido": valido(vin), "proposta": None, "marca": "", "tipologia": "", "modello": "", "alimentazione": "",
          "generazione": None, "anno_modello": None, "paese": paese(vin), "continente": continente(vin),
          "seriale": vin[11:] if len(vin) == 17 else "", "cifra_controllo": {"obbligatoria": False, "ok": None},
          "affidabilita": {}, "avvisi": []}
@@ -263,6 +266,9 @@ def decodifica(vin, oggi=None):
         d["affidabilita"]["modello"] = "media"  # regola del costruttore: può avere eccezioni, si conferma a vista
         if tipo == "C":
             d["tipologia"] = "commerciale"
+    if d["marca"] in SOLO_ELETTRICHE:
+        d["alimentazione"] = "Elettrica"
+        d["affidabilita"]["alimentazione"] = "alta"
     anno = anno_modello(vin, oggi)
     if anno:
         d["anno_modello"] = anno
@@ -278,6 +284,8 @@ def completa(veicolo, tipologia=False):
         veicolo.marca = d["marca"]
     if not veicolo.modello and d["modello"]:
         veicolo.modello = d["modello"]
+    if not getattr(veicolo, "alimentazione", None) and d["alimentazione"]:
+        veicolo.alimentazione = d["alimentazione"]
     if not getattr(veicolo, "anno", None) and d["anno_modello"]:
         veicolo.anno = d["anno_modello"]
     if tipologia and d["tipologia"] in ("vettura", "commerciale"):

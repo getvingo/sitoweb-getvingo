@@ -293,7 +293,7 @@
 </div>
 {% endmacro %}
 
-{# Anno, versione e colore dell'auto (obbligatori dal 13/11/2026; static/datiauto.js): l'anno si compila dal VIN
+{# Anno, alimentazione, versione e colore dell'auto (obbligatori dal 13/11/2026; static/datiauto.js): l'anno si compila dal VIN
    quando lo codifica, la versione si sceglie tra quelle del modello per quell'anno o se ne scrive una nuova #}
 {% macro campi_versione(form) %}
 <div class="griglia-2">
@@ -306,6 +306,11 @@
     <input name="colore" value="{{ form.get('colore', '') }}" required maxlength="80" list="colori-auto" autocomplete="off" placeholder="Es. Bianco Perla">
     <datalist id="colori-auto"></datalist></label>
 </div>
+<label class="campo"><span>Alimentazione</span>
+  <select name="alimentazione" required>
+    <option value="">Scegli l'alimentazione…</option>
+    {% for a in ALIMENTAZIONI %}<option {{ 'selected' if form.get('alimentazione') == a }}>{{ a }}</option>{% endfor %}
+  </select></label>
 <label class="campo"><span>Versione</span>
   <select data-versione-scelta hidden></select>
   <input name="versione" value="{{ form.get('versione', '') }}" required maxlength="120" placeholder="Es. 1.5 eTSI 150 CV Life" autocomplete="off">

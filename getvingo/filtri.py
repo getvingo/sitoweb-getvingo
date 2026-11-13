@@ -140,6 +140,8 @@ def init_app(app):
         return int((adesso() - momento).total_seconds()) if momento else 0
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
+    from .models import Veicolo
+    app.jinja_env.globals["ALIMENTAZIONI"] = Veicolo.ALIMENTAZIONI
     app.jinja_env.globals["timedelta"] = timedelta
     def ddt_per_id(ddt_id):
         from .models import Ddt, db as _db
