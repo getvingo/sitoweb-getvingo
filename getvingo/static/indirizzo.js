@@ -53,14 +53,25 @@
       var c0 = semplice(comune);
       return [a.municipality, a.city, a.town, a.village, a.hamlet, a.suburb].some(function (x) { return x && semplice(x) === c0; });
     }
+    // Via e civico in due campi (13/11/2026): per cercare e per il server si uniscono ("Via Roma 12/A")
+    function civicoPulito() {
+      var t = c('civico').value.trim();
+      return t ? (separa('x ' + t).civico || t) : '';
+    }
+    function viaIntera() { return (c('indirizzo').value.trim() + ' ' + civicoPulito()).trim(); }
+    function scriviVia(testo) {
+      var p = separa(testo);
+      c('indirizzo').value = p.strada;
+      if (p.civico) c('civico').value = p.civico;
+    }
     function compila(a, sovrascrivi) {
       var imposta = function (n, v) { if (v && (sovrascrivi || !c(n).value)) c(n).value = v; };
       imposta('comune', comuneDi(a)); imposta('cap', a.postcode); imposta('provincia', provincia(a));
       imposta('stato', a.country);
     }
     function cerca() {
-      var via = c('indirizzo').value.trim(), comune = c('comune').value.trim();
-      if (!via || !comune) return;
+      var via = viaIntera(), comune = c('comune').value.trim();
+      if (!c('indirizzo').value.trim() || !comune) return;
       var chiave = via + '|' + comune + '|' + c('stato').value;
       if (chiave === ultima) return;
       ultima = chiave;
@@ -76,7 +87,7 @@
           c('provincia').value = r.provincia || c('provincia').value; c('stato').value = r.stato || c('stato').value;
           verificato(r.lat, r.lon);
           var pg = separa(via), ng = numero(pg.civico);
-          stato(!pg.civico ? 'Via trovata · aggiungi il numero civico' : (numero(separa(r.via).civico) === ng || pg.civico === 'snc') ? 'Indirizzo trovato ✓' :
+          stato(!pg.civico ? 'Via trovata · scrivi il numero civico (snc se non c’è)' : (numero(separa(r.via).civico) === ng || pg.civico === 'snc') ? 'Indirizzo trovato ✓' :
                 'Via trovata ✓ · il civico ' + pg.civico + ' non è sulla mappa: il punto è sulla via, spostalo sul numero giusto se serve', 'ok');
         }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
       }
@@ -108,12 +119,12 @@
           if (v) c(n).value = v;
         });
         // via scritta come sulla mappa e civico in forma pulita (12/A), se non la si sta ancora scrivendo
-        if (document.activeElement !== c('indirizzo')) {
-          c('indirizzo').value = a.road + (parti.civico ? ' ' + parti.civico : '');
-          ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
+        if (document.activeElement !== c('indirizzo') && document.activeElement !== c('civico')) {
+          scriviVia(a.road + (parti.civico ? ' ' + parti.civico : ''));
+          ultima = viaIntera() + '|' + c('comune').value + '|' + c('stato').value;
         }
         verificato(r.lat, r.lon);
-        if (!parti.civico) return stato('Via trovata · aggiungi il numero civico', 'ok');
+        if (!parti.civico) return stato('Via trovata · scrivi il numero civico (snc se non c’è)', 'ok');
         stato(trovato || parti.civico === 'snc' ? 'Indirizzo trovato ✓' :
               'Via trovata ✓ · il civico ' + parti.civico + ' non è sulla mappa: il punto è sulla via, spostalo sul numero giusto se serve', 'ok');
       }).catch(function () { ultima = ''; stato('Ricerca non riuscita: riprova o tocca il punto sulla mappa.', 'errore'); });
@@ -131,9 +142,9 @@
           var a = d && d.address;
           if (!a || !a.road) return stato('Qui non c’è una via: tocca più vicino alla strada.', 'errore');
           var civ = a.house_number ? separa('x ' + a.house_number.split(/[;,]/)[0]).civico || a.house_number : '';
-          c('indirizzo').value = a.road + (civ ? ' ' + civ : '');
+          scriviVia(a.road + (civ ? ' ' + civ : ''));
           compila(a, true);
-          ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
+          ultima = viaIntera() + '|' + c('comune').value + '|' + c('stato').value;
           verificato(la, lo);
           stato(a.house_number ? 'Indirizzo compilato dal punto ✓' : 'Via compilata dal punto ✓ · aggiungi il numero civico', 'ok');
         }).catch(function () { stato('Lettura non riuscita: riprova.', 'errore'); });
@@ -145,10 +156,10 @@
                              form.querySelector('[name=ragione_sociale]'));
     function riempi(r) {
       lista.hidden = true; lista.innerHTML = '';
-      c('indirizzo').value = r.via; c('comune').value = r.comune || c('comune').value;
+      c('civico').value = ''; scriviVia(r.via); c('comune').value = r.comune || c('comune').value;
       c('cap').value = r.cap || ''; c('provincia').value = r.provincia || ''; c('stato').value = r.stato || 'Italia';
       if (campoNome && !campoNome.value.trim() && r.nome) campoNome.value = r.nome;
-      ultima = c('indirizzo').value + '|' + c('comune').value + '|' + c('stato').value;
+      ultima = viaIntera() + '|' + c('comune').value + '|' + c('stato').value;
       verificato(r.lat, r.lon);
       stato(r.via ? 'Luogo trovato ✓ · controlla i dati' + (/\d/.test(r.via) ? '' : ' e aggiungi il civico') : 'Luogo trovato: scrivi via e civico', r.via ? 'ok' : 'errore');
     }
@@ -253,7 +264,13 @@
       else if (c('indirizzo').value && c('comune').value) cerca();
     });
 
-    ['indirizzo', 'comune', 'stato'].forEach(function (n) {
+    // civico scritto nel campo della via ("Via Roma 12"): passa da solo nel suo campo
+    c('indirizzo').addEventListener('blur', function () {
+      var p = separa(c('indirizzo').value);
+      if (p.civico && !c('civico').value.trim()) { c('indirizzo').value = p.strada; c('civico').value = p.civico; }
+    });
+    c('civico').addEventListener('blur', function () { var t = civicoPulito(); if (t) c('civico').value = t; });
+    ['indirizzo', 'civico', 'comune', 'stato'].forEach(function (n) {
       c(n).addEventListener('input', function () {
         verificato(null); stato('');
         clearTimeout(timer); timer = setTimeout(cerca, 1200);  // una ricerca quando si smette di scrivere

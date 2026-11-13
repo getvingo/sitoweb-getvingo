@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input, gps, indietro %}
+{% from "_macro.html" import i, csrf_input, gps, indietro, campi_versione %}
 {% block contenuto %}
 {# Come nella demo (12/11/2026), in due tempi: 1) fotografa l'etichetta VIN; 2) i dati letti (VIN, gestionale,
    posizione del tocco) da controllare, "Correggi" se qualcosa non torna, Nuova / Usata salva. #}
-<form method="post" data-una-volta class="form-abbina tocco {{ 'a-mano' if form.get('vin') }}">
+<form method="post" data-una-volta data-dati-auto class="form-abbina tocco {{ 'a-mano' if form.get('vin') }}">
   {{ csrf_input() }}{{ gps() }}
   <div class="tocco-titolo">
     <small class="sopra">{% if tag %}{{ i('nfc', 's') }} Adesivo {{ tag.codice }} · nuovo{% else %}Nuova auto in stock{% endif %}</small>
@@ -35,6 +35,7 @@
   <div class="letti abbina-solo-letto">
     <div><span>Marca</span><b><span data-letto="marca"></span><em data-fonte="marca"></em></b></div>
     <div><span>Modello · versione</span><b><span data-letto="modello"></span><em data-fonte="modello"></em></b></div>
+    <div><span>Anno</span><b><span data-letto="anno"></span><em data-fonte="anno"></em></b></div>
     <div><span>Colore</span><b><span data-letto="colore"></span><em data-fonte="colore"></em></b></div>
     <div><span>Tipo</span><b><span data-letto="tipologia"></span><em data-fonte="tipologia"></em></b></div>
     <div data-riga-origine hidden><span>Costruita</span><b><span data-origine></span><em>DAL VIN</em></b></div>
@@ -50,12 +51,11 @@
       <small id="conta-vin" class="contatore"></small>
     </label>
     <div class="griglia-2">
-      <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required data-formato="nome" autocapitalize="words"></label>
-      <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required data-formato="nome" autocapitalize="words"></label>
+      <label class="campo"><span>Marca</span><input name="marca" value="{{ form.get('marca', '') }}" required autocapitalize="words"></label>
+      <label class="campo"><span>Modello</span><input name="modello" value="{{ form.get('modello', '') }}" required autocapitalize="words"></label>
     </div>
-    <label class="campo"><span>Versione <span class="tenue">(facoltativa)</span></span><input name="versione" value="{{ form.get('versione', '') }}" placeholder="Es. 1.5 eTSI Life"></label>
+    {{ campi_versione(form) }}
     <div class="griglia-2">
-      <label class="campo"><span>Colore</span><input name="colore" value="{{ form.get('colore', '') }}"></label>
       <label class="campo"><span>Dove si trova</span>
         <select name="sede_id" required>{% if sedi|length != 1 %}<option value="">Scegli il piazzale…</option>{% endif %}{% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if form.get('sede_id')|string == s.id|string }}>{{ s.nome }}{{ ' · ' ~ s.dove if s.comune }}</option>{% endfor %}</select>
       </label>
@@ -82,6 +82,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script src="{{ url_for('static', filename='vin.js', v=versione_statici) }}"></script>
+<script src="{{ url_for('static', filename='datiauto.js', v=versione_statici) }}"></script>
 <script>
   (function () {
     var form = document.querySelector('.form-abbina'), titolo = form.querySelector('[data-titolo]');
@@ -98,6 +99,7 @@
       scrivi('marca', val('marca'));
       scrivi('modello', [val('modello'), val('versione')].filter(Boolean).join(' · '));
       scrivi('colore', val('colore'));
+      scrivi('anno', val('anno'));
       var tipo = form.querySelector('[name=tipologia]:checked');
       scrivi('tipologia', tipo && tipo.value === 'commerciale' ? 'Veicolo commerciale' : 'Vettura');
       var sede = form.sede_id.options[form.sede_id.selectedIndex];
@@ -108,13 +110,14 @@
     document.addEventListener('vin-precompilato', function (e) {
       var d = e.detail || {};
       var f = d.fonti || {};
-      fonte('marca', f.marca || ''); fonte('modello', f.modello || ''); fonte('tipologia', f.tipologia || ''); fonte('colore', f.colore || '');
+      fonte('marca', f.marca || ''); fonte('modello', f.modello || ''); fonte('tipologia', f.tipologia || ''); fonte('colore', f.colore || ''); fonte('anno', f.anno || '');
       // solo informativi (non si salvano): dove è stata costruita e anno modello, se il VIN li codifica
       var origine = [d.paese, d.anno_modello ? 'anno modello ' + d.anno_modello : ''].filter(Boolean).join(' · ');
       form.querySelector('[data-origine]').textContent = origine;
       form.querySelector('[data-riga-origine]').hidden = !origine;
       aggiorna();
-      if (!val('marca') || !val('modello')) form.classList.add('a-mano');  // manca qualcosa: si completa a mano
+      // manca qualcosa (marca, modello, versione, anno o colore): si aprono i campi per completarlo
+      if (['marca', 'modello', 'versione', 'anno', 'colore'].some(function (n) { return !val(n); })) form.classList.add('a-mano');
     });
     form.querySelector('[data-a-mano]').addEventListener('click', function () { form.classList.add('a-mano'); form.vin.focus(); });
     form.querySelector('[data-correggi]').addEventListener('click', function () { form.classList.add('a-mano'); });

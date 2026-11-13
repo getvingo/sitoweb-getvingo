@@ -84,10 +84,27 @@ def pulisci_via(via):
     return f"{strada.rstrip(' ,')} {num}" + (f"/{lettera.upper()}" if lettera else f" {extra.lower()}" if extra else "")
 
 
+def separa_via(indirizzo):
+    """("Via Roma", "12/A") da "Via Roma 12/A": per riempire i due campi Via e Civico. Senza civico
+    riconoscibile tutto resta nella via."""
+    v = pulisci_via(indirizzo)
+    if v.endswith(" snc"):
+        return v[:-4], "snc"
+    m = _CIVICO.match(v)
+    if not m:
+        return v, ""
+    return v[:len(m.group(1))].rstrip(" ,"), v[len(m.group(1)):].strip()
+
+
 def leggi_indirizzo(oggetto, obbligatorio=True):
     """Indirizzo completo dal modulo. Vale solo se trovato sulla mappa (coordinate presenti): se la via
     non esiste la pagina la segna in rosso e non manda le coordinate, e qui ci si ferma."""
     valori = {c: _testo(c) for c in CAMPI_INDIRIZZO}
+    civico_mancante = False
+    if "via" in request.form:  # moduli con via e civico separati
+        via, civico = _testo("via"), _testo("civico")
+        civico_mancante = bool(via) and not civico
+        valori["indirizzo"] = f"{via} {civico}".strip()
     valori["indirizzo"] = pulisci_via(valori["indirizzo"])
     valori["provincia"] = valori["provincia"].upper()[:4]
     valori["stato"] = valori["stato"] or "Italia"
@@ -96,8 +113,10 @@ def leggi_indirizzo(oggetto, obbligatorio=True):
     except ValueError:
         lat = lon = None
     if obbligatorio:
-        mancano = [n for n, c in (("via e civico", "indirizzo"), ("comune", "comune"), ("CAP", "cap"))
+        mancano = [n for n, c in (("via", "indirizzo"), ("comune", "comune"), ("CAP", "cap"))
                    if not valori[c]]
+        if civico_mancante:
+            mancano.insert(0, "numero civico (scrivi snc se non c'è)")
         if italia(valori["stato"]) and not valori["provincia"]:
             mancano.append("provincia")
         if mancano:

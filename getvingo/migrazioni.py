@@ -173,7 +173,9 @@ def aggiungi_colonne():
              ("movimento", "stima_viaggio_min", "INTEGER"), ("movimento", "stima_viaggio_km", "FLOAT"),
              ("ddt", "copie_inviate_at", "TIMESTAMP"), ("azienda", "invia_copie_ddt", "BOOLEAN DEFAULT FALSE"), ("ddt", "copie_inviate_a", "VARCHAR(500) DEFAULT ''"),
              # 11/11/2026 sera: DDT da ritirare assegnato a una persona (solo lei lo prende in carico)
-             ("movimento", "assegnato_a_id", "INTEGER REFERENCES utente(id)")]
+             ("movimento", "assegnato_a_id", "INTEGER REFERENCES utente(id)"),
+             # 13/11/2026: anno modello dell'auto (dal VIN o scelto all'ingresso in stock)
+             ("veicolo", "anno", "INTEGER")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:

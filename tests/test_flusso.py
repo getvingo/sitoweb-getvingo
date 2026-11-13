@@ -69,6 +69,7 @@ class Base(unittest.TestCase):
     def abbina(self):
         r = self.c.post("/abbina/ABCD2345", data={
             "vin": "wvwzzz1kzaw000123", "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
+            "versione": "1.5 eTSI Life", "anno": "2024",
             "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"})
         self.assertEqual(r.status_code, 302)
         return self._id(Veicolo, vin=VIN)
@@ -137,7 +138,7 @@ class TestVinEAbbinamento(Base):
         self.c.post("/t/ABCD2345", data={"lat": "45.5", "lon": "12.5"})
         r = self.c.post("/abbina/ABCD2345", data={
             "vin": VIN, "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
-            "sede_id": self._id(Sede, nome="Sede A")})
+            "versione": "1.5 eTSI Life", "anno": "2024", "sede_id": self._id(Sede, nome="Sede A")})
         self.assertEqual(r.status_code, 302)
         with self.app.app_context():
             e = Evento.query.filter_by(tipo="abbinamento").one()
@@ -155,7 +156,7 @@ class TestVinEAbbinamento(Base):
             s["posizione_tocco"]["at"] -= routes.VALIDITA_TOCCO_S + 1
         self.c.post("/abbina/ABCD2345", data={
             "vin": VIN, "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco", "condizione": "nuovo",
-            "sede_id": self._id(Sede, nome="Sede A")})
+            "versione": "1.5 eTSI Life", "anno": "2024", "sede_id": self._id(Sede, nome="Sede A")})
         from getvingo.models import Evento
         with self.app.app_context():
             self.assertIsNone(Evento.query.filter_by(tipo="abbinamento").one().lat)
@@ -946,6 +947,7 @@ class TestPiazzaleMappa(Base):
 class TestStockEDati(Base):
     def test_nuova_auto_solo_con_adesivo(self):
         dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "targa": "gh 123 ab", "condizione": "usato",
+                "colore": "Bianco", "versione": "1.5 eTSI Life", "anno": "2024",
                 "tipologia": "commerciale", "sede_id": self._id(Sede, nome="Sede A")}
         self.c.post("/piazzale/nuova", data=dati)  # senza adesivo non entra in stock
         with self.app.app_context():
@@ -1223,7 +1225,7 @@ class TestPiuClienti(Base):
         self.assertNotIn("Golf", html)
         self.assertNotIn("<b>Sede A</b>", self.c.get("/admin/sedi").get_data(as_text=True))
         # stesso VIN ammesso in un'altra concessionaria, e il suo primo DDT è il n. 1
-        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "Volkswagen", "modello": "Polo", "colore": "Blu", "condizione": "usato",
+        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "Volkswagen", "modello": "Polo", "colore": "Blu", "condizione": "usato", "versione": "1.5 eTSI Life", "anno": "2024",
                                                  "sede_id": self._id2(Sede, nome="Sede Altra")})
         self.assertEqual(r.status_code, 302)
         with self.app.app_context():
@@ -1900,6 +1902,7 @@ class TestLoghiMarche(Base):
         marchi._scarica = lambda indirizzo: (chiesti.append(indirizzo), b"<svg xmlns='http://www.w3.org/2000/svg'/>")[1]
         try:
             self.c.post("/piazzale/nuova", data={"vin": VIN, "marca": "Lynk & Co", "modello": "01", "tag": "ABCD2345", "condizione": "nuovo",
+                                                 "colore": "Nero", "versione": "1.5 PHEV", "anno": "2024",
                                                  "sede_id": self._id(Sede, nome="Sede A")})
         finally:
             marchi._scarica = originale
@@ -1963,7 +1966,8 @@ class TestCampiDdtEFiltri(Base):
 
 class TestNuovoUsato(Base):
     def test_scelta_obbligatoria_e_mostrata_ovunque(self):
-        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "tag": "ABCD2345", "sede_id": self._id(Sede, nome="Sede A")}
+        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "tag": "ABCD2345", "sede_id": self._id(Sede, nome="Sede A"),
+                "colore": "Bianco", "versione": "1.5 eTSI Life", "anno": "2024"}
         self.c.post("/piazzale/nuova", data=dati)  # senza nuova/usata non entra
         with self.app.app_context():
             self.assertEqual(Veicolo.query.count(), 0)
@@ -2629,6 +2633,7 @@ class TestAnagraficaEDDT(Base):
         self.assertEqual(self.c.get("/api/veicolo?vin=XXX00000000000000").status_code, 404)
         # se la marca non è scritta, al salvataggio la prende dal VIN
         self.c.post("/abbina/ABCD2345", data={"vin": "ZFA31200000123456", "modello": "Panda", "condizione": "nuovo",
+                                              "colore": "Bianco", "versione": "1.0 Hybrid", "anno": "2024",
                                               "sede_id": self._id(Sede, nome="Sede A")})
         with self.app.app_context():
             self.assertEqual(Veicolo.query.filter_by(vin="ZFA31200000123456").one().marca, "Fiat")
@@ -2996,7 +3001,7 @@ class TestCorreggiPosizione(Base):
 
     def manda(self, **extra):
         d = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "Volkswagen", "modello": "Golf",
-             "colore": "Bianco", "in_stock_dal": adesso().date().isoformat(),
+             "colore": "Bianco", "versione": "1.5 eTSI Life", "anno": "2024", "in_stock_dal": adesso().date().isoformat(),
              "sede_id": self._id(Sede, nome="Piazzale B")}
         d.update(extra)
         return self.c.post(f"/veicolo/{self.vid}/modifica", data=d)
@@ -3052,7 +3057,7 @@ class TestModificaDatiAuto(Base):
     """Un solo "Modifica dati": gli stessi campi dell'ingresso in stock, per tutto il personale interno."""
     def dati_auto(self, **extra):
         d = {"vin": VIN, "condizione": "usato", "tipologia": "commerciale", "targa": "GH123AB", "marca": "Volkswagen",
-             "modello": "Polo", "versione": "1.0 TSI  Life", "colore": "Nero", "in_stock_dal": "2026-10-01"}
+             "modello": "Polo", "versione": "1.0 TSI  Life", "colore": "Nero", "anno": "2024", "in_stock_dal": "2026-10-01"}
         d.update(extra)
         return d
 
@@ -3128,7 +3133,7 @@ class TestHomeFornitore(Base):
     def test_admin_mette_dal_fornitore_con_lavorazione_obbligatoria(self):
         vid = self.abbina()
         base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "marca": "Volkswagen", "modello": "Golf",
-                "colore": "Bianco", "in_stock_dal": adesso().date().isoformat(),
+                "colore": "Bianco", "versione": "1.5 eTSI Life", "anno": "2024", "in_stock_dal": adesso().date().isoformat(),
                 "sede_id": self._id(Sede, nome="Carrozzeria B")}
         self.c.post(f"/veicolo/{vid}/modifica", data=base)  # senza lavorazione: no
         with self.app.app_context():
@@ -3246,6 +3251,7 @@ class TestHomeFornitore(Base):
             db.session.commit()
         r = self.c.post("/abbina/ALTRA234", data={
             "vin": "WVWZZZ1KZAW000999", "marca": "Volkswagen", "modello": "Polo", "colore": "Nero", "condizione": "nuovo",
+            "versione": "1.5 eTSI Life", "anno": "2024",
             "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"})
         self.assertEqual(r.status_code, 302)
         return self._id(Veicolo, vin="WVWZZZ1KZAW000999")
@@ -3417,7 +3423,7 @@ class TestUniforma(Base):
 
     def test_riusa_la_scrittura_gia_presente(self):
         vid = self.abbina()  # VW Golf Bianco
-        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "in_stock_dal": adesso().date().isoformat()}
+        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "in_stock_dal": adesso().date().isoformat(), "anno": "2024"}
         self.c.post(f"/veicolo/{vid}/modifica", data={**base, "marca": "volkswagen", "modello": "golf",
                                                       "versione": "1.5 etsi life", "colore": "bianco PURO"})
         with self.app.app_context():
@@ -3691,12 +3697,38 @@ class TestCompilaDalVin(Base):
         r = self.c.get("/api/veicolo?vin=WVWZZZAUZFW123456").json
         self.assertEqual((r["marca"], r["modello"], r["tipologia"], r["anno_modello"], r["paese"]),
                          ("Volkswagen", "Golf", "vettura", 2015, "Germania"))
-        self.assertEqual(r["fonti"], {"marca": "DAL VIN", "modello": "DAL VIN", "tipologia": "DAL VIN"})
+        self.assertEqual(r["fonti"], {"marca": "DAL VIN", "modello": "DAL VIN", "tipologia": "DAL VIN", "anno": "DAL VIN"})
+        self.assertEqual(r["anno"], 2015)
         r = self.c.get("/api/veicolo?vin=1M8GDM9A0KP042788").json  # cifra di controllo sbagliata: avviso
         self.assertIn("non torna", r["avvisi"][0])
         # modello non scritto: al salvataggio quello del VIN
-        self.c.post("/abbina/ABCD2345", data={"vin": "ZFA31200000654321", "condizione": "nuovo",
+        self.c.post("/abbina/ABCD2345", data={"vin": "ZFA31200000654321", "condizione": "nuovo", "colore": "Rosso",
+                                              "versione": "1.0 Hybrid", "anno": "2024",
                                               "sede_id": self._id(Sede, nome="Sede A")})
         with self.app.app_context():
             v = Veicolo.query.filter_by(vin="ZFA31200000654321").one()
             self.assertEqual((v.marca, v.modello), ("Fiat", "500"))
+
+
+class TestDatiAutoObbligatori(Base):
+    def test_versione_anno_colore_obbligatori_e_scritti_uguali(self):
+        base = {"vin": "WVWZZZAUZFW123456", "marca": "volkswagen", "modello": "GOLF", "condizione": "nuovo",
+                "sede_id": self._id(Sede, nome="Sede A")}
+        r = self.c.post("/abbina/ABCD2345", data=base)  # senza versione e colore non entra
+        self.assertIn("manca versione, colore", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertEqual(Veicolo.query.count(), 0)
+        # anno non scelto: dal VIN (Volkswagen lo codifica: F = 2015); colore e versione scritti uguali
+        self.c.post("/abbina/ABCD2345", data=dict(base, versione="1.6 tdi highline", colore="BIANCO perla"))
+        with self.app.app_context():
+            v = Veicolo.query.filter_by(vin="WVWZZZAUZFW123456").one()
+            self.assertEqual((v.marca, v.modello, v.versione, v.colore, v.anno),
+                             ("Volkswagen", "Golf", "1.6 TDI Highline", "Bianco Perla", 2015))
+        d = self.c.get("/api/versioni?marca=Volkswagen&modello=Golf&anno=2015").json
+        self.assertEqual((d["anno"], d["altre"], d["colori"]), (["1.6 TDI Highline"], [], ["Bianco Perla"]))
+        self.assertEqual(self.c.get("/api/versioni?marca=Volkswagen&modello=Golf&anno=2020").json["altre"], ["1.6 TDI Highline"])
+        self.assertEqual(self.c.get("/api/formatta?campo=colore&testo=grigio NARDO").json["testo"], "Grigio Nardo")
+        # un valore già presente scritto male non si ricopia: si corregge
+        with self.app.app_context():
+            v = Veicolo.query.one(); v.colore = "rosso corsa"; db.session.commit()
+        self.assertEqual(self.c.get("/api/formatta?campo=colore&testo=ROSSO CORSA").json["testo"], "Rosso Corsa")

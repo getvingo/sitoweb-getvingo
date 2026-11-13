@@ -253,7 +253,8 @@ class Veicolo(PerOrganizzazione, db.Model):
     vin = db.Column(db.String(17), nullable=False, index=True)
     marca = db.Column(db.String(80), default="")
     modello = db.Column(db.String(120), default="")
-    versione = db.Column(db.String(120), default="")  # allestimento / motorizzazione, facoltativa
+    versione = db.Column(db.String(120), default="")  # allestimento / motorizzazione (obbligatoria dal 13/11/2026)
+    anno = db.Column(db.Integer)  # anno modello: dal VIN quando lo codifica, altrimenti scelto (obbligatorio dal 13/11/2026)
     colore = db.Column(db.String(80), default="")
     targa = db.Column(db.String(12), default="")  # facoltativa: le auto nuove di solito non l'hanno
     tipologia = db.Column(db.String(20), nullable=False, default="vettura")

@@ -57,8 +57,14 @@ def _parola(w):
     return "-".join(p if i == 0 and p == "e" and len(pezzi) > 1 else _pezzo(p) for i, p in enumerate(pezzi))
 
 
-def formatta(testo):
-    return " ".join(_parola(w) for w in (testo or "").split())
+def _colore(w):
+    # colori: sempre iniziale maiuscola e il resto minuscolo (BLU → Blu, bIANCO → Bianco), anche col trattino
+    return "-".join(p[:1].upper() + p[1:].lower() for p in w.split("-"))
+
+
+def formatta(testo, campo=None):
+    parola = _colore if campo == "colore" else _parola
+    return " ".join(parola(w) for w in (testo or "").split())
 
 
 def _gia_usato(campo, valore, escludi_id=None, **filtri):
@@ -86,7 +92,8 @@ def valore(campo, testo, escludi_id=None, marca=None, modello=None):
         return MARCHE[testo.lower()]
     filtri = {"marca": marca} if campo == "modello" else (
         {"marca": marca, "modello": modello} if campo == "versione" else {})
-    return _gia_usato(campo, testo, escludi_id, **filtri) or formatta(testo)
+    # anche il valore già presente passa dalle regole: se era scritto male (es. "bianco perla") non si ricopia
+    return formatta(_gia_usato(campo, testo, escludi_id, **filtri) or testo, campo)
 
 
 def auto(v):
@@ -103,9 +110,9 @@ def auto(v):
 CAMPI = (("marca", "Marca"), ("modello", "Modello"), ("versione", "Versione"), ("colore", "Colore"))
 
 
-def _scelta(scritture):
+def _scelta(scritture, campo=None):
     """Fra le scritture dello stesso valore: la più usata, poi con le regole di scrittura."""
-    return formatta(scritture.most_common(1)[0][0])
+    return formatta(scritture.most_common(1)[0][0], campo)
 
 
 def proposte():
@@ -124,7 +131,7 @@ def proposte():
             t = pulito(getattr(v, campo))
             if t:
                 gruppi.setdefault((contesto(v), chiave(t)), Counter())[t] += 1
-        scelte = {k: _scelta(c) for k, c in gruppi.items()}
+        scelte = {k: _scelta(c, campo) for k, c in gruppi.items()}
         for v in auto_:
             t = pulito(getattr(v, campo))
             if not t:

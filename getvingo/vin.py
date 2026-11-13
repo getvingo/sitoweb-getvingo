@@ -271,12 +271,14 @@ def decodifica(vin, oggi=None):
 
 
 def completa(veicolo, tipologia=False):
-    """Riempie dal VIN i dati non scritti (marca, modello; con tipologia=True anche vettura/commerciale).
+    """Riempie dal VIN i dati non scritti (marca, modello, anno; con tipologia=True anche vettura/commerciale).
     Non tocca mai ciò che è già compilato."""
     d = decodifica(veicolo.vin)
     if not veicolo.marca and d["marca"]:
         veicolo.marca = d["marca"]
     if not veicolo.modello and d["modello"]:
         veicolo.modello = d["modello"]
+    if not getattr(veicolo, "anno", None) and d["anno_modello"]:
+        veicolo.anno = d["anno_modello"]
     if tipologia and d["tipologia"] in ("vettura", "commerciale"):
         veicolo.tipologia = d["tipologia"]

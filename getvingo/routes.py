@@ -1,5 +1,6 @@
 import os
 import re
+from collections import Counter
 import time
 import uuid
 from datetime import date, datetime, timedelta
@@ -1302,8 +1303,12 @@ def abbina(codice):
             valore = " ".join(request.form.get(campo, "").split())
             if valore:
                 setattr(veicolo, campo, valore)
-        vin_mod.completa(veicolo)  # marca e modello non scritti: quelli che il VIN dice con certezza
+        veicolo.anno = _anno_scelto() or veicolo.anno
+        vin_mod.completa(veicolo)  # marca, modello e anno non scritti: quelli che il VIN dice con certezza
         uniforma.auto(veicolo)  # scritte tutte allo stesso modo
+        if _manca_dato_auto(veicolo):
+            flash(_manca_dato_auto(veicolo), "errore")
+            return render_template("abbina.html", tag=tag, sedi=sedi, form=request.form)
         if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
             veicolo.tipologia = request.form["tipologia"]
         if request.form.get("condizione") not in Veicolo.CONDIZIONI:
@@ -1330,6 +1335,22 @@ def abbina(codice):
     if lat is not None and vicine:  # il piazzale si propone dalla posizione del tocco
         form["sede_id"] = min(vicine, key=lambda s: servizi.distanza_m(lat, lon, s.lat, s.lon)).id
     return render_template("abbina.html", tag=tag, sedi=sedi, form=form, sede_da_posizione="sede_id" in form)
+
+
+ANNO_MINIMO = 1950
+
+
+def _anno_scelto():
+    """Anno modello dal modulo (dal VIN o scelto), se plausibile."""
+    a = request.form.get("anno", type=int)
+    return a if a and ANNO_MINIMO <= a <= adesso().year + 1 else None
+
+
+def _manca_dato_auto(v):
+    """Dal 13/11/2026 versione, anno e colore sono obbligatori come marca e modello."""
+    mancano = [n for n, val in (("marca", v.marca), ("modello", v.modello), ("versione", v.versione),
+                                ("anno", v.anno), ("colore", v.colore)) if not val]
+    return f"Completa i dati dell'auto: manca {', '.join(mancano)}." if mancano else None
 
 
 def _targa():
@@ -1385,8 +1406,13 @@ def nuova_auto():
             for k in ("marca", "modello", "versione", "colore"):
                 if request.form.get(k, "").strip():
                     setattr(v, k, " ".join(request.form[k].split()))
-            vin_mod.completa(v)  # marca e modello non scritti: quelli che il VIN dice con certezza
+            v.anno = _anno_scelto() or v.anno
+            vin_mod.completa(v)  # marca, modello e anno non scritti: quelli che il VIN dice con certezza
             uniforma.auto(v)
+            if _manca_dato_auto(v):
+                db.session.rollback()
+                flash(_manca_dato_auto(v), "errore")
+                return render_template("abbina.html", tag=None, sedi=sedi, tag_liberi=liberi, form=request.form)
             tag.veicolo, tag.abbinato_at = v, adesso()
             servizi.registra_evento(v, "inserimento", g.utente, *_coord())
             db.session.commit()
@@ -1420,7 +1446,7 @@ def modifica_auto(veicolo_id):
         form = {"sede_id": v.sede_id, "lat": v.lat if v.lat is not None else "",
                 "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
                 "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
-                "colore": v.colore or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
+                "colore": v.colore or "", "anno": v.anno or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
                 "lavorazione": qui.lavorazione if qui and qui.senza_ddt else "",
                 "lavorazione_note": qui.lavorazione_note if qui and qui.senza_ddt else ""}
         return pagina(form)
@@ -1438,8 +1464,8 @@ def modifica_auto(veicolo_id):
         errore = "Questo VIN è già di un'altra auto in Getvingo."
     elif f.get("condizione") not in Veicolo.CONDIZIONI:
         errore = "Indica se l'auto è nuova o usata."
-    elif not pulito["marca"] or not pulito["modello"]:
-        errore = "Marca e modello sono obbligatori."
+    elif not all(pulito.values()) or not _anno_scelto():
+        errore = "Marca, modello, versione, anno e colore sono obbligatori."
     elif giorno is None or giorno > adesso().date():
         errore = "In stock dal: scegli una data valida, non nel futuro."
     elif _targa_insolita():
@@ -1469,6 +1495,7 @@ def modifica_auto(veicolo_id):
         v.tipologia = f["tipologia"]
     v.marca, v.modello = pulito["marca"], pulito["modello"]
     v.versione, v.colore = pulito["versione"][:120], pulito["colore"][:80]
+    v.anno = _anno_scelto()
     uniforma.auto(v)
     if v.creato_at is None or giorno != v.creato_at.date():
         v.creato_at = datetime.combine(giorno, v.creato_at.time() if v.creato_at else datetime.min.time())
@@ -1519,13 +1546,53 @@ def api_veicolo():
                 dati[k], fonti[k] = getattr(v, k), "GESTIONALE"
         if v.tipologia:
             dati["tipologia"], fonti["tipologia"] = v.tipologia, "GESTIONALE"
+        if v.anno:
+            dati["anno"], fonti["anno"] = v.anno, "GESTIONALE"
     for k in ("marca", "modello", "tipologia"):
         if k not in dati and d[k] and (k != "tipologia" or d[k] in Veicolo.TIPOLOGIE):
             dati[k], fonti[k] = d[k], "DAL VIN"
+    if "anno" not in dati and d["anno_modello"]:
+        dati["anno"], fonti["anno"] = d["anno_modello"], "DAL VIN"
     if not dati and not d["avvisi"]:
         return {}, 404
     return {"vin": vin, **dati, "fonti": fonti, "da_vin": fonti.get("marca") == "DAL VIN",
             "anno_modello": d["anno_modello"], "paese": d["paese"], "avvisi": d["avvisi"], "proposta": d["proposta"]}
+
+
+@bp.route("/api/versioni")
+@solo_interni
+def api_versioni():
+    """Versioni tra cui scegliere per marca e modello (le più usate prima): prima quelle dello stesso anno,
+    poi le altre del modello. Non esiste un catalogo pubblico delle versioni per anno: l'elenco cresce
+    con le auto caricate; una versione nuova si scrive una volta e poi si sceglie."""
+    marca, modello = request.args.get("marca", "").strip(), request.args.get("modello", "").strip()
+    anno = request.args.get("anno", type=int)
+    if not marca or not modello:
+        return {"anno": [], "altre": [], "colori": []}
+    k_marca, k_modello = uniforma.chiave(marca), uniforma.chiave(modello)
+    stesso, altre, colori = Counter(), Counter(), Counter()
+    for vv in Veicolo.query.with_entities(Veicolo.marca, Veicolo.modello, Veicolo.versione, Veicolo.anno, Veicolo.colore):
+        if uniforma.chiave(vv.marca) != k_marca:
+            continue
+        if vv.colore:
+            colori[uniforma.formatta(vv.colore, "colore")] += 1
+        if uniforma.chiave(vv.modello) != k_modello or not vv.versione:
+            continue
+        (stesso if anno and vv.anno == anno else altre)[uniforma.formatta(vv.versione)] += 1
+    prima = [x for x, _ in stesso.most_common()]
+    return {"anno": prima, "altre": [x for x, _ in altre.most_common() if x not in prima],
+            "colori": [x for x, _ in colori.most_common(30)]}
+
+
+@bp.route("/api/formatta")
+@solo_interni
+def api_formatta():
+    """Come verrà salvato un dato dell'auto (stesse regole di uniforma): per correggerlo mentre si scrive."""
+    campo = request.args.get("campo", "")
+    if campo not in ("marca", "modello", "versione", "colore"):
+        return {"testo": request.args.get("testo", "")}
+    return {"testo": uniforma.valore(campo, request.args.get("testo", ""), marca=request.args.get("marca") or None,
+                                     modello=request.args.get("modello") or None)}
 
 
 @bp.route("/veicolo/<int:veicolo_id>/note", methods=["POST"])

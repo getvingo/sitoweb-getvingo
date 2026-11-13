@@ -293,6 +293,26 @@
 </div>
 {% endmacro %}
 
+{# Anno, versione e colore dell'auto (obbligatori dal 13/11/2026; static/datiauto.js): l'anno si compila dal VIN
+   quando lo codifica, la versione si sceglie tra quelle del modello per quell'anno o se ne scrive una nuova #}
+{% macro campi_versione(form) %}
+<div class="griglia-2">
+  <label class="campo"><span>Anno</span>
+    <select name="anno" required>
+      <option value="">Scegli l'anno…</option>
+      {% for a in range(adesso().year + 1, 1979, -1) %}<option value="{{ a }}" {{ 'selected' if form.get('anno')|string == a|string }}>{{ a }}</option>{% endfor %}
+    </select></label>
+  <label class="campo"><span>Colore</span>
+    <input name="colore" value="{{ form.get('colore', '') }}" required maxlength="80" list="colori-auto" autocomplete="off" placeholder="Es. Bianco Perla">
+    <datalist id="colori-auto"></datalist></label>
+</div>
+<label class="campo"><span>Versione</span>
+  <select data-versione-scelta hidden></select>
+  <input name="versione" value="{{ form.get('versione', '') }}" required maxlength="120" placeholder="Es. 1.5 eTSI 150 CV Life" autocomplete="off">
+  <small class="tenue" data-versione-aiuto></small>
+</label>
+{% endmacro %}
+
 {# Indirizzo completo come sui DDT (via e civico, CAP, comune, provincia, stato) verificato sulla mappa:
    la via si cerca da sola, oppure si tocca il punto sulla mappa / "Sono qui". Se la via non esiste il campo
    diventa rosso e il modulo non parte. o = oggetto con i valori attuali (o None) #}
@@ -305,8 +325,14 @@
       <button type="button" class="btn piccolo" data-cerca-vai>{{ i('cerca', 's') }} Cerca</button></span></label>
     <ul class="risultati-luogo" data-risultati hidden></ul>
   </div>
-  <label class="campo"><span>Via e numero civico</span>
-    <input name="indirizzo" value="{{ (o.indirizzo or '') if o else '' }}" {{ 'required' if obbligatorio }} autocomplete="street-address" placeholder="Es. Via Roma 12" data-campo="indirizzo"></label>
+  {# via e civico in due campi (13/11/2026); sul server tornano un solo indirizzo ("Via Roma 12/A", anagrafica.leggi_indirizzo) #}
+  {% set via_civico = ((o.indirizzo or '')|separa_via) if o else ('', '') %}
+  <div class="riga-via">
+    <label class="campo"><span>Via</span>
+      <input name="via" value="{{ via_civico[0] }}" {{ 'required' if obbligatorio }} autocomplete="address-line1" placeholder="Es. Via Roma" data-campo="indirizzo"></label>
+    <label class="campo"><span>Civico</span>
+      <input name="civico" value="{{ via_civico[1] }}" {{ 'required' if obbligatorio }} maxlength="12" autocomplete="off" placeholder="12/A o snc" data-campo="civico"></label>
+  </div>
   <div class="griglia-indirizzo">
     <label class="campo"><span>Comune</span><input name="comune" value="{{ (o.comune or '') if o else '' }}" {{ 'required' if obbligatorio }} data-campo="comune"></label>
     <label class="campo"><span>CAP</span><input name="cap" value="{{ (o.cap or '') if o else '' }}" inputmode="numeric" maxlength="10" data-campo="cap"></label>

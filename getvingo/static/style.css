@@ -1403,9 +1403,18 @@ a.destinazione-btn { text-decoration: none; }
 /* Azioni della scheda: Predisponi accanto a Inizia spostamento quando non c'è "Metti in preparazione" */
 @media (min-width: 560px) {
   .azioni-auto { grid-template-columns: 1fr 1fr; }
-  .azioni-auto.con-prepara .predisponi, .azioni-auto .predisponi[open] { grid-column: 1 / -1; }
+  .azioni-auto .predisponi[open] { grid-column: 1 / -1; }
 }
-.azioni-auto .predisponi > summary { height: 100%; }
+/* 13/11/2026: con height 100% anche da aperto il titolo diventava alto quanto tutto il riquadro e spingeva il
+   modulo sotto la mappa e "Elimina questa auto": il pulsante "Predisponi DDT" non si poteva premere */
+.azioni-auto .predisponi:not([open]) > summary { height: 100%; }
+/* Predisponi e Metti in preparazione affiancati; aperto, il modulo occupa tutta la riga sotto i due pulsanti */
+@media (min-width: 560px) {
+  .azioni-auto.con-prepara .predisponi { grid-column: 1; grid-row: 1; }
+  .azioni-auto.con-prepara .azione-prepara { grid-column: 2; grid-row: 1; align-self: start; }
+  .azioni-auto.con-prepara .predisponi[open] { grid-column: 1 / -1; }
+  .azioni-auto.con-prepara .predisponi[open] > summary { width: calc(50% - 5px); }
+}
 
 /* Sotto l'etichetta di stato nella carta dell'auto: il dettaglio della fase */
 .carta-auto-stato { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
@@ -2403,3 +2412,6 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .cerca-veloce input { font-size: 16px; -webkit-appearance: none; appearance: none; }
 .cerca-veloce input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .cerca-veloce input, .cerca-veloce input:focus { border: 0; box-shadow: none; background: none; outline: none; padding: 0; }
+
+/* Via e civico in due campi (13/11/2026) */
+.riga-via { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 10px; }

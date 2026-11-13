@@ -185,8 +185,9 @@
 {# ---- Emissione: solo dall'account del luogo in cui si trova l'auto ---- #}
 {% elif puo_emettere %}
 <section class="azioni-auto {{ 'con-prepara' if puo_preparare else 'senza-prepara' }}">
-  {% if v.sede and v.sede.esterna %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>
-  {% else %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('camion') }} Inizia spostamento</a>{% endif %}
+  {# 13/11/2026: da computer niente "Inizia spostamento" (si parte toccando l'adesivo): Predisponi e Metti in
+     preparazione affiancati; aperto, il modulo del DDT prende tutta la riga sotto i due pulsanti #}
+  {% if v.sede and v.sede.esterna %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>{% endif %}
   {% if puo_predisporre %}
   <details class="predisponi">
     <summary class="btn pieno btn-predisponi">{{ i('orologio') }} Predisponi DDT da ritirare</summary>
@@ -203,7 +204,7 @@
   <p class="rientro-stato bloccato">{{ i('orologio', 's') }} <span><b>DDT da ritirare non ancora disponibile</b> · si predispone quando {{ v.sede.nome }} conferma la fine dei lavori</span></p>
   {% endif %}
   {% if puo_preparare %}
-  <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta>
+  <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="azione-prepara">
     {{ csrf_input() }}
     <button class="btn pieno btn-prepara">{{ i('brilla') }} Metti in preparazione</button>
   </form>

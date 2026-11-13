@@ -86,8 +86,9 @@ def slot(momento):
 
 
 def init_app(app):
+    from .anagrafica import separa_via
     app.jinja_env.filters.update(vin=vin, da_quanto=da_quanto, iniziali=iniziali, data=data, marchio=marchio,
-                                 slot=slot, da_tempo=da_tempo, ritardo=ritardo)
+                                 slot=slot, da_tempo=da_tempo, ritardo=ritardo, separa_via=separa_via)
     # g come globale: serve anche dentro le macro importate (che non vedono il contesto)
     app.jinja_env.globals["g"] = g
 
