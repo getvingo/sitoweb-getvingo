@@ -2530,3 +2530,89 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .trova-messaggio { text-align: center; max-width: 300px; opacity: .85; }
 body.con-trova .nav-basso, body.con-trova .testata { display: none; }
 @media (prefers-reduced-motion: reduce) { .trova-vicino .trova-cerchio { animation: none; } }
+/* ---- Filtri di stato compatti (13/11/2026 notte): una riga di pillole; quella attiva piena con la ✕, ritoccandola si toglie ---- */
+.stato-filtri { background: none; border: 0; box-shadow: none; border-radius: 0; margin: 2px 0 12px; overflow: visible; }
+.stato-filtri .stato-quota { display: none; }
+.stato-voci { display: flex; flex-wrap: wrap; gap: 8px; }
+.stato-voce { flex-direction: row; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 6px; border: 1.5px solid var(--bordo);
+  border-radius: var(--r-pillola); background: var(--carta); }
+.stato-voce:first-child { border-left: 1.5px solid var(--bordo); }
+.stato-voce .stato-riga { display: contents; }
+.stato-voce .stato-icona { order: 0; width: 28px; height: 28px; }
+.stato-voce b { order: 1; font-size: var(--fs-17); }
+.stato-voce .stato-nome { order: 2; font-size: var(--fs-14); color: var(--testo); }
+.stato-voce .stato-togli { order: 3; margin-left: 2px; background: rgba(255,255,255,.25); color: #fff; }
+.stato-voce:hover { border-color: var(--c); background: var(--carta); }
+.stato-voce.attivo { background: var(--c); border-color: var(--c); box-shadow: none; padding-right: 8px; }
+.stato-voce.attivo b, .stato-voce.attivo .stato-nome { color: #fff; }
+.stato-voce.attivo .stato-icona { background: rgba(255,255,255,.22); color: #fff; }
+.stato-voce.zero { opacity: .6; }
+/* Stock: targa ben visibile (stile targa) e veicoli commerciali riconoscibili */
+.targa-grande { display: inline-flex; align-items: center; font-family: var(--mono); font-weight: 800; font-size: var(--fs-14); letter-spacing: .06em;
+  color: #111; background: #fff; border: 1.5px solid #111; border-radius: 4px; padding: 0 6px 0 16px; position: relative; line-height: 20px; margin-bottom: 3px; }
+.targa-grande::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: #1F4AA8; border-radius: 2px 0 0 2px; }
+.cella-telaio .vin { display: block; font-size: var(--fs-13); font-weight: 600; color: var(--testo-2); }
+.cella-telaio .targa-grande + .vin { font-size: var(--fs-12); }
+.badge-comm { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 7px; border-radius: var(--r-xs);
+  font-size: 11px; font-weight: 700; line-height: 18px; background: #FEF3C7; color: #92400E; vertical-align: 1px; }
+.badge-comm .icona { width: 13px; height: 13px; }
+@media (prefers-color-scheme: dark) { .badge-comm { background: #3A2A0B; color: #FCD34D; } }
+/* DDT e Danni a righe (13/11/2026 notte) */
+.riga-stock.ddt-predisposto { --fase: var(--st-ritiro); } .riga-stock.ddt-aperto { --fase: var(--st-viaggio); }
+.riga-stock.ddt-chiuso { --fase: var(--pronta-verde); } .riga-stock.ddt-scaduto { --fase: var(--liv-1); }
+.riga-stock.ddt-annullato { --fase: #94A3B8; } .riga-stock.ddt-annullato > td { opacity: .8; }
+.tabella-ddt .c-num { width: 11%; } .tabella-ddt .c-auto { width: 27%; } .tabella-ddt .c-tratta { width: 28%; }
+.tabella-ddt .c-chi { width: 16%; } .tabella-ddt .c-stato { width: 18%; }
+.cella-num b { font-family: var(--mono); font-size: var(--fs-15); color: var(--testo); }
+.cella-tratta span, .cella-chi span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cella-tratta small, .cella-chi small, .cella-num small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.targa-grande.piccola { font-size: 11px; line-height: 16px; padding: 0 5px 0 13px; margin: 0 6px 0 0; }
+.targa-grande.piccola::before { width: 8px; }
+.cella-auto small .vin { font-size: var(--fs-12); }
+.riga-stock.danno-aperto { --fase: var(--danno); } .riga-stock.danno-risolto { --fase: var(--pronta-verde); }
+.tabella-danni .c-auto { width: 27%; } .tabella-danni .c-danno { width: 25%; } .tabella-danni .c-dove { width: 25%; }
+.tabella-danni .c-stato { width: 16%; } .tabella-danni .c-azione { width: 7%; }
+/* ---- Scheda auto compatta (13/11/2026 notte) ---- */
+.info-striscia { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: var(--r); padding: 10px 14px; margin: 10px 0 0; font-size: var(--fs-14); color: var(--testo-2); }
+.info-striscia > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.info-striscia .icona { color: var(--segnale); }
+.info-striscia b { color: var(--testo); }
+.blocco-fase { background: var(--carta); border: 1px solid var(--bordo); border-left: var(--bordo-stato) solid var(--fase); border-radius: var(--r);
+  padding: 12px 16px; margin: 0 0 12px; display: grid; gap: 8px; }
+.blocco-fase.lavoro-corso, .blocco-fase.prep-tempo { --fase: var(--in-tempo); }
+.blocco-fase.lavoro-ritardo, .blocco-fase.prep-ritardo { --fase: var(--in-ritardo); }
+.blocco-fase.lavoro-finita { --fase: var(--pronta-verde); }
+.blocco-testa { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: var(--fs-15); }
+.blocco-link { margin-left: auto; font-size: var(--fs-14); font-weight: 600; }
+.blocco-nota { margin: 0; font-size: var(--fs-14); }
+.blocco-sotto { color: var(--testo-2); font-size: var(--fs-13); }
+.mini-barra.larga { max-width: none; height: 6px; margin: 0; }
+.blocco-azioni { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.blocco-azioni .sollecita > summary { min-height: 40px; }
+.blocco-azioni details[open] { flex-basis: 100%; }
+.passi-nomi { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.passi-nomi li { display: grid; gap: 2px; font-size: var(--fs-13); color: var(--testo-2); }
+.passi-nomi .barretta { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--fase) 16%, transparent); margin-bottom: 4px; }
+.passi-nomi .fatto .barretta { background: var(--fase); }
+.passi-nomi .ora .barretta { background: repeating-linear-gradient(45deg, var(--fase) 0 3px, color-mix(in srgb, var(--fase) 30%, transparent) 3px 6px); }
+.passi-nomi b { color: var(--testo); font-size: var(--fs-14); }
+.passi-nomi .ora b { color: var(--fase); }
+/* Anagrafica dell'auto (13/11/2026 notte) */
+.dati-auto { max-width: 640px; margin: 0 auto; }
+.indietro-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
+.dati-testa { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: center; background: var(--carta); border-radius: var(--r-l);
+  padding: 14px; border-left: var(--bordo-stato) solid var(--fase, var(--st-sede)); box-shadow: var(--ombra); }
+.dati-testa .logo-marca { width: 56px; height: 56px; }
+.dati-testa small { font-size: var(--fs-13); font-weight: 650; color: var(--testo-2); text-transform: uppercase; letter-spacing: .04em; }
+.dati-testa h1 { font-size: var(--fs-24); margin: 0; }
+.dati-stato { margin-top: 6px; }
+.dati-righe { margin: 0; background: var(--carta); border-radius: var(--r); padding: 2px 14px; }
+.dati-righe > div { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--bordo); font-size: var(--fs-15); }
+.dati-righe > div:last-child { border-bottom: 0; }
+.dati-righe dt { color: var(--testo-2); }
+.dati-righe dd { margin: 0; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.dati-righe dd.vin { font-weight: 500; }
+a.auto-breve-link { color: inherit; position: relative; padding-right: 54px; }
+a.auto-breve-link:hover { text-decoration: none; border-color: var(--segnale); }
+a.auto-breve-link::after { content: "Dati ›"; position: absolute; right: 12px; top: 12px; font-size: var(--fs-12); font-weight: 700; color: var(--segnale); }

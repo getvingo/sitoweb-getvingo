@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, badge_ddt, giorni, filtro_select, pillole %}
+{% from "_macro.html" import i, badge_ddt, giorni, filtro_select, pillole, marchio %}
 {% block larghezza %}largo{% endblock %}
 {% block titolo %}DDT · Getvingo{% endblock %}
 {% block contenuto %}
@@ -9,7 +9,7 @@
 
 <form id="filtri">
   <input type="hidden" name="stato" value="{{ stato }}">
-  <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" placeholder="Numero, telaio, modello o autista" aria-label="Cerca DDT"></div>
+  <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" id="cerca-righe" autocomplete="off" placeholder="Cerca: numero, auto, telaio, targa, luogo, autista…" aria-label="Cerca DDT"></div>
   <details class="ripiega" style="margin-top:10px" {{ 'open' if avanzati }}>
     <summary>{{ i('gestione', 's') }} Filtri{% if avanzati %} · {{ avanzati|length }} attivi{% endif %}</summary>
     <div class="scheda">
@@ -39,26 +39,37 @@
 {% endfor %}
 {{ pillole(voci, stato, a_destra=('chiuso', 'annullati'), etichetta='Filtra i DDT per stato') }}
 
-<div class="lista lista-ddt">
-{% for d in elenco %}
-  {% set m = d.movimento %}
-  <a class="voce" href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}">
-    <div style="flex:none;width:64px" class="num ddt-num">{{ d.sigla }}{% if d.revisione %}<div class="tenue piccolo" style="font-weight:500">rev. {{ d.revisione }}</div>{% endif %}</div>
-    <div class="corpo">
-      {% if d.multiplo %}
-      <h3>{{ d.movimenti|length }} auto <span class="badge multiplo">Multiplo</span></h3>
-      <div class="tratta">{% for x in d.movimenti %}{{ x.veicolo.modello or x.veicolo.descrizione }} <span class="vin"><b>{{ x.veicolo.vin[-8:] }}</b></span>{{ ' · ' if not loop.last }}{% endfor %}</div>
-      {% else %}
-      <h3>{{ m.veicolo.descrizione }}{{ condizione(m.veicolo) }} <span class="tenue piccolo" style="font-weight:400">{{ m.veicolo.vin|vin }}</span></h3>
-      {% endif %}
-      <div class="tratta" style="margin-top:2px">{{ m.da_sede.nome if m.da_sede else '—' }} {{ i('freccia', 's') }} <b style="color:var(--testo)">{{ m.sede_arrivo_effettiva.nome }}</b></div>
-      <div class="tratta tenue">{{ i('utente', 's') }} {{ m.conducente or 'da indicare' }}{% if m.con_lavorazione %} · {{ i('chiave', 's') }} {{ m.lavorazione }}{% endif %} · {{ d.emesso_at|data('%d/%m %H:%M') }}</div>
-      {% if d.annullato_at %}<div class="tratta" style="color:var(--errore)">Cancellato da {{ d.annullato_da.nome }}: {{ d.motivo_annullamento }}</div>{% endif %}
-    </div>
-    <div class="lato">{{ badge_ddt(d) }}<div style="margin-top:6px">{{ giorni(m.giorni_lavorazione if not m.lavorazione_completata_at else none) }}</div></div>
-  </a>
+{# Elenco a righe (13/11/2026 notte): colore dello stato sul bordo e sulla pillola (da ritirare magenta, in viaggio
+   viola, arrivato verde, ritiro scaduto arancio, cancellato grigio) #}
+{% if elenco %}
+<table class="tabella-stock tabella-ddt">
+  <colgroup><col class="c-num"><col class="c-auto"><col class="c-tratta"><col class="c-chi"><col class="c-stato"></colgroup>
+  <thead><tr><th>DDT</th><th>Auto</th><th>Da → a</th><th>Chi la sposta</th><th>Stato</th></tr></thead>
+  <tbody class="gruppo-stock">
+  {% for d in elenco %}{% set m = d.movimento %}{% set k, testo = d.stato %}
+  <tr class="riga-stock ddt-{{ k }}" data-url="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}"
+      data-cerca="{{ ([d.sigla, m.da_sede.nome if m.da_sede else '', m.sede_arrivo_effettiva.nome, m.conducente, m.causale, m.lavorazione, testo]
+                     + d.movimenti|map(attribute='veicolo')|map(attribute='descrizione')|list
+                     + d.movimenti|map(attribute='veicolo')|map(attribute='vin')|list
+                     + d.movimenti|map(attribute='veicolo')|map(attribute='targa')|select|list)|select|join(' ')|lower }}">
+    <td class="cella-num"><a href="{{ url_for('main.ddt_dettaglio', ddt_id=d.id) }}"><b>{{ d.sigla }}</b></a><small>{{ d.emesso_at|data('%d/%m %H:%M') }}{% if d.revisione %} · rev. {{ d.revisione }}{% endif %}</small></td>
+    <td class="cella-auto">{% if d.multiplo %}<div><span class="logo-marca sigla">{{ d.movimenti|length }}</span>
+        <span><b>{{ d.movimenti|length }} auto <span class="badge multiplo">Multiplo</span></b><small>{% for x in d.movimenti %}{{ x.veicolo.modello or x.veicolo.descrizione }}{{ ', ' if not loop.last }}{% endfor %}</small></span></div>
+      {% else %}<div>{{ marchio(m.veicolo) }}<span><b>{{ m.veicolo.descrizione }}</b>
+        <small>{% if m.veicolo.targa %}<span class="targa-grande piccola">{{ m.veicolo.targa }}</span>{% endif %}<span class="vin">{{ m.veicolo.vin[-8:] }}</span></small></span></div>{% endif %}</td>
+    <td class="cella-tratta"><span>{{ m.da_sede.nome if m.da_sede else '—' }} → <b>{{ m.sede_arrivo_effettiva.nome }}</b></span>
+      <small>{{ m.causale }}{% if m.con_lavorazione %} · {{ m.lavorazione }}{% endif %}</small></td>
+    <td class="cella-chi"><span>{{ m.conducente or 'da indicare' }}</span>{% if m.mezzo %}<small>{{ m.mezzo }}</small>{% endif %}</td>
+    <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ testo }}</span>
+      {% if d.annullato_at %}<small class="testo-ritardo" title="{{ d.motivo_annullamento }}">da {{ d.annullato_da.nome }}</small>
+      {% elif m.giorni_lavorazione is not none and not m.lavorazione_completata_at %}<small>{{ m.giorni_lavorazione }} {{ 'giorno' if m.giorni_lavorazione == 1 else 'giorni' }} dal fornitore</small>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="vuoto" id="righe-nessuna" hidden>Nessun DDT con questa ricerca.</p>
 {% else %}
-  <div class="vuoto">Nessun DDT con questi filtri.</div>
-{% endfor %}
-</div>
+<div class="vuoto">Nessun DDT con questi filtri.</div>
+{% endif %}
 {% endblock %}
+{% block script %}<script src="{{ url_for('static', filename='righe.js', v=versione_statici) }}"></script>{% endblock %}

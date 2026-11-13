@@ -48,7 +48,7 @@
 {% if gruppi %}
 <table class="tabella-stock">
   <colgroup><col class="c-auto"><col class="c-telaio"><col class="c-stato"><col class="c-da"><col class="c-mappa"></colgroup>
-  <thead><tr><th>Auto</th><th>Telaio</th><th>Stato</th><th>Da</th><th><span class="nascosto">Mappa</span></th></tr></thead>
+  <thead><tr><th>Auto</th><th>Targa · telaio</th><th>Stato</th><th>Da</th><th><span class="nascosto">Mappa</span></th></tr></thead>
   {% for gr in gruppi %}
   <tbody class="gruppo-stock" data-zona="{{ gr.chiave }}">
     <tr class="riga-gruppo"><th colspan="5">{{ i(gr.icona, 's') }} {{ gr.titolo }} <span class="conteggio">{{ gr.voci|length }}</span></th></tr>
@@ -58,8 +58,8 @@
         data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.alimentazione, v.anno, v.vin, v.targa, v.tag.codice if v.tag else '', v.sede.nome if v.sede else '', etichetta]|select|join(' ')|lower }}">
       <td class="cella-auto"><div>{{ marchio(v) }}
         <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" title="{{ v.descrizione }}{{ ' · ' ~ v.versione if v.versione }}"><b>{{ v.descrizione }}</b></a>
-          <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %} · Comm.{% endif %}{% if v.targa %} · <span class="targa">{{ v.targa }}</span>{% endif %}</small></span></div></td>
-      <td class="cella-telaio"><span class="vin">{{ v.vin[-8:] }}</span></td>
+          <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %}<span class="badge-comm">{{ i('camion', 's') }} Commerciale</span>{% endif %}</small></span></div></td>
+      <td class="cella-telaio">{% if v.targa %}<span class="targa-grande">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></td>
       <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
         {% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}
         {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</td>

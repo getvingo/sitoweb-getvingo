@@ -1,4 +1,5 @@
 """Logica dei movimenti e dei DDT, condivisa tra scheda veicolo, pagina DDT e fornitori."""
+from collections import Counter
 import base64
 import binascii
 import math
@@ -436,6 +437,64 @@ def destinazioni_rapide(veicolo, utente):
     preferite = sorted((s for s in sedi if uso.get(s.id)), key=lambda s: -uso[s.id])[:4]
     altre = [s for s in sedi if s not in preferite]
     return preferite, [(Sede.TIPI[t], list(gr)) for t, gr in groupby(altre, key=lambda s: s.tipo)]
+
+
+def destinazioni_ordinate(veicolo, utente):
+    """Tutte le destinazioni per "Dove la porti?", dalla più probabile (13/11/2026 notte): [(luogo, motivo)].
+
+    1. se l'auto è da un fornitore, il luogo da cui è arrivata (il rientro); poi le altre sedi della concessionaria
+    2. i fornitori e gli altri luoghi già usati per auto simili (stessa marca e modello pesa di più, poi lo
+       stesso tipo: vetture con vetture, commerciali con commerciali) e da chi guarda
+    3. gli altri luoghi
+    4. in fondo i meno affini: luoghi usati quasi solo per l'altro tipo di veicolo (es. un allestitore per una vettura)
+    Un'auto pronta va solo nella sede di consegna."""
+    sedi = Sede.query.filter(Sede.attiva.is_(True), Sede.id != (veicolo.sede_id or 0))
+    if veicolo.fase == "pronta":
+        sedi = sedi.filter(Sede.id == veicolo.consegna_sede_id)
+    sedi = sedi.all()
+    storia = (db.session.query(Movimento.a_sede_id, Veicolo.marca, Veicolo.modello, Veicolo.tipologia,
+                               Movimento.partenza_utente_id)
+              .join(Veicolo, Movimento.veicolo_id == Veicolo.id)
+              .filter(Movimento.veicolo_id != veicolo.id).all())
+    def k(t):
+        return (t or "").strip().lower()
+    simili, stesso_tipo, altro_tipo, mie = Counter(), Counter(), Counter(), Counter()
+    for sede_id, marca, modello, tipologia, chi in storia:
+        if k(marca) == k(veicolo.marca) and k(modello) == k(veicolo.modello):
+            simili[sede_id] += 1
+        if (tipologia or "vettura") == (veicolo.tipologia or "vettura"):
+            stesso_tipo[sede_id] += 1
+        else:
+            altro_tipo[sede_id] += 1
+        if chi == utente.id:
+            mie[sede_id] += 1
+    arrivo = veicolo.arrivo_qui if veicolo.sede is not None and veicolo.sede.esterna else None
+    da_dove = arrivo.da_sede_id if arrivo else None
+    commerciale = veicolo.tipologia == "commerciale"
+    ordine_tipi = ("propria", "carrozzeria", "officina", "allestitore", "altro", "esposizione", "concessionario",
+                   "rivenditore", "cliente")
+
+    def posto(s):
+        punteggio = simili[s.id] * 5 + stesso_tipo[s.id] + mie[s.id] * 2
+        # meno affine: usato sempre e solo per l'altro tipo di veicolo (almeno 3 volte), o un allestitore per una vettura
+        poco_affine = (stesso_tipo[s.id] == 0 and altro_tipo[s.id] >= 3) or (s.tipo == "allestitore" and not commerciale)
+        if s.id == da_dove:
+            livello, motivo = 0, "da qui è arrivata"
+        elif s.tipo == "propria":
+            livello, motivo = 1, "sede"
+        elif poco_affine:
+            livello, motivo = 4, "di solito per commerciali" if not commerciale else "di solito per vetture"
+        elif punteggio:
+            livello = 2
+            motivo = (f"usata per {simili[s.id]} {'auto simile' if simili[s.id] == 1 else 'auto simili'}" if simili[s.id]
+                      else "la usi spesso" if mie[s.id] else "già usata")
+        else:
+            livello, motivo = 3, "partner" if s.esterna and s.tipo in Sede.FORNITORI else ""
+        return (livello, -punteggio, ordine_tipi.index(s.tipo) if s.tipo in ordine_tipi else 99, s.nome.lower()), motivo
+
+    valutate = [(posto(s), s) for s in sedi]
+    valutate.sort(key=lambda x: x[0][0])
+    return [(s, motivo) for (_, motivo), s in valutate]
 
 
 TIPI_DESTINAZIONE_NUOVA = ("altro", "cliente", "carrozzeria", "officina", "allestitore", "esposizione", "concessionario",

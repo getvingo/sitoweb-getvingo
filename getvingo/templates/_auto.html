@@ -29,28 +29,15 @@
 
 {# Dove si trova, quando è stata aggiornata la posizione (e da chi), da quando è lì #}
 {% macro info_auto(v) %}
+{# 13/11/2026 notte: una sola striscia "dove · da quando · posizione" al posto di tre riquadri #}
 {% set pos = v.ultima_posizione %}{% set arrivo = v.ultimo_arrivo %}{% set mov = v.movimento_aperto %}
-<section class="riquadri-info">
-  <div class="info-tile">
-    <span class="tondo-piccolo">{{ i('pin', 's') }}</span>
-    <div>{% if stai_qui(v) %}<small>Posizione</small><b>Qui</b><span>{{ 'da voi' if not g.utente.interno else 'vicino a te' }} · {{ v.sede.nome }}</span>
-      {% else %}<small>Dove si trova</small>
-      {% if v.stato == 'in_viaggio' and mov %}<b>In viaggio verso {{ mov.a_sede.nome }}</b><span>da {{ in_viaggio_da(mov) }}</span>
-      {% elif v.stato == 'consegnato' %}<b>Consegnata</b><span>{{ v.consegnato_at|data('%d/%m/%Y') }}{{ ' · ' ~ v.sede.nome if v.sede }}</span>
-      {% else %}<b>{{ v.sede.nome if v.sede else '—' }}</b>{% if v.sede %}<span>{{ v.sede.dove }}</span>{% endif %}{% endif %}{% endif %}</div>
-  </div>
-  <div class="info-tile">
-    <span class="tondo-piccolo">{{ i('orologio', 's') }}</span>
-    <div><small>Posizione aggiornata</small>
-      {% if pos %}<b>{{ pos.at|data('%d/%m/%Y alle %H:%M') }}</b><span>{{ 'da ' ~ pos.utente.nome ~ ', ' if pos.utente }}{{ pos.come }}</span>{% else %}<b>—</b>{% endif %}</div>
-  </div>
-  <div class="info-tile">
-    <span class="tondo-piccolo">{{ i('bandiera', 's') }}</span>
-    <div>{% if v.stato == 'in_sede' and arrivo and arrivo.arrivo_at and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}
-      <small>Arrivata qui</small><b>{{ arrivo.arrivo_at|data('%d/%m/%Y alle %H:%M') }}</b><span>{% if arrivo.ddt %}con DDT {{ arrivo.ddt.sigla }}{% else %}senza DDT{% endif %} da {{ arrivo.da_sede.nome if arrivo.da_sede else '—' }}</span>
-      {% else %}<small>In stock dal</small><b>{{ v.creato_at|data('%d/%m/%Y') }}</b>
-{% endif %}</div>
-  </div>
+<section class="info-striscia">
+  <div>{{ i('pin', 's') }}<span>{% if stai_qui(v) %}<b>Qui</b> · {{ 'da voi' if not g.utente.interno else 'vicino a te' }} · {{ v.sede.nome }}
+    {% elif v.stato == 'in_viaggio' and mov %}<b>In viaggio verso {{ mov.a_sede.nome }}</b> · da {{ in_viaggio_da(mov) }}
+    {% elif v.stato == 'consegnato' %}<b>Consegnata</b> il {{ v.consegnato_at|data('%d/%m/%Y') }}{{ ' · ' ~ v.sede.nome if v.sede }}
+    {% else %}<b>{{ v.sede.nome if v.sede else '—' }}</b>{% if v.sede and v.sede.dove %} · {{ v.sede.dove }}{% endif %}{% endif %}</span></div>
+  <div>{{ i('bandiera', 's') }}<span>{% if v.stato == 'in_sede' and arrivo and arrivo.arrivo_at and v.sede and arrivo.sede_arrivo_effettiva.id == v.sede.id %}arrivata il <b>{{ arrivo.arrivo_at|data('%d/%m/%Y') }}</b> {% if arrivo.ddt %}con DDT {{ arrivo.ddt.sigla }}{% else %}senza DDT{% endif %}{% else %}in stock dal <b>{{ v.creato_at|data('%d/%m/%Y') }}</b>{% endif %}</span></div>
+  <div>{{ i('orologio', 's') }}<span>posizione {% if pos %}aggiornata il <b>{{ pos.at|data('%d/%m %H:%M') }}</b>{{ ' da ' ~ pos.utente.nome if pos.utente }}{{ ', ' ~ pos.come if pos.come }}{% else %}non ancora rilevata{% endif %}</span></div>
 </section>
 {% endmacro %}
 
@@ -123,16 +110,16 @@
 {% endmacro %}
 
 {# Sotto l'etichetta di stato: il dettaglio della fase, toccabile (porta dove si segue quella fase) #}
-{% macro dettaglio_stato(v) %}{% set f = v.fase %}
+{% macro dettaglio_stato(v, collegato=True) %}{% set f = v.fase %}{% set tag = 'a' if collegato else 'span' %}
 {% if f == 'preparazione' and v.preparazione_attiva %}{% set p = v.preparazione_attiva %}
-<a class="dettaglio-stato" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione">
-  <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</a>
+<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"{% endif %}>
+  <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</{{ tag }}>
 {% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}
-<a class="dettaglio-stato" href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}">{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</a>
+<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}"{% endif %}>{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</{{ tag }}>
 {% elif f == 'in_viaggio' and v.movimento_aperto %}
-<a class="dettaglio-stato" href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}">{{ i('camion', 's') }} da {{ in_viaggio_da(v.movimento_aperto) }}</a>
+<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}"{% endif %}>{{ i('camion', 's') }} da {{ in_viaggio_da(v.movimento_aperto) }}</{{ tag }}>
 {% elif f == 'pronta' %}
-<a class="dettaglio-stato" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{{ i('bandiera', 's') }} {{ v.consegna_sede.nome if v.consegna_sede else 'consegna da fissare' }}</a>
+<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna"{% endif %}>{{ i('bandiera', 's') }} {{ v.consegna_sede.nome if v.consegna_sede else 'consegna da fissare' }}</{{ tag }}>
 {% elif f == 'in_sede' %}{% set arrivo = v.ultimo_arrivo %}{% set dal = arrivo.arrivo_at if arrivo and arrivo.arrivo_at else v.creato_at %}
 {% set giorni_qui = (adesso() - dal).days %}<span class="dettaglio-stato">{{ i('orologio', 's') }} {% if giorni_qui == 0 %}arrivata oggi{% elif giorni_qui == 1 %}qui da ieri{% else %}qui da {{ giorni_qui }} giorni{% endif %}</span>
 {% endif %}
@@ -226,16 +213,17 @@
 
 {# Carta compatta dell'auto (telefono snello, come nella demo del 12/11/2026): logo, marca e modello,
    nuova/usata, telaio; sotto, se serve, stato e luogo con "da quando". Bordo nel colore della fase. #}
-{% macro auto_breve(v, stato=True) %}{% set k, testo = v.stato_per(g.utente) %}
-<section class="auto-breve {{ k }}">
+{% macro auto_breve(v, stato=True, dati=none) %}{% set k, testo = v.stato_per(g.utente) %}
+{# dati: indirizzo dell'anagrafica (13/11/2026 notte): toccando la carta si apre con tutti i dati dell'auto #}
+<{{ 'a' if dati else 'section' }} class="auto-breve {{ k }} {{ 'auto-breve-link' if dati }}" {% if dati %}href="{{ dati }}" aria-label="Dati di {{ v.descrizione }}"{% endif %}>
   {{ marchio(v) }}
   <div class="auto-breve-dati">
     <b>{{ v.descrizione }}</b>{{ condizione(v) }}
     <div class="auto-breve-vin">{{ v.vin|vin }}{% if v.targa %} <span class="targa">{{ v.targa }}</span>{% endif %}</div>
     {% if stato %}<div class="auto-breve-stato"><i aria-hidden="true"></i>{{ testo }}{% if v.sede and v.stato == 'in_sede' %} · {{ v.sede.nome }}{% endif %}</div>
-    {{ dettaglio_stato(v) }}{% endif %}
+    {{ dettaglio_stato(v, collegato=not dati) }}{% endif %}
   </div>
-</section>
+</{{ 'a' if dati else 'section' }}>
 {% endmacro %}
 
 {# Lavorazione in breve: tipo e dettagli, barra sul tempo stimato e a che punto è #}

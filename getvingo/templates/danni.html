@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, pillole %}
+{% from "_macro.html" import i, pillole, marchio, annulla %}
 {% from "_danno.html" import scheda_danno %}
 {% block titolo %}Danni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
@@ -11,11 +11,37 @@
   ('aperti', 'Da verificare', url_for('main.danni'), aperti|length, 'attenzione'),
   ('risolti', 'Risolti', url_for('main.danni', vista='risolti'), risolti|length, 'check'),
 ], vista, a_destra=('risolti',)) }}
-<div class="lista griglia">
-{% for d in (aperti if vista == 'aperti' else risolti) %}
-  {{ scheda_danno(d, url_for('main.danni', vista=vista)) }}
+{# Elenco a righe (13/11/2026 notte): rosso = da verificare, verde = risolto; correzioni con "⋯" #}
+{% set elenco = aperti if vista == 'aperti' else risolti %}
+{% if elenco %}
+<div class="stock-cerca"><div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, zona, chi l'ha segnalato…" aria-label="Cerca tra i danni"></div></div>
+<table class="tabella-stock tabella-danni" style="margin-top:12px">
+  <colgroup><col class="c-auto"><col class="c-danno"><col class="c-dove"><col class="c-stato"><col class="c-azione"></colgroup>
+  <thead><tr><th>Auto</th><th>Danno</th><th>Dove e quando</th><th>Stato</th><th><span class="nascosto">Azioni</span></th></tr></thead>
+  <tbody class="gruppo-stock">
+  {% for d in elenco %}{% set v = d.veicolo %}{% set torna = url_for('main.danni', vista=vista) %}
+  <tr class="riga-stock danno-{{ 'aperto' if d.aperto else 'risolto' }}" data-url="{{ url_for('main.danno', danno_id=d.id, torna=torna) }}"
+      data-cerca="{{ [v.descrizione, v.vin, v.targa, d.zona, d.descrizione, d.segnalato_da.nome, d.CONTESTI[d.contesto]]|select|join(' ')|lower }}">
+    <td class="cella-auto"><div>{{ marchio(v) }}<span><a href="{{ url_for('main.danno', danno_id=d.id, torna=torna) }}"><b>{{ v.descrizione }}</b></a>
+      <small>{% if v.targa %}<span class="targa-grande piccola">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
+    <td class="cella-lavoro"><b>{{ d.zona }}</b><small title="{{ d.descrizione }}">{{ d.descrizione or 'Nessuna descrizione: vedi le foto' }}</small></td>
+    <td class="cella-tratta"><span>{{ d.CONTESTI[d.contesto] }}{% if d.movimento %} · DDT {{ d.movimento.ddt.sigla }}{% endif %}</span>
+      <small>{{ d.segnalato_da.nome }} · {{ d.segnalato_at|data('%d/%m %H:%M') }} · {{ d.foto_segnalazione|length }} foto</small></td>
+    <td class="cella-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ 'Da verificare' if d.aperto else 'Risolto' }}</span>
+      {% if not d.aperto and d.risolto_at %}<small>il {{ d.risolto_at|data('%d/%m') }} da {{ d.risolto_da.nome }}</small>{% elif d.aperto and v.fase in ('preparazione', 'pronta') %}<small class="testo-ritardo">blocca la consegna</small>{% endif %}</td>
+    <td class="cella-azione"><button type="button" class="btn-icona" data-apri-riga="danno-{{ d.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni">⋯</button></td>
+  </tr>
+  <tr class="riga-dettagli" id="danno-{{ d.id }}" hidden><td colspan="5"><div class="dettagli-lavoro">
+    {% if d.aperto %}{{ annulla(annullabile(d.veicolo_id, 'danno', danno_id=d.id), 'Elimina segnalazione (errata)', torna) }}
+    {% else %}{% if d.nota_risoluzione %}<div>{{ d.nota_risoluzione }}</div>{% endif %}{{ annulla(annullabile(d.veicolo_id, 'danno_risolto', danno_id=d.id), 'Riapri il danno', torna) }}{% endif %}
+    <a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Apri la scheda dell'auto</a>
+  </div></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="vuoto" id="righe-nessuna" hidden>Nessun danno con questa ricerca.</p>
 {% else %}
-  <div class="vuoto">{{ i('check') }}{{ 'Nessun danno da verificare.' if vista == 'aperti' else 'Nessun danno risolto.' }}</div>
-{% endfor %}
-</div>
+<div class="vuoto">{{ i('check') }}{{ 'Nessun danno da verificare.' if vista == 'aperti' else 'Nessun danno risolto.' }}</div>
+{% endif %}
 {% endblock %}
+{% block script %}<script src="{{ url_for('static', filename='righe.js', v=versione_statici) }}"></script>{% endblock %}

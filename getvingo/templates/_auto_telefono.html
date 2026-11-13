@@ -4,7 +4,7 @@
 {% from "_auto.html" import auto_breve %}
 {% set pos = v.ultima_posizione %}{% set mov = v.movimento_aperto %}
 <div class="tocco">
-  {{ auto_breve(v) }}
+  {{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
   {% if v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id) }}">{{ i('attenzione', 's') }}<span><b>{{ v.danni_aperti|length }} {{ 'danno' if v.danni_aperti|length == 1 else 'danni' }} da verificare</b> · tocca per vedere</span></a>{% endif %}
   <div class="dove-auto">
     <span class="tondo-piccolo">{{ i('pin', 's') }}</span>

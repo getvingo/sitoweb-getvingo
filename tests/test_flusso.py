@@ -970,7 +970,7 @@ class TestStockEDati(Base):
             self.assertEqual((v.modello, v.targa, v.fase), ("Golf", "AB123CD", "preparazione"))
             self.assertEqual(v.preparazione_attiva.pronta_entro_at.hour, 16)
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
-        self.assertIn("Posizione aggiornata", pagina)
+        self.assertIn("posizione aggiornata", pagina)
         self.assertIn("abbinamento dell&#39;adesivo", pagina)
         self.assertNotIn("45.660000", pagina)  # niente coordinate in gradi
 
@@ -1111,7 +1111,7 @@ class TestDdtGestione(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B", conducente="Giulia Verdi")
         def trovati(**q):
-            return self.c.get("/ddt", query_string=q).get_data(as_text=True).count('class="voce"')
+            return self.c.get("/ddt", query_string=q).get_data(as_text=True).count('class="riga-stock ddt-')  # elenco a righe (13/11/2026)
         self.assertEqual(trovati(conducente="giulia"), 1)
         self.assertEqual(trovati(conducente="mario"), 0)
         self.assertEqual(trovati(vin="000123"), 1)
@@ -1131,7 +1131,7 @@ class TestFornitoreVedeSoloIlSuo(Base):
         self.assertEqual(self.c.get(f"/ddt/{d}").status_code, 403)
         self.assertEqual(self.c.get("/cerca").status_code, 403)
         self.assertEqual(self.c.get("/admin/").status_code, 403)
-        self.assertEqual(self.c.get("/ddt").get_data(as_text=True).count('class="voce"'), 0)
+        self.assertEqual(self.c.get("/ddt").get_data(as_text=True).count('class="riga-stock ddt-'), 0)
         self.assertEqual(self.c.get("/").status_code, 200)
 
     def test_pagine_si_aprono_per_ogni_ruolo(self):
@@ -1534,7 +1534,7 @@ class TestRegoleNuove(Base):
             pagina = self.c.get(url).get_data(as_text=True)
             self.assertNotIn("btn-fatto", pagina)
             self.assertNotIn("Prossimo passo", pagina)
-            self.assertIn("tocco-passi", pagina)
+            self.assertRegex(pagina, r"passi-(nomi|riga)")  # i 4 passi (a righe dal 13/11/2026)
         self.assertEqual(self.c.post(f"/preparazione/{pid}/avanza").status_code, 404)  # non esiste più
         self.c.post("/t/ABCD2345", data=POS)  # il tocco da solo non chiude il passo
         with self.app.app_context():
@@ -1781,7 +1781,7 @@ class TestRegole0311Sera(Base):
         pagina = self.c.get("/preparazione").get_data(as_text=True)
         self.assertIn("in ritardo di", pagina)
         self.assertNotIn('name="pronta_entro" value="2020', pagina)  # niente campo per spostarlo
-        self.assertIn("In preparazione da", pagina)
+        self.assertIn("in preparazione da", pagina)
         self.assertIn("Volkswagen Golf", self.c.get("/preparazione?stato=ritardo").get_data(as_text=True))
 
     def test_consegna_senza_appuntamento(self):
@@ -1809,14 +1809,15 @@ class TestRegole0311Sera(Base):
         self.assertIn("Nessuna auto in ritardo", vuota)
         self.assertIn('class="stato-voce ritardo attivo', vuota)
         self.assertNotIn("dai fornitori</span>", vuota)  # il totale non c'è più: solo i 3 stati
-        self.assertIn('class="interruttore filtro-gruppo in-riga"', vuota)  # tipi di lavorazione su una riga
+        self.assertIn('<select name="lavorazione"', vuota)  # tipi di lavorazione nel pannello Filtri (13/11/2026)
         self.assertNotIn("<span>in preparazione</span>", self.c.get("/preparazione").get_data(as_text=True))
 
     def test_stock_sedi_a_pulsanti_filtri_a_menu(self):
         self.abbina()
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn('class="interruttore filtro-gruppo in-riga tutta-larghezza" id="scegli-piazzale"', stock)
-        self.assertIn('<select name="marca"', stock)  # gli altri filtri restano menu
+        self.assertNotIn('<select name="marca"', stock)  # 13/11/2026: marca, modello, colore si cercano
+        self.assertIn('id="cerca-stock"', stock)
 
 
 class TestCalendarioETarga(Base):
@@ -3325,7 +3326,7 @@ class TestQui(Base):
         self.entra("ufficio")  # in ufficio: la carrozzeria è altrove
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
         self.assertIn("Portami qui", pagina)
-        self.assertIn("Dove si trova", pagina)
+        self.assertIn("info-striscia", pagina)  # dove si trova: striscia compatta (13/11/2026)
         self.entra("carr")  # l'auto è da loro
         pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
         self.assertNotIn("Portami qui", pagina)
@@ -3480,7 +3481,7 @@ class TestTelefonoSnello(Base):
         self.profilo()
         self.c.post("/t/ABCD2345", data=POS)
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
-        for testo in ("Dove la porti?", "Carrozzeria B", "foglio-partenza", "data-scorri", "Altra destinazione"):
+        for testo in ("Dove la porti?", "Carrozzeria B", "foglio-partenza", "data-scorri", "Nuova destinazione"):
             self.assertIn(testo, pagina)
         torna = f"/veicolo/{vid}/tocco"
         # lavorazione senza dettagli: non parte, si torna alla schermata del tocco
@@ -3756,3 +3757,40 @@ class TestRientroDaComputer(Base):
             self.assertNotIn("Crea DDT di rientro", pagina, url)  # vale solo sul posto: da computer no
         self.assertIn("Predisponi rientro", self.c.get("/lavorazioni").get_data(as_text=True))
         self.assertIn('id="predisponi"', self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+
+
+class TestDestinazioniOrdinate(Base):
+    """"Dove la porti?" dalla più probabile (13/11/2026 notte)."""
+    def test_ordine_e_vedi_tutte(self):
+        vid = self.abbina()  # Golf (vettura) in Sede A
+        with self.app.app_context():
+            db.session.add_all([Sede(nome="Sede E", tipo="propria", lat=45.5, lon=12.5),
+                                Sede(nome="Allestimenti F", tipo="allestitore", lat=45.6, lon=12.6),
+                                Sede(nome="Detailing G", tipo="altro", lat=45.7, lon=12.7)])
+            db.session.commit()
+        with self.app.app_context():
+            g.utente = Utente.query.filter_by(email="admin@t.it").one()
+            v = db.session.get(Veicolo, vid)
+            nomi = [s.nome for s, _ in servizi.destinazioni_ordinate(v, g.utente)]
+            self.assertEqual(nomi[0], "Sede E")                # prima le altre sedi della concessionaria
+            self.assertEqual(nomi[-1], "Allestimenti F")       # un allestitore per una vettura: in fondo
+        self.c.post("/profilo-guida", data={"vettore_id": self._id(Vettore, nome="Vettore X"), "mezzo": "Bisarca", "firma": FIRMA})
+        self.c.post("/t/ABCD2345", data=POS)
+        pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
+        self.assertIn('class="btn pieno vedi-tutte"', pagina)                 # più di 4: le altre con "Vedi tutte"
+        self.assertEqual(pagina.count("data-in-piu hidden"), len(nomi) - 4)
+        # dal fornitore: in testa il luogo da cui è arrivata
+        self.parti(vid, "Carrozzeria B")
+        self.arrivo(self.ddt())
+        with self.app.app_context():
+            g.utente = Utente.query.filter_by(email="admin@t.it").one()
+            primo, motivo = servizi.destinazioni_ordinate(db.session.get(Veicolo, vid), g.utente)[0]
+            self.assertEqual((primo.nome, motivo), ("Sede A", "da qui è arrivata"))
+
+    def test_anagrafica_dell_auto(self):
+        vid = self.abbina()
+        self.c.post("/t/ABCD2345", data=POS)
+        self.assertIn(f"/veicolo/{vid}/dati", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))
+        pagina = self.c.get(f"/veicolo/{vid}/dati").get_data(as_text=True)
+        for testo in ("Telaio (VIN)", "Versione", "1.5 eTSI Life", "Alimentazione", "Benzina", "Anno", "2024", "Adesivo NFC"):
+            self.assertIn(testo, pagina)

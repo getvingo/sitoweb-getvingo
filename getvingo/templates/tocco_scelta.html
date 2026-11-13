@@ -33,7 +33,7 @@
 {% set mio = ritiro.assegnato_a_id == g.utente.id %}
 <div class="tocco-titolo"><small class="sopra ritiro">DDT {{ ritiro.ddt.sigla }} · {{ 'assegnato a te' if mio else 'da ritirare' }}</small>
   <h1>{{ 'Il ritiro è tuo' if mio else 'Da ritirare' }}</h1></div>
-{{ auto_breve(v) }}
+{{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
 {{ tratta(ritiro.da_sede, ritiro.a_sede) }}
 {% set lav = v.arrivo_qui %}{% if lav and lav.con_lavorazione and lav.lavorazione_completata_at %}{{ lavoro_breve(lav) }}{% endif %}
 {% if distanza_ritiro is not none %}
@@ -54,7 +54,7 @@
 
 {% elif fine_lavori %}
 {# ---- Il partner che ha l'auto: lavori finiti ---- #}
-{{ auto_breve(v) }}
+{{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
 {{ lavoro_breve(fine_lavori, 'Lavorazione · per ' ~ g.utente.organizzazione.nome) }}
 <form method="post" action="{{ url_for('main.lavorazione_completata', mov_id=fine_lavori.id) }}" class="tocco-fondo"
       data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
@@ -79,7 +79,7 @@
 {% set p = v.ultima_preparazione %}
 <div class="tocco-titolo"><small class="sopra pronta">Pronta · {{ v.consegna_sede.nome }}</small>
   <h1>Consegna {{ 'a ' ~ v.cliente_nome if v.cliente_nome else 'al cliente' }}</h1></div>
-{{ auto_breve(v, stato=False) }}
+{{ auto_breve(v, stato=False, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
 <form method="post" action="{{ url_for('main.consegna', veicolo_id=v.id) }}" class="tocco-fondo"
       data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
@@ -99,7 +99,7 @@
 
 {% elif prep %}
 {# ---- Preparazione: anello, i 4 passi, ogni passo con un tocco ---- #}
-{{ auto_breve(v) }}
+{{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
 {% set fatti = prep.fasi|length %}{% set totale = prep.FASI|length %}
 <section class="prep-breve {{ 'completata' if prep.completata_at }}">
   <div class="anello" data-anello data-da="{{ da if da is not none else prep.avanzamento }}" data-a="{{ prep.avanzamento }}">
@@ -132,7 +132,7 @@
 {% else %}
 {# ---- Auto ferma: dove la porti ---- #}
 {% if v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('attenzione', 's') }}<span><b>{{ v.danni_aperti|length }} {{ 'danno' if v.danni_aperti|length == 1 else 'danni' }} da verificare</b> · tocca per vedere</span></a>{% endif %}
-{{ auto_breve(v) }}
+{{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
 {% set lav = v.arrivo_qui if v.fase in ('lavorazione', 'da_ritirare') else none %}
 {% if lav and lav.con_lavorazione %}{{ lavoro_breve(lav) }}{% endif %}
 {% if v.movimento_predisposto and v.movimento_predisposto.assegnato_a %}
@@ -146,17 +146,19 @@
   <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
   <small class="tenue">Manca: {{ profilo_mancante|join(', ') }}. Si fa una volta sola.</small>
   {% else %}
+  {# 13/11/2026 notte: ordinate dalla più probabile (servizi.destinazioni_ordinate); 4 in vista, le altre con "Vedi tutte" #}
   <div class="scelte-destinazione">
-    {% for s in proposte %}
-    <button type="button" class="scelta-destinazione" data-destinazione="{{ s.id }}" data-nome="{{ s.nome }}"
+    {% for s, motivo in proposte %}
+    <button type="button" class="scelta-destinazione" data-destinazione="{{ s.id }}" data-nome="{{ s.nome }}" {{ 'data-in-piu hidden' if loop.index > 4 }}
             data-esterna="{{ 1 if s.esterna else '' }}" data-commercio="{{ 1 if s.tipo in ('concessionario', 'rivenditore') else '' }}">
       <span class="tondo-piccolo">{{ i('chiave' if s.esterna else 'sede', 's') }}</span>
-      <span><b>{{ s.nome }}</b><small>{{ s.indirizzo or s.dove or s.TIPI[s.tipo] }}</small></span>
-      <span class="etichetta-dest">{{ 'la usi spesso' if s.id in usate else ('partner' if s.esterna else '') }}</span>
+      <span><b>{{ s.nome }}</b><small>{{ s.TIPI[s.tipo] if s.tipo != 'propria' else 'Sede della concessionaria' }}{{ ' · ' ~ s.dove if s.comune }}</small></span>
+      <span class="etichetta-dest">{{ motivo }}</span>
     </button>
     {% endfor %}
   </div>
-  <a class="btn-link altra-destinazione" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">+ Altra destinazione…</a>
+  {% if proposte|length > 4 %}<button type="button" class="btn pieno vedi-tutte" data-vedi-tutte>Vedi tutte le destinazioni ({{ proposte|length }})</button>{% endif %}
+  <a class="btn-link altra-destinazione" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">+ Non è in elenco? Nuova destinazione</a>
 
   <dialog class="foglio" id="foglio-partenza" aria-labelledby="foglio-titolo">
     <form method="post" action="{{ url_for('main.sposta', veicolo_id=v.id) }}" data-una-volta>
@@ -219,6 +221,12 @@
       foglio.querySelector('[data-chiudi-foglio]').addEventListener('click', function () { foglio.close(); });
       foglio.addEventListener('click', function (e) { if (e.target === foglio) foglio.close(); });  // tocco fuori dal foglio
     }
+    // "Vedi tutte": compaiono le altre destinazioni, dalla più probabile alla meno affine
+    var tutte = document.querySelector('[data-vedi-tutte]');
+    if (tutte) tutte.addEventListener('click', function () {
+      document.querySelectorAll('[data-in-piu]').forEach(function (b) { b.hidden = false; });
+      tutte.remove();
+    });
     // "Altri della concessionaria…": compare la scelta della persona
     document.querySelectorAll('input[name=chi_riporta]').forEach(function (r) {
       r.addEventListener('change', function () {

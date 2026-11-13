@@ -1026,6 +1026,17 @@ def trova(veicolo_id):
     return render_template("trova.html", v=v)
 
 
+@bp.route("/veicolo/<int:veicolo_id>/dati")
+@login_richiesto
+def dati_auto(veicolo_id):
+    """Anagrafica dell'auto (13/11/2026 notte): tutti i dati del mezzo in una pagina, dal telefono si apre toccando
+    la carta dell'auto dopo il tocco dell'adesivo."""
+    v = _veicolo_visibile(veicolo_id)
+    storico = sorted((m for m in v.movimenti if m.ddt and not m.ddt.annullato_at and servizi.puo_vedere(m.ddt, g.utente)),
+                     key=lambda m: m.ddt.emesso_at, reverse=True)
+    return render_template("veicolo_dati.html", v=v, storico=storico, torna=request.args.get("torna", ""))
+
+
 @bp.route("/veicolo/<int:veicolo_id>/tocco")
 @login_richiesto
 def tocco_scelta(veicolo_id):
@@ -1067,18 +1078,10 @@ ORDINE_PROPOSTE = ("propria", "carrozzeria", "officina", "allestitore", "altro",
                    "rivenditore", "cliente")
 
 
-def _destinazioni_proposte(v, quante=4):
-    """Le destinazioni da toccare subito sotto l'auto: prima il luogo da cui è arrivata (se ora è da un
-    fornitore: il rientro), poi le più usate da chi guarda, poi sedi proprie e fornitori."""
-    preferite, gruppi = servizi.destinazioni_rapide(v, g.utente)
-    altre = sorted((s for _, sedi in gruppi for s in sedi),
-                   key=lambda s: ORDINE_PROPOSTE.index(s.tipo) if s.tipo in ORDINE_PROPOSTE else 99)
-    elenco = preferite + altre
-    arrivo = v.arrivo_qui
-    if v.sede is not None and v.sede.esterna and arrivo and arrivo.da_sede in elenco:
-        elenco.remove(arrivo.da_sede)
-        elenco.insert(0, arrivo.da_sede)
-    return elenco[:quante]
+def _destinazioni_proposte(v):
+    """Tutte le destinazioni dalla più probabile (servizi.destinazioni_ordinate): la schermata del tocco ne
+    mostra 4, le altre con "Vedi tutte"."""
+    return servizi.destinazioni_ordinate(v, g.utente)
 
 
 @bp.route("/miei-ddt")

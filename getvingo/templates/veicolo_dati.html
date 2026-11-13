@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, marchio, badge_condizione %}
+{% block titolo %}{{ v.descrizione }} · dati · Getvingo{% endblock %}
+{% block contenuto %}
+{# Anagrafica dell'auto (13/11/2026 notte): tutti i dati del mezzo, a righe "etichetta · valore" #}
+{% set k, stato = v.stato_per(g.utente) %}{% set pos = v.ultima_posizione %}{% set arrivo = v.ultimo_arrivo %}
+<div class="tocco dati-auto">
+  <a class="btn-link indietro-link" href="{{ torna if torna.startswith('/') and not torna.startswith('//') else url_for('main.veicolo', veicolo_id=v.id) }}">{{ i('indietro', 's') }} Indietro</a>
+  <div class="dati-testa {{ k }}">{{ marchio(v) }}
+    <div><small>{{ v.marca }}{% if v.anno %} · {{ v.anno }}{% endif %}</small><h1>{{ v.modello or v.descrizione }}</h1>
+      {% if v.versione %}<div class="tenue">{{ v.versione }}</div>{% endif %}
+      <div class="dati-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ stato }}</span></div></div>
+  </div>
+
+  <h2 class="sezione-t">Il veicolo</h2>
+  <dl class="dati-righe">
+    <div><dt>Telaio (VIN)</dt><dd class="vin">{{ v.vin|vin }}</dd></div>
+    <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa-grande">{{ v.targa }}</span>{% else %}<span class="tenue">non ancora targata</span>{% endif %}</dd></div>
+    <div><dt>Marca</dt><dd>{{ v.marca or '—' }}</dd></div>
+    <div><dt>Modello</dt><dd>{{ v.modello or '—' }}</dd></div>
+    <div><dt>Versione</dt><dd>{{ v.versione or '—' }}</dd></div>
+    <div><dt>Anno</dt><dd>{{ v.anno or '—' }}</dd></div>
+    <div><dt>Alimentazione</dt><dd>{{ v.alimentazione or '—' }}</dd></div>
+    <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
+    <div><dt>Tipo</dt><dd>{% if v.tipologia == 'commerciale' %}<span class="badge-comm" style="margin:0">{{ i('camion', 's') }} Veicolo commerciale</span>{% else %}Vettura{% endif %}</dd></div>
+    <div><dt>Nuova o usata</dt><dd>{{ badge_condizione(v) }}</dd></div>
+    <div><dt>Adesivo NFC</dt><dd>{{ v.tag.codice if v.tag else 'nessuno' }}</dd></div>
+  </dl>
+
+  <h2 class="sezione-t">Dove e da quando</h2>
+  <dl class="dati-righe">
+    <div><dt>Dove si trova</dt><dd>{% if v.stato == 'in_viaggio' and v.movimento_aperto %}in viaggio verso {{ v.movimento_aperto.a_sede.nome }}{% else %}{{ v.sede.nome if v.sede else '—' }}{% if v.sede and v.sede.dove %} · {{ v.sede.dove }}{% endif %}{% endif %}</dd></div>
+    <div><dt>In questo stato</dt><dd>{{ v.stato_dal|da_tempo if v.stato_dal else '—' }}</dd></div>
+    <div><dt>In stock dal</dt><dd>{{ v.creato_at|data('%d/%m/%Y') }}</dd></div>
+    {% if arrivo and arrivo.arrivo_at %}<div><dt>Ultimo arrivo</dt><dd>{{ arrivo.arrivo_at|data('%d/%m/%Y %H:%M') }}{% if arrivo.ddt %} · DDT {{ arrivo.ddt.sigla }}{% endif %}</dd></div>{% endif %}
+    <div><dt>Posizione</dt><dd>{% if pos %}aggiornata {{ pos.at|da_quanto }}{{ ' da ' ~ pos.utente.nome if pos.utente }}{% else %}non ancora rilevata{% endif %}</dd></div>
+    {% if v.consegna_sede %}<div><dt>Consegna</dt><dd>{{ v.consegna_sede.nome }}</dd></div>{% endif %}
+    {% if v.consegnato_at %}<div><dt>Consegnata il</dt><dd>{{ v.consegnato_at|data('%d/%m/%Y %H:%M') }}</dd></div>{% endif %}
+  </dl>
+
+  {% if g.utente.interno and (v.cliente_nome or v.venditore or v.venduta_il or v.note_interne) %}
+  <h2 class="sezione-t">Note interne</h2>
+  <dl class="dati-righe">
+    {% if v.cliente_nome %}<div><dt>Cliente</dt><dd>{{ v.cliente_nome }}</dd></div>{% endif %}
+    {% if v.venditore %}<div><dt>Venditore</dt><dd>{{ v.venditore.nome }}</dd></div>{% endif %}
+    {% if v.venduta_il %}<div><dt>Venduta il</dt><dd>{{ v.venduta_il.strftime('%d/%m/%Y') }}</dd></div>{% endif %}
+    {% if v.note_interne %}<div><dt>Note</dt><dd>{{ v.note_interne }}</dd></div>{% endif %}
+  </dl>
+  {% endif %}
+
+  {% if v.danni_aperti %}
+  <h2 class="sezione-t">Danni da verificare · {{ v.danni_aperti|length }}</h2>
+  {% for d in v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=d.id) }}">{{ i('attenzione', 's') }}<span><b>{{ d.zona }}</b>{% if d.descrizione %} · {{ d.descrizione }}{% endif %}</span></a>{% endfor %}
+  {% endif %}
+
+  {% if storico %}
+  <h2 class="sezione-t">DDT su questo telaio · {{ storico|length }}</h2>
+  <div class="per-te">
+    {% for m in storico %}{% set ks, ts = m.ddt.stato %}
+    <a class="per-te-voce {{ 'in_viaggio' if ks == 'aperto' else ('da_ritirare' if ks == 'predisposto' else 'chiuso') }}" href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
+      <span><b>DDT {{ m.ddt.sigla }} · {{ ts }}</b><small>{{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.sede_arrivo_effettiva.nome }} · {{ m.ddt.emesso_at|data('%d/%m/%Y') }}</small></span>{{ i('chevron', 's') }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="tocco-fondo">
+    {% if v.stato not in ('in_viaggio', 'consegnato') and v.lat is not none %}<a class="btn btn-trova pieno" href="{{ url_for('main.trova', veicolo_id=v.id) }}">{{ i('pin') }} Trova l'auto</a>{% endif %}
+    {% if g.utente.interno %}<a class="btn pieno solo-computer" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

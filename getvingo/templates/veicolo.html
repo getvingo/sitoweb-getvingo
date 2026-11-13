@@ -30,37 +30,27 @@
 <div class="col-principale">
 {% for d in v.danni_aperti %}{{ scheda_danno(d, url_for('main.veicolo', veicolo_id=v.id), mostra_auto=False) }}<div style="height:12px"></div>{% endfor %}
 
-{# ---- Presso un fornitore ---- #}
+{# ---- Presso un fornitore (13/11/2026 notte: un solo riquadro compatto, lo stato detto una volta) ---- #}
 {% if v.stato == 'in_sede' and v.sede and v.sede.esterna and ultimo %}
-{% set tag_voce = 'a' if ultimo.ddt else 'div' %}
-<{{ tag_voce }} class="voce" {% if ultimo.ddt %}href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}"{% endif %} style="margin-bottom:12px">
-  <span class="tondo {{ 'da_ritirare' if ultimo.lavorazione_completata_at else 'lavorazione' }}">{{ i('chiave') }}</span>
-  <div class="corpo">
-    {% if ultimo.con_lavorazione %}
-    <div class="etichetta">{{ 'Lavorazione finita' if ultimo.lavorazione_completata_at else 'In lavorazione' }} presso {{ v.sede.nome }}</div>
-    <h3>{{ ultimo.lavorazione }}</h3>
-    {% else %}
-    <div class="etichetta">Presso {{ v.sede.nome }}</div>
-    <h3>Solo trasferimento · nessuna lavorazione</h3>
-    {% endif %}
-    {% if ultimo.lavorazione_note %}<div class="lavoro-dettaglio">{{ ultimo.lavorazione_note }}</div>{% endif %}
-    {% if ultimo.lavorazione_completata_at %}
-      <div class="tratta" style="color:var(--ok);font-weight:650">{{ i('check', 's') }} Completata {{ ultimo.lavorazione_completata_at|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}</div>
-    {% else %}
-      <div class="tratta">{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m/%Y') }}{% if ultimo.senza_ddt %} (senza DDT){% endif %}{% if ultimo.con_lavorazione %} · la fine lavorazione la segna {{ v.sede.nome }}{% endif %}</div>
-    {% endif %}
+{% set finita = ultimo.lavorazione_completata_at %}{% set rit = ultimo.giorni_ritardo %}
+{% set giorno = (adesso() - ultimo.arrivo_at).days + 1 if ultimo.arrivo_at else 0 %}
+<section class="blocco-fase lavoro-{{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
+  <div class="blocco-testa">
+    <span class="pillola-stato"><i aria-hidden="true"></i>{% if not ultimo.con_lavorazione %}Solo trasferimento{% elif finita %}Finita, da ritirare{% elif rit %}In ritardo di {{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
+    <b>{{ ultimo.lavorazione if ultimo.con_lavorazione else 'Nessuna lavorazione' }}</b><span class="tenue">presso {{ v.sede.nome }}</span>
+    {% if ultimo.ddt %}<a class="blocco-link" href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}">DDT {{ ultimo.ddt.sigla }}</a>{% endif %}
   </div>
-  {{ giorni(ultimo.giorni_lavorazione) }}
-</{{ tag_voce }}>
-{% if ultimo.con_lavorazione %}
-<section class="scheda tocco-prep tocco-lavoro" style="margin:-4px 0 12px">
-  {{ avanzamento_lavoro(ultimo, anello=True) }}
-  {{ rientro_lavoro(v, ultimo, pulsante=False) }}
-  {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
-  {% if not ultimo.lavorazione_completata_at %}{{ cambia_stima(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
+  {% if ultimo.lavorazione_note %}<p class="blocco-nota">{{ ultimo.lavorazione_note }}</p>{% endif %}
+  {% if ultimo.con_lavorazione %}
+  <div class="mini-barra larga" aria-hidden="true"><span style="width:{{ ultimo.avanzamento_lavorazione }}%"></span></div>
+  <small class="blocco-sotto">{% if finita %}finita {{ finita|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}{% else %}{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m') }} · giorno {{ giorno }} di {{ ultimo.stima_giorni }} · fine prevista {{ ultimo.lavorazione_prevista_at|data('%d/%m') }}{% endif %}</small>
+  <div class="blocco-azioni">
+    {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
+    {% if not finita %}{{ cambia_stima(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
+    {% if finita %}{{ annulla(annullabile(v.id, 'lavorazione_completata', ultimo.ddt_id), 'Annulla completamento', url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
+  </div>
+  {% endif %}
 </section>
-{% endif %}
-{% if ultimo.lavorazione_completata_at %}{{ annulla(annullabile(v.id, 'lavorazione_completata', ultimo.ddt_id), 'Annulla completamento', url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
 {% endif %}
 
 {% if puo_lavorazione %}
@@ -75,16 +65,21 @@
 </form>
 {% endif %}
 
-{# ---- Preparazione per la consegna ---- #}
-{% if preparazione %}
-<section class="scheda tocco-prep" id="preparazione" style="margin-bottom:12px;scroll-margin-top:16px">
-  {{ avanzamento_prep(preparazione) }}
-  {% if bloccata_da_danni(preparazione) %}
-  {% set dn = v.danni_aperti[0] %}
-  <a class="blocco-danno" href="{{ url_for('main.danno', danno_id=dn.id, torna=url_for('main.veicolo', veicolo_id=v.id)) }}">
-    {{ i('attenzione', 's') }}<span><b>{{ preparazione.prossima_fase }} bloccato:</b> danno da verificare ({{ dn.zona|lower }}). Risolvilo con una foto per continuare.</span></a>
+{# ---- Preparazione per la consegna (13/11/2026 notte: compatta, i 4 passi in fila con data) ---- #}
+{% if preparazione %}{% set p = preparazione %}{% set fatti = p.fasi|length %}{% set rit = p.pronta_entro_at|ritardo if p.pronta_entro_at else none %}
+<section class="blocco-fase prep-{{ 'ritardo' if rit else 'tempo' }}" id="preparazione" style="scroll-margin-top:16px">
+  <div class="blocco-testa">
+    <span class="pillola-stato"><i aria-hidden="true"></i>Passo {{ fatti + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}</span>
+    {% if p.pronta_entro_at %}<span class="tenue">pronta entro <b style="color:var(--testo)">{{ p.pronta_entro_at|slot }}</b></span>{% if rit %}<b class="testo-ritardo">in ritardo di {{ rit }}</b>{% endif %}{% else %}<span class="tenue">orario non fissato</span>{% endif %}
+  </div>
+  <ol class="passi-nomi">
+    {% for f in p.FASI %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}"><span class="barretta" aria-hidden="true"></span>
+      <b>{{ f }}</b><small>{{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') if loop.index0 < fatti else ('in corso' if loop.index0 == fatti else '') }}</small></li>{% endfor %}
+  </ol>
+  {% if bloccata_da_danni(p) %}{% set dn = v.danni_aperti[0] %}
+  <a class="blocco-danno" href="{{ url_for('main.danno', danno_id=dn.id, torna=url_for('main.veicolo', veicolo_id=v.id)) }}">{{ i('attenzione', 's') }}<span><b>{{ p.prossima_fase }} bloccato:</b> danno da verificare ({{ dn.zona|lower }}). Risolvilo con una foto per continuare.</span></a>
   {% endif %}
-  {% if preparazione.fasi %}{{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=preparazione.id), 'Annulla “' ~ preparazione.fasi_fatte[-1].nome ~ '”', url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
+  {% if p.fasi %}<div class="blocco-azioni">{{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.veicolo', veicolo_id=v.id)) }}</div>{% endif %}
 </section>
 {% elif (v.da_consegnare or v.fase == 'consegnato') and ultima_prep %}
 <div class="scheda" style="margin-bottom:12px">
@@ -200,8 +195,6 @@
       <button type="submit" name="azione" value="predisponi" formnovalidate class="btn primario pieno">{{ i('orologio') }} Predisponi DDT</button>
     </form>
   </details>
-  {% elif lavorazione_in_corso %}
-  <p class="rientro-stato bloccato">{{ i('orologio', 's') }} <span><b>DDT da ritirare non ancora disponibile</b> · si predispone quando {{ v.sede.nome }} conferma la fine dei lavori</span></p>
   {% endif %}
   {% if puo_preparare %}
   <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="azione-prepara">
