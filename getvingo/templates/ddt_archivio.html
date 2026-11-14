@@ -10,13 +10,13 @@
 <form id="filtri" class="stock-cerca">
   <input type="hidden" name="stato" value="{{ stato }}">
   <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" id="cerca-righe" autocomplete="off" placeholder="Cerca: numero, auto, telaio, targa, luogo, autista…" aria-label="Cerca DDT"></div>
-  <details class="ripiega filtri-stock" {{ 'open' if avanzati }}>
-    <summary>{{ i('gestione', 's') }} Filtri{% if avanzati %} · {{ avanzati|length }} attivi{% endif %}</summary>
+  <details class="ripiega filtri-stock">
+    <summary>{{ i('gestione', 's') }} Filtri{% if avanzati %}<span class="filtri-n" title="Filtri attivi: {{ avanzati|length }}">{{ avanzati|length }}</span>{% endif %}</summary>
     <div class="scheda">
       <div class="filtri-avanzati">
         <label class="campo"><span>Mezzo</span><input name="mezzo" value="{{ f.mezzo }}" placeholder="Marca, modello o colore"></label>
-        <label class="campo"><span>VIN</span><input name="vin" value="{{ f.vin }}" placeholder="Anche solo una parte" class="vin"></label>
-        <label class="campo"><span>Chi sposta il mezzo</span><input name="conducente" value="{{ f.conducente }}"></label>
+        <label class="campo"><span>VIN</span><input name="vin" value="{{ f.vin }}" placeholder="Anche solo una parte" class="vin" autocomplete="off"></label>
+        <label class="campo"><span>Chi sposta il mezzo</span><input name="conducente" value="{{ f.conducente }}" placeholder="Nome o cognome"></label>
         {{ filtro_select('tipologia', 'Tipologia', tipologie, f.tipologia, 'Tutte', auto=False) }}
         {{ filtro_select('creato_da', 'Creato da', autori, f.creato_da, 'Chiunque', auto=False) }}
         {{ filtro_select('destinazione', 'Destinazione', destinazioni, f.destinazione, 'Tutte', auto=False) }}
@@ -25,8 +25,8 @@
         <label class="campo"><span>Al</span><input type="date" name="al" value="{{ f.al }}"></label>
       </div>
       <div class="azioni">
-        <button class="btn primario">Applica filtri</button>
         <a class="btn" href="{{ url_for('main.archivio_ddt', stato=stato) }}">Azzera</a>
+        <button class="btn primario">Applica filtri</button>
       </div>
     </div>
   </details>

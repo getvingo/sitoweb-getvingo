@@ -20,11 +20,14 @@
 <div class="stock-cerca">
   <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, fornitore, lavorazione…" aria-label="Cerca tra le lavorazioni"></div>
   {% if tipi %}
-  <details class="ripiega filtri-stock" {{ 'open' if tipo }}>
-    <summary>{{ i('gestione', 's') }} Filtri{% if tipo %} · 1 attivo{% endif %}</summary>
-    <nav class="pillole-tipi" aria-label="Tipo di lavorazione">
+  <details class="ripiega filtri-stock">
+    <summary>{{ i('gestione', 's') }} Filtri{% if tipo %}<span class="filtri-n" title="Filtri attivi: 1">1</span>{% endif %}</summary>
+    <div class="filtri-elenco">
+    <p class="filtri-titolo" id="filtri-tipo-lavorazione">Tipo di lavorazione</p>
+    <nav class="pillole-tipi" aria-labelledby="filtri-tipo-lavorazione">
       {% for l, n in tipi %}<a href="{{ url_for('main.lavorazioni', lavorazione=none if tipo == l else l, tipologia=tl, stato=st, modo=md) }}" class="pillola-tipo {{ 'attivo' if tipo == l }}">{{ i('chiave', 's') }} {{ l }} <b>{{ n }}</b>{% if tipo == l %}<span class="pillola-togli" aria-hidden="true">✕</span>{% endif %}</a>{% endfor %}
     </nav>
+    </div>
   </details>
   {% endif %}
 </div>

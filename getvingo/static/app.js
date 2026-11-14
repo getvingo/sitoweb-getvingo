@@ -384,6 +384,8 @@
   var menu = document.querySelector('details.menu-utente');
   document.addEventListener('click', function (e) {  // il menu utente si chiude toccando fuori
     if (menu && menu.open && !menu.contains(e.target)) menu.open = false;
+    // anche il pannello dei Filtri (Stock, DDT, Lavorazioni) è un menu: toccando fuori si chiude
+    document.querySelectorAll('details.filtri-stock[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;

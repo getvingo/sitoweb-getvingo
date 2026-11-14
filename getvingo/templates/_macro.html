@@ -193,7 +193,7 @@
 {# Elenco / Calendario, con il conteggio a sinistra (e "azzera filtri" se serve) #}
 {% macro interruttore_modo(modo, url_elenco, url_calendario, conteggio, url_azzera=none, sinistra=none) %}
 <div class="barra-modo">
-  <span class="barra-modo-sx">{% if sinistra %}{{ sinistra }}{% endif %}<span class="tenue piccolo">{{ conteggio }}{% if url_azzera %} · <a href="{{ url_azzera }}">azzera filtri</a>{% endif %}</span></span>
+  <span class="barra-modo-sx">{% if sinistra %}{{ sinistra }}{% endif %}<span class="tenue piccolo">{{ conteggio }}{% if url_azzera %}{{ ' · ' if conteggio }}<a href="{{ url_azzera }}">azzera filtri</a>{% endif %}</span></span>
   <div class="interruttore" role="group" aria-label="Come vedere">
     <a href="{{ url_elenco }}" class="{{ 'attivo' if modo == 'elenco' }}">{{ i('doc', 's') }} Elenco</a>
     <a href="{{ url_calendario }}" class="{{ 'attivo' if modo == 'calendario' }}">{{ i('orologio', 's') }} Calendario</a>

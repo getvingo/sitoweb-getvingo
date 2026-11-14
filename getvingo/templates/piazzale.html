@@ -14,8 +14,8 @@
 <form class="stock-cerca">
   <div class="ricerca">{{ i('cerca') }}<input name="q" value="{{ f.q }}" id="cerca-stock" autocomplete="off"
        placeholder="Cerca: marca, modello, versione, colore, telaio, targa, adesivo…" aria-label="Cerca nello stock"></div>
-  <details class="ripiega filtri-stock" {{ 'open' if filtri_attivi }}>
-    <summary>{{ i('gestione', 's') }} Filtri{% if filtri_attivi %} · {{ filtri_attivi|length }} attivi{% endif %}</summary>
+  <details class="ripiega filtri-stock">
+    <summary>{{ i('gestione', 's') }} Filtri{% if filtri_attivi %}<span class="filtri-n" title="Filtri attivi: {{ filtri_attivi|length }}">{{ filtri_attivi|length }}</span>{% endif %}</summary>
     <div class="barra-filtri">
       {{ filtro_select('fase', 'Stato', opzioni.fase, f.fase) }}
       {{ filtro_select('tipologia', 'Tipologia', opzioni.tipologia, f.tipologia, 'Tutte') }}
