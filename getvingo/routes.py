@@ -1747,6 +1747,30 @@ def note_interne(veicolo_id):
     return redirect(url_for("main.veicolo", veicolo_id=v.id) + "#note-interne")
 
 
+def _lavoro_fatto(v):
+    """Ultima lavorazione presso un fornitore già conclusa e rientrata (14/11/2026 sera): in preparazione e
+    da pronta la scheda la mostra completata, con i suoi dati. None se l'auto è ancora dal fornitore."""
+    if v.sede and v.sede.esterna:
+        return None
+    validi = [m for m in v.movimenti if m.ddt_id is None or (m.ddt and not m.ddt.annullato_at)]
+    andate = sorted((m for m in validi if m.stato == "chiuso" and m.arrivo_at and m.con_lavorazione
+                     and m.sede_arrivo_effettiva and m.sede_arrivo_effettiva.esterna),
+                    key=lambda m: m.arrivo_at, reverse=True)
+    if not andate:
+        return None
+    m = andate[0]
+    sede = m.sede_arrivo_effettiva
+    rientro = min((r for r in validi if r.da_sede_id == sede.id and r.partenza_at and r.partenza_at >= m.arrivo_at),
+                  key=lambda r: r.partenza_at, default=None)
+    fine = m.lavorazione_completata_at or (rientro.partenza_at if rientro else None)
+    oltre = None
+    if fine and m.lavorazione_prevista_at:
+        oltre = -(-(fine - m.lavorazione_prevista_at).total_seconds() // 86400)
+    return {"m": m, "fornitore": sede.nome, "fine": fine, "rientro": rientro,
+            "giorni": (fine.date() - m.arrivo_at.date()).days if fine else None,
+            "oltre": int(oltre) if oltre is not None else None}
+
+
 @bp.route("/veicolo/<int:veicolo_id>")
 @login_richiesto
 def veicolo(veicolo_id):
@@ -1763,7 +1787,7 @@ def veicolo(veicolo_id):
     simili = Veicolo.query.filter(Veicolo.marca == v.marca, Veicolo.modello == v.modello,
                                   Veicolo.id != v.id, Veicolo.stato != "consegnato").count()
     return render_template(
-        "veicolo.html", v=v, mov=mov, predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
+        "veicolo.html", v=v, mov=mov, lavoro_fatto=_lavoro_fatto(v), predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
         slot_prep=_scelta_prep(), slot_auto=servizi.slot_automatico(),
         preparazione=v.preparazione_attiva, ultima_prep=v.ultima_preparazione, simili=simili,
         puo_emettere=servizi.puo_emettere(v, g.utente),

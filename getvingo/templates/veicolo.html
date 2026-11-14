@@ -269,11 +269,40 @@
 </a>
 {% endif %}
 
+{# 14/11/2026 sera: sotto, a sinistra i DDT del telaio e a destra la lavorazione già conclusa (in preparazione e da pronta) #}
+{% set lf = lavoro_fatto if (preparazione or v.da_consegnare) else none %}
+{% if storico or lf %}
+<div class="sotto-fase {{ 'con-lavoro' if lf }}">
 {% if storico %}
 <section class="ddt-telaio">
   <h2>{{ i('doc') }} DDT su questo telaio <span class="conta-titolo">{{ storico|length }}</span></h2>
   <div class="ddt-telaio-griglia">{% for m in storico %}{{ ddt_mini(m.ddt) }}{% endfor %}</div>
 </section>
+{% endif %}
+{% if lf %}{% set m = lf.m %}
+<section class="lavoro-fatto">
+  <h2>{{ i('chiave') }} Lavorazione completata</h2>
+  <div class="blocco-fase lavoro-finita lavoro-fatto-carta">
+    <div class="lavoro-testa">
+      <span class="lavoro-icona" aria-hidden="true">{{ i('check') }}</span>
+      <div class="lavoro-titolo">
+        <small>{{ lf.fornitore }}{% if m.ddt %} · <a href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) }}">DDT {{ m.ddt.sigla }}</a>{% endif %}</small>
+        <h3>{{ m.lavorazione }}</h3>
+        {% if m.lavorazione_note %}<p>{{ m.lavorazione_note }}</p>{% endif %}
+      </div>
+    </div>
+    <dl class="lavoro-fatto-dati">
+      <div><dt>Arrivata dal fornitore</dt><dd>{{ m.arrivo_at|data('%d/%m/%Y') }}</dd></div>
+      <div><dt>Finita</dt><dd>{{ lf.fine|data('%d/%m/%Y') if lf.fine else '—' }}</dd></div>
+      <div><dt>Tempo dal fornitore</dt><dd>{% if lf.giorni is not none %}{{ lf.giorni }} {{ 'giorno' if lf.giorni == 1 else 'giorni' }} su {{ m.stima_giorni }} stimati{% else %}—{% endif %}</dd></div>
+      <div><dt>Esito</dt><dd>{% if lf.oltre is none %}—{% elif lf.oltre > 0 %}<span class="testo-ritardo">in ritardo di {{ lf.oltre }} {{ 'giorno' if lf.oltre == 1 else 'giorni' }}</span>{% else %}<span class="testo-ok">nei tempi</span>{% endif %}</dd></div>
+      {% if lf.rientro %}<div class="intera"><dt>Rientrata</dt><dd>{{ (lf.rientro.arrivo_at or lf.rientro.partenza_at)|data('%d/%m/%Y') }}{% if lf.rientro.ddt %} · <a href="{{ url_for('main.ddt_dettaglio', ddt_id=lf.rientro.ddt.id) }}">DDT {{ lf.rientro.ddt.sigla }}</a>{% endif %}</dd></div>{% endif %}
+      {% if m.lavorazione_note_fine %}<div class="intera"><dt>Note di fine lavori</dt><dd>{{ m.lavorazione_note_fine }}</dd></div>{% endif %}
+    </dl>
+  </div>
+</section>
+{% endif %}
+</div>
 {% endif %}
 </div>
 

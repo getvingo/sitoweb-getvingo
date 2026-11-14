@@ -2960,3 +2960,20 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .anagrafica-dati .badge.usato { background: var(--superficie); color: var(--testo); }
 .passi-nomi { align-items: start; } .passi-nomi li { align-content: start; } .passi-nomi small { min-height: 1.3em; }
 .lavoro-numeri { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+/* ---- In preparazione: sotto, DDT a sinistra e lavorazione completata a destra (14/11/2026 sera) ---- */
+.sotto-fase { margin-top: 10px; }
+.sotto-fase > section > h2 { margin: 12px 0 10px; }
+.sotto-fase.con-lavoro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 16px; align-items: start; }
+.sotto-fase.con-lavoro .ddt-telaio-griglia { grid-template-columns: minmax(0, 1fr); }
+.sotto-fase.con-lavoro .ddt-telaio { margin-top: 0; }
+.sotto-fase .lavoro-fatto:only-child { grid-column: 1 / -1; }
+.lavoro-fatto-carta { margin: 0; }
+.lavoro-fatto-carta .lavoro-icona { width: 40px; height: 40px; border-radius: 12px; }
+.lavoro-fatto-carta .lavoro-titolo h3 { margin: 2px 0 0; font-size: var(--fs-17); }
+.lavoro-fatto-dati { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.lavoro-fatto-dati > div { background: var(--superficie); border-radius: var(--r-s); padding: 8px 12px; display: grid; gap: 2px; }
+.lavoro-fatto-dati .intera { grid-column: 1 / -1; }
+.lavoro-fatto-dati dt { font-size: var(--fs-12); color: var(--testo-2); font-weight: 650; }
+.lavoro-fatto-dati dd { margin: 0; font-size: var(--fs-14); font-weight: 650; }
+.testo-ok { color: var(--ok); }
+@media (max-width: 1240px) { .sotto-fase.con-lavoro { grid-template-columns: minmax(0, 1fr); } }
