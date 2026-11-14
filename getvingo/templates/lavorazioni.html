@@ -71,7 +71,8 @@
       <td class="cella-da">{{ (m.arrivo_at|da_tempo)|replace('da ', '') }}</td>
       <td class="cella-azione">
         {% if stato_m == 'finita' and not v.movimento_predisposto %}<a class="btn piccolo btn-predisponi" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#predisponi">Predisponi rientro</a>
-        {% elif stato_m == 'ritardo' and puo_sollecitare(m) %}<button type="button" class="btn piccolo btn-sollecito" data-apri-riga="dett-{{ m.id }}">Sollecita</button>{% endif %}
+        {% elif stato_m == 'ritardo' and puo_sollecitare(m) %}<button type="button" class="btn piccolo btn-sollecito" data-apri-riga="dett-{{ m.id }}">Sollecita</button>
+        {% elif stato_m == 'finita' and v.movimento_predisposto %}<a class="btn piccolo" href="{{ url_for('main.ddt_dettaglio', ddt_id=v.movimento_predisposto.ddt.id) }}">Apri DDT di rientro</a>{% endif %}
         <button type="button" class="btn-icona" data-apri-riga="dett-{{ m.id }}" aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
       </td>
     </tr>

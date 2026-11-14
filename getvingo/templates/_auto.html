@@ -8,7 +8,7 @@
     {{ marchio(v) }}
     <div class="carta-auto-nome">
       <small>{{ v.marca or 'Marca non indicata' }} · {{ v.TIPOLOGIE[v.tipologia] }}</small>
-      <b>{{ v.modello or '—' }}</b>
+      <b role="heading" aria-level="1">{{ v.modello or '—' }}</b>
       <span>{{ v.versione or 'Versione non indicata' }}</span>
     </div>
     {% if con_stato %}<div class="carta-auto-stato">{{ badge_veicolo(v) }}{{ dettaglio_stato(v) }}</div>{% endif %}

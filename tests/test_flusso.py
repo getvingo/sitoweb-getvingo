@@ -1558,7 +1558,7 @@ class TestRegoleNuove(Base):
         self.avanza(pid)  # Pronta: bloccata dal danno
         with self.app.app_context():
             self.assertEqual(db.session.get(Preparazione, pid).prossima_fase, "Pronta")
-        self.assertIn("Pronta bloccato", self.c.get("/preparazione").get_data(as_text=True))
+        self.assertIn("Pronta: in attesa", self.c.get("/preparazione").get_data(as_text=True))
 
     def test_stock_fino_a_pronta_e_conteggi(self):
         vid = self.abbina()

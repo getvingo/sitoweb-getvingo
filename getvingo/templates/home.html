@@ -115,15 +115,15 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 {% endif %}
 
 {# Panoramica (14/11/2026): stesso stile delle altre pagine. In alto una riga di numeri a pillole (ognuno porta
-   alla sua pagina), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
+   alla sua pagina; in ordine di urgenza: ritiri, viaggi, fornitori, preparazione, pronte, stock), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
 <div class="panoramica-righe">
 <nav class="numeri-riga" aria-label="Le auto oggi">
   {% macro numero(url, fase, icona, n, etichetta) %}<a href="{{ url }}" class="numero-voce {{ fase }} {{ 'zero' if not n }}"><span class="numero-icona">{{ i(icona, 's') }}</span><b>{{ n }}</b><span>{{ etichetta }}</span></a>{% endmacro %}
   {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
-  {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
   {{ numero(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio, 'In viaggio') }}
   {{ numero(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
   {{ numero(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
+  {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
   {{ numero(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
 </nav>
 
@@ -155,10 +155,12 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 {% else %}
 <table class="tabella-stock tabella-fare">
   <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-vai"></colgroup>
-  <thead><tr><th>Auto</th><th>Cosa fare</th><th><span class="nascosto">Apri</span></th></tr></thead>
+  {# 14/11/2026 sera: niente riga "Auto · Cosa fare"; "Cosa fare" sta sulla riga del primo gruppo #}
+  <thead class="nascosto"><tr><th>Auto</th><th>Cosa fare</th><th>Apri</th></tr></thead>
   {% for chiave, titolo, icona, voci in da_fare if voci %}
   <tbody class="gruppo-stock">
-    <tr class="riga-gruppo"><th colspan="3">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th></tr>
+    <tr class="riga-gruppo">{% if loop.first %}<th scope="rowgroup">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th><th colspan="2" class="etichetta-colonna" aria-hidden="true">Cosa fare</th>
+      {% else %}<th colspan="3" scope="rowgroup">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th>{% endif %}</tr>
     {% for x in voci %}
     <tr class="riga-stock fare-l{{ x.livello }} fare-{{ chiave }}" data-url="{{ x.url }}">
       <td class="cella-auto"><div>{{ marchio(x.v) }}<span><a href="{{ x.url }}"><b>{{ x.v.descrizione }}</b></a>

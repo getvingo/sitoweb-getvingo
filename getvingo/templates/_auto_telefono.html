@@ -4,6 +4,7 @@
 {% from "_auto.html" import auto_breve %}
 {% set pos = v.ultima_posizione %}{% set mov = v.movimento_aperto %}
 <div class="tocco">
+  <h1 class="nascosto">{{ v.descrizione }}</h1>{# titolo per lettori di schermo: la carta qui sotto lo mostra già #}
   {{ auto_breve(v, dati=url_for('main.dati_auto', veicolo_id=v.id, torna=request.path)) }}
   {% if v.danni_aperti %}<a class="blocco-danno" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id) }}">{{ i('attenzione', 's') }}<span><b>{{ v.danni_aperti|length }} {{ 'danno' if v.danni_aperti|length == 1 else 'danni' }} da verificare</b> · tocca per vedere</span></a>{% endif %}
   <div class="dove-auto">

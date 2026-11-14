@@ -17,21 +17,21 @@
     <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"><b>{{ v.descrizione }}</b></a>
       <small>{{ badge_condizione(v) }}{% if v.targa %} <span class="targa-chip">{{ v.targa }}</span>{% endif %} <span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
   {# 14/11/2026: stesse colonne delle Lavorazioni (Auto · Cosa · Avanzamento · Entro · Da) #}
-  <td class="cella-cosa">{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }} bloccato</b><small>danno da verificare</small>{% else %}<b>{{ p.prossima_fase }}</b><small>passo {{ fatti + 1 }} di 4{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small>{% endif %}</td>
+  <td class="cella-cosa">{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }}: in attesa</b><small>prima va verificato il danno</small>{% else %}<b>{{ p.prossima_fase }}</b><small>passo {{ fatti + 1 }} di 4{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small>{% endif %}</td>
   <td class="cella-avanz"><span class="pillola-stato"><i aria-hidden="true"></i>{% if rit %}In ritardo di {{ rit }}{% else %}Nei tempi{% endif %}</span>
     <ol class="passi-riga" aria-label="Passo {{ fatti + 1 }} di 4">{% for f in fasi %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}" title="{{ f }}{% if loop.index0 < fatti %} · {{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') }}{% endif %}"></li>{% endfor %}</ol>
     <small>{{ fatti }} di 4 passi fatti</small></td>
   <td class="cella-entro">{% if p.pronta_entro_at %}{{ p.pronta_entro_at|slot }}{% else %}<span class="tenue">da fissare</span>{% endif %}</td>
   <td class="cella-da">{{ (p.creata_at|da_tempo)|replace('da ', '') }}</td>
   <td class="cella-azione">
-    {% if bloccata %}<a class="btn piccolo btn-danno-riga" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.preparazione')) }}">Vedi danno</a>{% endif %}
+    {% if bloccata %}<a class="btn piccolo btn-danno-riga" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.preparazione')) }}">Verifica il danno</a>
+    {% elif not p.pronta_entro_at %}<button type="button" class="btn piccolo" data-apri-riga="prep-{{ p.id }}">{{ i('orologio', 's') }} Fissa l'orario</button>{% endif %}
     {# 14/11/2026: "⋯" apre un piccolo menu lì accanto (niente riga che si espande) #}
     <span class="menu-riga-box"><button type="button" class="btn-icona" data-menu-riga aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
       <span class="menu-riga" hidden>
-        {% if not p.pronta_entro_at %}<button type="button" class="btn-link" data-apri-riga="prep-{{ p.id }}">{{ i('orologio', 's') }} Fissa l'orario</button>{% endif %}
         {% if p.fasi %}{{ annulla(annullabile(p.veicolo_id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.preparazione')) }}{% endif %}
         {{ elimina_prep(p) }}
-        {% if not p.fasi and p.pronta_entro_at and g.utente.ruolo != 'admin' %}<span class="tenue piccolo">Nessuna azione</span>{% endif %}
+        {% if not p.fasi and g.utente.ruolo != 'admin' %}<span class="tenue piccolo">Nessuna azione</span>{% endif %}
       </span></span></td>
 </tr>
 {% if not p.pronta_entro_at %}<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
@@ -44,7 +44,7 @@
 {% endmacro %}
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>Preparazione</h1>
-  <p class="descrizione-pagina">Auto vendute da preparare per la consegna: controllo rientro, preparazione, lavaggio, pronta.</p></div>
+  <p class="descrizione-pagina">Auto vendute da preparare per la consegna: controllo rientro, preparazione, lavaggio, pronta. Ogni passo si conferma dal telefono, toccando l'adesivo dell'auto.</p></div>
   {% if da_preparare %}<button type="button" class="btn piccolo primario" data-apri="pannello-prepara" aria-expanded="false">{{ i('brilla', 's') }} Metti in preparazione</button>{% endif %}</div>
 
 {% if da_preparare %}
@@ -80,7 +80,7 @@
   ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', corso if attivo == 'ritardo' else url_for('main.preparazione', vista='corso', stato='ritardo', tipologia=tipologia), True),
   ('pronte', conteggi.pronte, 'Pronte', 'bandiera', corso if attivo == 'pronte' else url_for('main.preparazione', vista='pronte', tipologia=tipologia), True),
   ('consegnate', conteggi.consegnate, 'Consegnate', 'archivio', corso if attivo == 'consegnate' else url_for('main.preparazione', vista='consegnate', tipologia=tipologia), False),
-], attivo if vista != 'corso' or stato_prep else none, tutte=(conteggi.corso, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo if modo == 'calendario' else none), 'In preparazione')) }}
+], attivo if vista != 'corso' or stato_prep else none, tutte=(conteggi.corso, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo if modo == 'calendario' else none), 'Tutte')) }}
 {# 13/11/2026: ricerca che filtra mentre si scrive + Filtri chiuso (tipo di veicolo), come Stock e Lavorazioni #}
 {% if not (vista == 'consegnate') %}
 <form class="stock-cerca" method="get">
@@ -105,7 +105,7 @@
   {% if preparazioni %}
   <table class="tabella-stock tabella-fasi tabella-prep">
     <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-avanz"><col class="c-entro"><col class="c-da"><col class="c-azione"></colgroup>
-    <thead><tr><th>Auto</th><th>Passo</th><th>Avanzamento</th><th>Pronta entro</th><th>In preparazione</th><th><span class="nascosto">Azioni</span></th></tr></thead>
+    <thead><tr><th>Auto</th><th>Da fare ora</th><th>Avanzamento</th><th>Pronta entro</th><th>In preparazione</th><th><span class="nascosto">Azioni</span></th></tr></thead>
     <tbody class="gruppo-stock">
     {% for p in preparazioni|sort(attribute='pronta_entro_at') if p.pronta_entro_at %}{{ riga_prep(p) }}{% endfor %}
     {% for p in preparazioni if not p.pronta_entro_at %}{{ riga_prep(p) }}{% endfor %}
@@ -136,7 +136,7 @@
           {% if v.sede_id != v.consegna_sede_id %}<small class="testo-ritardo">ora a {{ v.sede.nome }}: serve l'ultimo DDT</small>{% elif not v.targa %}<small class="testo-ritardo">senza targa</small>{% else %}<small>pronta per la consegna</small>{% endif %}{% endif %}</td>
       <td class="cella-da">{{ (v.stato_dal|da_tempo)|replace('da ', '') }}</td>
       <td class="cella-azione">{% if v.verso_consegna %}<a class="btn piccolo" href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}">Segui il viaggio</a>
-        {% else %}<a class="btn piccolo {{ 'primario' if not mancano }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{% if not v.consegna_sede %}Indica la sede{% elif v.sede_id != v.consegna_sede_id %}Ultimo DDT{% elif not v.targa %}Targa e consegna{% else %}Consegna{% endif %}</a>
+        {% else %}<a class="btn piccolo {{ 'primario' if not mancano }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{% if not v.consegna_sede %}Indica la sede di consegna{% elif v.sede_id != v.consegna_sede_id %}Crea l'ultimo DDT{% elif not v.targa %}Inserisci la targa{% else %}Consegna al cliente{% endif %}</a>
         <span class="menu-riga-box"><button type="button" class="btn-icona" data-menu-riga aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
           <span class="menu-riga" hidden>
             {{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=v.ultima_preparazione.id), 'Non è ancora pronta: annulla “Pronta”', url_for('main.preparazione', vista='pronte', tipologia=tipologia)) }}

@@ -2841,3 +2841,14 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .stock-cerca .filtri-stock .pillola-tipo { justify-content: flex-start; min-height: var(--alt-piccola); border-radius: var(--r-s); }
 .stock-cerca .filtri-stock .pillola-tipo b { margin-left: auto; padding-left: 16px; }
 .stock-cerca .filtri-stock .pillola-tipo:not(.attivo) { padding-right: 40px; }  /* i numeri restano in colonna anche accanto alla ✕ */
+/* ---- Azioni delle righe più chiare (14/11/2026 sera): il menu "⋯" ha voci tutte uguali (prima si accavallavano) e sta sopra le righe sotto ---- */
+.menu-riga { z-index: 40; min-width: 260px; }
+.menu-riga form, .menu-riga form.annulla { display: block; margin: 0; }
+.menu-riga .btn-link, .menu-riga .annulla .btn-link, .menu-riga > a { margin: 0; padding: 0 10px; min-height: 40px; font-size: var(--fs-14); font-weight: 600; color: var(--testo); }
+.menu-riga .btn-link .icona, .menu-riga > a .icona { flex: none; color: var(--testo-2); }
+.menu-riga .annulla .btn-link.testo-pericolo, .menu-riga .btn-link.testo-pericolo { color: var(--danno-scuro); }
+.menu-riga .btn-link.testo-pericolo .icona { color: inherit; }
+/* la colonna delle azioni è larga quanto il pulsante più lungo, a ogni larghezza di schermo */
+.tabella-fasi .c-azione { width: 216px; } .tabella-pronte .c-azione { width: 256px; } .tabella-pronte .c-auto { width: 32%; }
+/* Home: "Cosa fare" sulla riga del primo gruppo, scritta come le intestazioni di colonna */
+.tabella-stock .riga-gruppo th.etichetta-colonna { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .05em; padding-left: 10px; vertical-align: bottom; }
