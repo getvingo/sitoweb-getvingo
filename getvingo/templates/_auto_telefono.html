@@ -13,6 +13,34 @@
       {% elif v.stato == 'consegnato' %}<b>Consegnata</b><small>{{ v.consegnato_at|data('%d/%m/%Y') }}</small>
       {% else %}<b>{{ v.sede.nome if v.sede else 'Luogo non indicato' }}</b>{% if pos %}<small>posizione aggiornata {{ pos.at|da_quanto }}</small>{% endif %}{% endif %}</div>
   </div>
+  {# 14/11/2026 sera: dal telefono la fase in breve, con la stessa grafica del computer (linea del tempo, attività) #}
+  {% if v.stato == 'in_sede' and v.sede and v.sede.esterna and ultimo and ultimo.con_lavorazione and ultimo.arrivo_at %}
+  {% set finita = ultimo.lavorazione_completata_at %}{% set rit = ultimo.giorni_ritardo %}
+  {% set a = ultimo.arrivo_at %}{% set prev = ultimo.lavorazione_prevista_at %}{% set fine = finita or adesso() %}
+  {% set tot = [(fine - a).total_seconds(), (prev - a).total_seconds(), 1]|max %}
+  {% set fp = ((prev - a).total_seconds() / tot * 100)|round(1) %}{% set fo = ((fine - a).total_seconds() / tot * 100)|round(1) %}
+  <section class="fase-tel blocco-fase lavoro-{{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
+    <div class="fase-tel-testa"><span class="lavoro-icona" aria-hidden="true">{{ i('chiave') }}</span>
+      <div><small>Lavorazione</small><b>{{ ultimo.lavorazione }}</b></div>
+      <span class="pillola-stato"><i aria-hidden="true"></i>{% if finita %}Finita{% elif rit %}+{{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span></div>
+    {% if ultimo.lavorazione_note %}<p class="fase-tel-nota">{{ ultimo.lavorazione_note }}</p>{% endif %}
+    <div class="lavoro-binario"><span class="fatto" style="width:{{ [fo, fp]|min }}%"></span>
+      {% if fo > fp %}<span class="oltre" style="left:{{ fp }}%;width:{{ fo - fp }}%"></span>{% endif %}
+      <span class="tacca prevista" style="left:{{ fp }}%"></span><span class="tacca adesso" style="left:{{ fo }}%"></span></div>
+    <ol class="lavoro-punti"><li><small>Arrivata</small><b>{{ a|data('%d/%m') }}</b></li><li><small>Fine prevista</small><b>{{ prev|data('%d/%m %H:%M') }}</b></li>
+      <li class="adesso"><small>{{ 'Finita' if finita else 'Oggi' }}</small><b>{{ fine|data('%d/%m') }}</b></li></ol>
+  </section>
+  {% elif preparazione %}{% set p = preparazione %}{% set fatti = p.fasi|length %}{% set rit = p.pronta_entro_at|ritardo if p.pronta_entro_at else none %}
+  <section class="fase-tel blocco-fase blocco-prep prep-{{ 'ritardo' if rit else 'tempo' }}">
+    <div class="fase-tel-testa"><span class="lavoro-icona" aria-hidden="true">{{ i('brilla') }}</span>
+      <div><small>Preparazione · attività {{ fatti + 1 }} di {{ p.FASI|length }}</small><b>{{ p.prossima_fase }}</b></div>
+      <span class="pillola-stato {{ 'in-attesa' if bloccata_da_danni(p) }}"><i aria-hidden="true"></i>{% if bloccata_da_danni(p) %}In attesa{% elif rit %}+{{ rit }}{% else %}Nei tempi{% endif %}</span></div>
+    <ol class="passi-nomi">{% for f in p.FASI %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}"><span class="barretta" aria-hidden="true" title="{{ f }}"></span><b class="nascosto">{{ f }}</b></li>{% endfor %}</ol>
+    <p class="fase-tel-nota">{% if p.pronta_entro_at %}{{ 'Doveva essere pronta' if rit else 'Pronta entro' }} <b>{{ p.pronta_entro_at|slot }}</b>{% else %}Orario da fissare{% endif %}</p>
+  </section>
+  {% endif %}
+  {% set lf = lavoro_fatto if (preparazione or v.da_consegnare) else none %}
+  {% if lf %}<p class="fase-tel-fatto">{{ i('check', 's') }} <span><b>{{ lf.m.lavorazione }}</b> da {{ lf.fornitore }}: finita {{ lf.fine|data('%d/%m') if lf.fine else '' }}{% if lf.oltre is not none %}, {{ 'in ritardo di ' ~ lf.oltre ~ (' giorno' if lf.oltre == 1 else ' giorni') if lf.oltre > 0 else 'nei tempi' }}{% endif %}</span></p>{% endif %}
   {% if v.stato not in ('in_viaggio', 'consegnato') and v.lat is not none %}
   <a class="btn btn-trova pieno" href="{{ url_for('main.trova', veicolo_id=v.id) }}">{{ i('pin') }} Trova l'auto</a>
   {% elif mov %}

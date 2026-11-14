@@ -2992,3 +2992,114 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .tabella-fare .riga-stock .cella-stato small, .tabella-fare .riga-stock:not(.in_sede) .cella-stato small:not(.testo-ritardo) { color: var(--testo); font-weight: 500; }
 .tabella-fare .fascia-adesso .btn.piccolo { border-color: var(--in-ritardo); color: var(--in-ritardo-testo); }
 .tabella-fare .fascia-adesso .btn.piccolo:hover { background: var(--in-ritardo-tenue); text-decoration: none; }
+
+/* ---- Pagina DDT (14/11/2026 sera): intestazione come la scheda auto, veicolo che si apre toccandolo ---- */
+.ddt-testata { --fase: var(--st-viaggio); border-radius: calc(var(--r) + 4px); overflow: hidden; border: 1px solid var(--bordo);
+  border-top: 5px solid var(--fase); background: var(--carta); box-shadow: 0 8px 24px rgba(28,21,51,.08); margin: 0 0 14px; }
+.ddt-testata.stato-predisposto { --fase: var(--st-ritiro); } .ddt-testata.stato-aperto { --fase: var(--st-viaggio); }
+.ddt-testata.stato-chiuso { --fase: var(--st-pronta); } .ddt-testata.stato-scaduto { --fase: var(--arancio); } .ddt-testata.stato-annullato { --fase: var(--bordo-forte); }
+.ddt-testata-alto { display: flex; align-items: center; gap: 18px; padding: 20px 24px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--fase) 45%, transparent) 0%, transparent 55%),
+              linear-gradient(115deg, var(--marchio-viola) 0%, #3B2A78 60%, #24478A 100%); }
+.ddt-testata-nome { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ddt-testata-nome small { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .08em; opacity: .8; }
+.ddt-testata-nome h1 { color: #fff; font-size: var(--fs-30); margin: 0; }
+.ddt-testata-nome > span { opacity: .85; font-size: var(--fs-15); }
+.ddt-testata-dx { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.ddt-testata-dx .badge { font-size: var(--fs-14); padding: 6px 12px; background: rgba(255,255,255,.95); }
+.ddt-testata-dx .azioni { flex-wrap: nowrap; }
+.ddt-testata-dx .btn { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.45); }
+.ddt-testata-dx .btn:hover { background: #fff; color: var(--marchio-viola); text-decoration: none; }
+.ddt-percorso { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: center; padding: 18px 24px 20px; }
+.ddt-luogo { display: grid; gap: 2px; min-width: 0; }
+.ddt-luogo.a { text-align: right; }
+.ddt-luogo small { font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--testo-2); }
+.ddt-luogo b { font-size: var(--fs-20); line-height: 1.2; }
+.ddt-luogo span { font-size: var(--fs-14); color: var(--testo-2); }
+.ddt-linea { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); position: relative; }
+.ddt-linea::before { content: ""; position: absolute; left: 16.66%; right: 16.66%; top: 9px; height: 3px; border-radius: 2px; background: var(--bordo); }
+.ddt-linea li { position: relative; display: grid; justify-items: center; gap: 2px; padding-top: 28px; text-align: center; color: var(--testo-2); }
+.ddt-linea li::before { content: ""; position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 18px; height: 18px; border-radius: 50%;
+  background: var(--carta); border: 3px solid var(--bordo-forte); box-sizing: border-box; }
+.ddt-linea li.fatto::before { background: var(--fase); border-color: var(--fase); }
+.ddt-linea li.ora::before { border-color: var(--fase); box-shadow: 0 0 0 4px color-mix(in srgb, var(--fase) 22%, transparent); }
+.ddt-linea li.fatto + li.fatto::after, .ddt-linea li.fatto + li.ora::after { content: ""; position: absolute; top: 9px; right: 50%; width: 100%; height: 3px; background: var(--fase); z-index: 0; }
+.ddt-linea li::before { z-index: 1; }
+.ddt-linea b { font-size: var(--fs-14); color: var(--testo); }
+.ddt-linea li:not(.fatto):not(.ora) b { color: var(--testo-2); font-weight: 600; }
+.ddt-linea small { font-size: var(--fs-12); font-variant-numeric: tabular-nums; }
+.ddt-testata-stima { padding: 0 24px 16px; } .ddt-testata-stima .stima-viaggio { margin: 0; }
+.ddt-sezione { background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); padding: 16px 18px; margin: 0 0 12px; }
+.ddt-titolo { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: var(--fs-12); font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
+.col-laterale > .ddt-titolo { margin-top: 18px; } .col-laterale > .ddt-titolo:first-child { margin-top: 0; }
+.ddt-veicoli { display: grid; gap: 8px; }
+.ddt-veicolo { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--bordo); border-radius: var(--r-s); background: var(--superficie); color: var(--testo); }
+.ddt-veicolo.apribile { cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.ddt-veicolo.apribile:hover { text-decoration: none; border-color: var(--segnale); background: var(--carta); box-shadow: 0 4px 14px rgba(28,21,51,.08); }
+.ddt-veicolo.apribile:focus-visible { outline: 3px solid var(--segnale); outline-offset: 2px; }
+.ddt-veicolo .logo-marca { width: 52px; height: 52px; } .ddt-veicolo .logo-marca img { width: 40px; height: 40px; }
+.ddt-veicolo-nome { flex: 1; min-width: 0; display: grid; gap: 3px; justify-items: start; }
+.ddt-veicolo-nome > b { font-size: var(--fs-17); }
+.ddt-veicolo-nome .badge { margin: 0; }
+.ddt-veicolo-nome > small { color: var(--testo-2); font-size: var(--fs-13); }
+.ddt-vin { font-family: var(--mono); font-size: var(--fs-15); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ddt-veicolo-apri { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-14); font-weight: 650; color: var(--segnale); }
+.ddt-campi { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ddt-campi > div { background: var(--superficie); border-radius: var(--r-s); padding: 10px 12px; display: grid; gap: 2px; }
+.ddt-campi .intera { grid-column: 1 / -1; }
+.ddt-campi dt { font-size: var(--fs-12); color: var(--testo-2); font-weight: 650; }
+.ddt-campi dd { margin: 0; font-weight: 650; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.ddt-campi .ddt-nota { width: 100%; font-weight: 500; color: var(--testo-2); }
+.ddt-parti { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0; }
+.ddt-parte { padding: 16px 18px; display: grid; gap: 2px; align-content: start; }
+.ddt-parte + .ddt-parte { border-left: 1px solid var(--bordo); }
+.ddt-parte b { font-size: var(--fs-17); } .ddt-parte span { font-size: var(--fs-14); color: var(--testo-2); }
+@media (max-width: 1240px) { .ddt-percorso { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ddt-linea { grid-column: 1 / -1; grid-row: 2; } }
+/* telefono: tratta con le tappe e i dati essenziali; la carta dell'auto apre l'anagrafica */
+.ddt-tel-tratta { --fase: var(--st-viaggio); list-style: none; margin: 0 0 12px; padding: 14px 16px; background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); display: grid; gap: 0; }
+.ddt-tel-tratta.stato-predisposto { --fase: var(--st-ritiro); } .ddt-tel-tratta.stato-chiuso { --fase: var(--st-pronta); } .ddt-tel-tratta.stato-scaduto { --fase: var(--arancio); }
+.ddt-tel-tratta li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; position: relative; padding-bottom: 14px; }
+.ddt-tel-tratta li:last-child { padding-bottom: 0; }
+.ddt-tel-tratta li:not(:last-child)::after { content: ""; position: absolute; left: 7.5px; top: 20px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--bordo); }
+.ddt-tel-tratta li.fatto:has(+ li.fatto)::after { background: var(--fase); }
+.ddt-tel-tratta .pallino { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--bordo-forte); background: var(--carta); box-sizing: border-box; margin-top: 2px; }
+.ddt-tel-tratta .fatto .pallino { background: var(--fase); border-color: var(--fase); }
+.ddt-tel-tratta small { display: block; font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); }
+.ddt-tel-tratta b { display: block; font-size: var(--fs-17); }
+.ddt-tel-tratta div > span { font-size: var(--fs-13); color: var(--testo-2); }
+.ddt-tel-dati { margin: 0 0 14px; display: grid; gap: 6px; }
+.ddt-tel-dati > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--bordo); }
+.ddt-tel-dati dt { font-size: var(--fs-13); color: var(--testo-2); }
+.ddt-tel-dati dd { margin: 0; font-weight: 650; font-size: var(--fs-15); }
+.ddt-tel-dati dd span { display: block; font-weight: 500; color: var(--testo-2); font-size: var(--fs-13); }
+.ddt-testata-dx .badge { color: var(--marchio-viola) !important; display: inline-flex; align-items: center; gap: 6px; }
+.ddt-veicolo-nome .riga-nome { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ddt-veicolo-nome .riga-nome b { font-size: var(--fs-17); }
+/* ---- "Da fare" dal telefono (14/11/2026 sera) ---- */
+.tel-fare-testa { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 6px; }
+.tel-fare-testa .sezione-t { margin: 0; }
+.tel-fare-testa .interruttore { margin: 0; } .tel-fare-testa .interruttore a { min-height: 36px; padding: 0 14px; }
+.tel-fascia { display: flex; align-items: center; gap: 6px; margin: 12px 0 6px; font-size: var(--fs-13); font-weight: 750; text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); }
+.tel-fascia.fascia-adesso { color: var(--in-ritardo-testo); } .tel-fascia.fascia-oggi { color: #8A4A05; }
+.per-te-voce.fare-tel.fare-adesso { --c: var(--in-ritardo); border-color: color-mix(in srgb, var(--in-ritardo) 45%, var(--bordo)); }
+.per-te-voce.fare-tel.fare-oggi { --c: var(--arancio); } .per-te-voce.fare-tel.fare-prossimi { --c: var(--bordo-forte); }
+.per-te-voce.fare-tel .per-te-barra { background: var(--c); }
+.fare-tel-etichetta { display: block; font-size: var(--fs-12); font-weight: 750; text-transform: uppercase; letter-spacing: .04em; color: var(--c); }
+.fare-adesso .fare-tel-etichetta { color: var(--in-ritardo-testo); } .fare-oggi .fare-tel-etichetta { color: #8A4A05; }
+.per-te-voce.fare-tel em { display: block; margin-top: 4px; font-style: normal; font-weight: 700; font-size: var(--fs-13); color: var(--segnale); }
+.per-te-voce.fare-tel em.dal-computer { color: var(--testo-2); font-weight: 600; }
+/* scheda auto dal telefono: la fase in breve (14/11/2026 sera) */
+.fase-tel { margin: 0 0 12px; padding: 14px; gap: 12px; }
+.fase-tel-testa { display: flex; align-items: center; gap: 10px; }
+.fase-tel-testa .lavoro-icona { width: 40px; height: 40px; border-radius: 12px; }
+.fase-tel-testa > div { flex: 1; min-width: 0; display: grid; }
+.fase-tel-testa small { font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); }
+.fase-tel-testa b { font-size: var(--fs-17); }
+.fase-tel-nota { margin: 0; font-size: var(--fs-14); color: var(--testo-2); } .fase-tel-nota b { color: var(--testo); }
+.fase-tel .passi-nomi { gap: 6px; } .fase-tel .passi-nomi b { font-size: var(--fs-12); }
+.fase-tel .lavoro-punti b { font-size: var(--fs-13); }
+.fase-tel-fatto { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--r-s); background: var(--ok-tenue); font-size: var(--fs-14); }
+.fase-tel-fatto .icona { color: var(--ok); flex: none; margin-top: 2px; }
+/* dal telefono il dettaglio sotto lo stato (giorni, %, attività) lo dice già il riquadro della fase */
+.tocco:has(.fase-tel) .auto-breve .dettaglio-stato { display: none; }
+.fase-tel .passi-nomi .barretta { margin: 0; }

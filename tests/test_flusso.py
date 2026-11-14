@@ -3644,7 +3644,7 @@ class TestTelefonoEssenziale(Base):
         vid = self.abbina()
         self.entra("autista")
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("I tuoi lavori", home)
+        self.assertIn("Da fare", home)  # 14/11 sera: "I tuoi lavori" compare solo se c'è altro oltre a Da fare
         self.assertIn('grid-template-columns:repeat(3, 1fr)', home)  # Home · Cerca · DDT
         for url in ("/stock", "/lavorazioni", "/preparazione", "/ddt", "/danni"):
             self.assertIn("Questa pagina si usa dal computer", self.c.get(url).get_data(as_text=True), url)

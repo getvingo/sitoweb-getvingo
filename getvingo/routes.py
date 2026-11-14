@@ -283,39 +283,18 @@ def _eventi_pronte(tipi=("preparazione", "lavorazione")):
     oggi = adesso().date()
     return [{"d": e["data"].isoformat(), "t": e["tipo"], "s": e["stato"], "r": e["stato"] == "ritardo", "n": e["v"].descrizione,
              "o": e["ora"], "c": e["cosa"], "u": e["url"]}
-            for e in _eventi_calendario(oggi - timedelta(days=31), oggi + timedelta(days=62), tipi)]
+            for e in _eventi_calendario(oggi - timedelta(days=31), oggi + timedelta(days=62), tipi)
+            if e["stato"] != "ritardo"]  # 14/11/2026 sera: i ritardi stanno in "Da fare", come da computer
 
 
 def _home_telefono():
-    """Home dal telefono, solo ciò che serve a chi guarda (14/11/2026):
-    - Consegne: i ritiri da fare (non assegnati ad altri) e il calendario di quando saranno pronte
-    - Preparatore: le auto in preparazione e il calendario delle preparazioni
-    - Backoffice: i ritiri senza DDT di rientro, i fornitori in ritardo, il calendario
-    - Venditore e responsabile commerciale: il calendario (quando le auto saranno pronte)
-    - Amministratore: tutto, in breve
-    "I tuoi lavori" (in home.html) vale per tutti."""
+    """Home dal telefono (14/11/2026 sera): "Da fare" è lo stesso del computer (`_da_fare_home`, con la vista
+    iniziale per mansione), poi "I tuoi lavori" senza le auto già in Da fare, poi il calendario: per il
+    Preparatore solo le preparazioni. Prima c'erano "Da andare a prendere", "Fornitori in ritardo" e
+    "In preparazione" per mansione: erano le stesse auto di Da fare."""
     ruolo = g.utente.ruolo
-    esterne = [(v, m) for _, voci in servizi.presso_fornitori() for v, m in voci if m and m.con_lavorazione]
-    da_prendere, in_lavorazione, preparazioni = [], [], []
-    if ruolo in ("consegne", "backoffice", "admin"):
-        for v, m in esterne:
-            if not m.lavorazione_completata_at:
-                continue
-            r = v.movimento_predisposto
-            if ruolo == "consegne" and r is not None and r.assegnato_a_id not in (None, g.utente.id):
-                continue  # lo va a prendere un altro
-            if ruolo == "backoffice" and r is not None:
-                continue  # all'ufficio interessa solo dove manca il DDT di rientro
-            da_prendere.append((v, m))
-    if ruolo in ("backoffice", "resp_commerciale", "admin"):
-        in_lavorazione = sorted(((v, m) for v, m in esterne if not m.lavorazione_completata_at and m.giorni_ritardo),
-                                key=lambda x: -x[1].giorni_ritardo)
-    if ruolo in ("preparatore", "admin"):
-        preparazioni = (Preparazione.query.filter_by(completata_at=None)
-                        .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).all())
     tipi = ("preparazione",) if ruolo == "preparatore" else ("preparazione", "lavorazione")
-    return {"da_prendere": da_prendere, "in_lavorazione": in_lavorazione, "preparazioni": preparazioni,
-            "eventi_cal": _eventi_pronte(tipi=tipi), "oggi_iso": adesso().date().isoformat(),
+    return {"eventi_cal": _eventi_pronte(tipi=tipi), "oggi_iso": adesso().date().isoformat(),
             "cal_solo_prep": ruolo == "preparatore"}
 
 
@@ -386,16 +365,17 @@ def _da_fare_home(gruppi, attivi):
     tra_un_giorno = ora + timedelta(hours=24)
     for m in _movimenti("predisposto").order_by(Movimento.ritiro_entro_at):
         url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
-        chi = f" · lo ritira {m.assegnato_a.nome}" if m.assegnato_a else " · nessuno incaricato"
+        mio = m.assegnato_a_id == io
+        chi = "" if mio else (f" · lo ritira {m.assegnato_a.nome}" if m.assegnato_a else " · nessuno incaricato")
         persone, ruoli = (m.assegnato_a_id, m.ddt.creato_da_id), ("consegne",)
         if m.scaduto:
-            aggiungi("ritiri", "adesso", "Ritiro scaduto", m.veicolo, f"DDT {m.ddt.sigla}: scaduto il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
+            aggiungi("ritiri", "adesso", "Ritiro scaduto" + (" (tuo)" if mio else ""), m.veicolo, f"DDT {m.ddt.sigla}: scaduto il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
                      url, ("Rinnova il ritiro", url), persone, ruoli)
         elif m.ritiro_entro_at and m.ritiro_entro_at <= tra_un_giorno:
-            aggiungi("ritiri", "oggi", "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: entro le {m.ritiro_entro_at:%H:%M del %d/%m} presso "
+            aggiungi("ritiri", "oggi", "Ritiro assegnato a te" if mio else "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: entro le {m.ritiro_entro_at:%H:%M del %d/%m} presso "
                      f"{m.da_sede.nome if m.da_sede else '—'}{chi}", url, ("Apri il DDT", url), persone, ruoli)
         else:
-            aggiungi("ritiri", "prossimi", "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: presso {m.da_sede.nome if m.da_sede else '—'}"
+            aggiungi("ritiri", "prossimi", "Ritiro assegnato a te" if mio else "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: presso {m.da_sede.nome if m.da_sede else '—'}"
                      + (f" entro il {m.ritiro_entro_at:%d/%m}" if m.ritiro_entro_at else "") + chi, url, ("Apri il DDT", url), persone, ruoli)
     # lavorazioni: stessa regola della pagina Lavorazioni (ritardo sulla fine prevista)
     for v in attivi:
@@ -1991,6 +1971,8 @@ def ddt_dettaglio(ddt_id):
     attivo = d.annullato_at is None
     return render_template(
         "ddt_dettaglio.html", d=d, m=m, mittente=servizi.dati_ddt(d)[0],
+        # auto che chi guarda può aprire (14/11/2026 sera: si apre toccando la carta dell'auto, niente pulsante "Auto")
+        apribili={x.veicolo_id for x in (d.movimenti or [m]) if servizi.puo_vedere_veicolo(x.veicolo, g.utente)},
         puo_modificare=servizi.puo_modificare(d, g.utente),
         puo_presa=attivo and not d.multiplo and servizi.puo_prendere_in_carico(m, g.utente),
         puo_arrivo=attivo and servizi.puo_confermare_arrivo(m, g.utente),
