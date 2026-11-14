@@ -2917,3 +2917,46 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 /* Home: pillole dei numeri un po' più larghe (14/11/2026 sera) */
 .numeri-riga { gap: 10px; }
 .numero-voce { min-height: 48px; padding: 0 22px 0 8px; gap: 10px; }
+
+/* ---- Intestazione dell'anagrafica (14/11/2026 sera): piano scuro con nome e stato, piano chiaro con i dati ---- */
+.carta-auto.anagrafica { padding: 0; border-top-width: 5px; background: var(--carta); color: var(--testo); border: 1px solid var(--bordo);
+  border-top: 5px solid var(--fase, var(--marchio-blu)); box-shadow: 0 8px 24px rgba(28,21,51,.08); }
+.carta-auto.anagrafica::after { display: none; }
+.anagrafica .carta-auto-testa { padding: 22px 24px; gap: 18px; align-items: center; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--fase, var(--marchio-blu)) 45%, transparent) 0%, transparent 55%),
+              linear-gradient(115deg, var(--marchio-viola) 0%, #3B2A78 60%, #24478A 100%); }
+.anagrafica .logo-marca { width: 72px; height: 72px; border-radius: 18px; background: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+.anagrafica .logo-marca img { width: 54px; height: 54px; }
+.anagrafica .carta-auto-nome small { opacity: .8; }
+.anagrafica .carta-auto-nome b { font-size: var(--fs-30); letter-spacing: -.01em; }
+.anagrafica .carta-auto-stato { margin-left: auto; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.anagrafica .carta-auto-stato .badge { font-size: var(--fs-14); padding: 6px 12px; }
+.anagrafica .modifica-auto { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.45); }
+.anagrafica .modifica-auto:hover { background: #fff; color: var(--marchio-viola); text-decoration: none; }
+.anagrafica-dati { margin: 0; padding: 16px 24px 18px; display: grid; grid-template-columns: 1.6fr repeat(5, minmax(0, 1fr)); gap: 12px 20px; }
+.anagrafica-dati > div { min-width: 0; display: grid; gap: 4px; align-content: start; }
+.anagrafica-dati > div + div { border-left: 1px solid var(--bordo); padding-left: 20px; }
+.anagrafica-dati dt { font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--testo-2); }
+.anagrafica-dati dd { margin: 0; font-size: var(--fs-15); font-weight: 650; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.anagrafica-dati dd .icona { color: var(--segnale); flex: none; }
+.anagrafica-dati .dato-telaio dd { font-size: var(--fs-17); }
+.anagrafica-dati .dato-telaio .vin b { color: var(--segnale); }
+.anagrafica-dati .targa { background: #fff; color: #111; border: 1.5px solid #111; border-radius: 4px; padding: 1px 8px; font-family: var(--mono); font-size: var(--fs-14); }
+.anagrafica-dati .badge { margin: 0; }
+@media (max-width: 1240px) { .anagrafica-dati { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .anagrafica-dati > div:nth-child(3n+1) { border-left: 0; padding-left: 0; } }
+/* preparazione con la stessa grafica della lavorazione */
+.blocco-prep { gap: 16px; }
+.blocco-prep .pillola-stato.in-attesa { --c: var(--danno); background: var(--danno-tenue); color: var(--danno-scuro); }
+.blocco-prep .pillola-stato.in-attesa i { background: var(--danno); }
+.passi-nomi .barretta { height: 10px; border-radius: 5px; }
+.blocco-prep .blocco-azioni { padding-top: 12px; border-top: 1px solid var(--bordo); }
+/* DDT del telaio sotto la lavorazione, in griglia */
+.ddt-telaio { margin-top: 10px; }
+.ddt-telaio > h2 { margin: 12px 0 10px; }
+.ddt-telaio-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.ddt-telaio-griglia .ddt-mini { display: block; width: auto; margin: 0; }
+.anagrafica-dati .badge.nuovo { background: var(--segnale-tenue); color: var(--segnale); }
+.anagrafica-dati .badge.usato { background: var(--superficie); color: var(--testo); }
+.passi-nomi { align-items: start; } .passi-nomi li { align-content: start; } .passi-nomi small { min-height: 1.3em; }
+.lavoro-numeri { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot, scelta_orario_prep %}
+{% from "_macro.html" import i, durata, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot, scelta_orario_prep %}
 {% from "_danno.html" import scheda_danno %}
 {% from "_auto.html" import carta_auto, info_auto, ddt_mini, in_viaggio_da, avanzamento_prep, avanzamento_lavoro, sollecito_lavoro, cambia_stima, rientro_lavoro %}
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
@@ -57,7 +57,7 @@
       <span class="tacca prevista" style="left:{{ fp }}%"></span>
       <span class="tacca adesso" style="left:{{ fo }}%"></span>
     </div>
-    {% set punti = [(0, 'Arrivata', a|data('%d/%m')), (fp, 'Fine prevista', prev|data('%d/%m %H:%M')), (fo, 'Finita' if finita else 'Oggi', finita|data('%d/%m') if finita else 'giorno ' ~ giorno)] %}
+    {% set punti = [(0, 'Arrivata', a|data('%d/%m')), (fp, 'Fine prevista', prev|data('%d/%m %H:%M')), (fo, 'Finita' if finita else 'Oggi', (finita or adesso())|data('%d/%m'))] %}
     <ol class="lavoro-punti">{% for pos, nome, quando in punti|sort(attribute='0') %}<li class="{{ 'prevista' if nome == 'Fine prevista' else ('adesso' if pos == fo and nome != 'Arrivata' else '') }}"><small>{{ nome }}</small><b>{{ quando }}</b></li>{% endfor %}</ol>
   </div>
   <div class="lavoro-numeri">
@@ -66,7 +66,7 @@
     {% if finita %}{% set oltre = ((finita - prev).total_seconds() / 86400)|round(0, 'ceil')|int %}
     <div class="esito {{ 'ritardo' if oltre > 0 else 'ok' }}"><small>{{ 'Finita in ritardo' if oltre > 0 else 'Finita nei tempi' }}</small><b>{% if oltre > 0 %}di {{ oltre }} {{ 'giorno' if oltre == 1 else 'giorni' }}{% else %}{{ finita|da_quanto }}{% endif %}</b>{% if ultimo.lavorazione_note_fine %}<span>{{ ultimo.lavorazione_note_fine }}</span>{% endif %}</div>
     {% elif rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}</b></div>
-    {% else %}<div class="esito"><small>Fine prevista</small><b>{{ prev|data('%d/%m %H:%M') }}</b></div>{% endif %}
+    {% else %}<div class="esito"><small>Tempo che resta</small><b>{{ durata(prev - adesso()) }}</b></div>{% endif %}
   </div>
   <div class="blocco-azioni">
     {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
@@ -92,14 +92,43 @@
 {# ---- Preparazione per la consegna (13/11/2026 notte: compatta, i 4 passi in fila con data) ---- #}
 {% if preparazione %}{% set p = preparazione %}{% set fatti = p.fasi|length %}{% set rit = p.pronta_entro_at|ritardo if p.pronta_entro_at else none %}
 <section class="blocco-fase blocco-prep prep-{{ 'ritardo' if rit else 'tempo' }}" id="preparazione" style="scroll-margin-top:16px">
-  <div class="blocco-testa">
-    <span class="pillola-stato"><i aria-hidden="true"></i>Passo {{ fatti + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}</span>
-    {% if p.pronta_entro_at %}<span class="tenue">pronta entro <b style="color:var(--testo)">{{ p.pronta_entro_at|slot }}</b></span>{% if rit %}<b class="testo-ritardo">in ritardo di {{ rit }}</b>{% endif %}{% else %}<span class="tenue">orario non fissato</span>{% endif %}
+  {# 14/11/2026 sera: stessa grafica della lavorazione: cosa si fa ora, i 4 passi, la linea del tempo e tre numeri #}
+  {% set bloccata = bloccata_da_danni(p) %}
+  <div class="lavoro-testa">
+    <span class="lavoro-icona" aria-hidden="true">{{ i('brilla') }}</span>
+    <div class="lavoro-titolo">
+      <small>Preparazione per la consegna · passo {{ fatti + 1 }} di {{ p.FASI|length }}</small>
+      <h2>{{ p.prossima_fase }}</h2>
+      <p>{% if bloccata %}In attesa: prima va verificato il danno qui sopra.{% elif p.prossima_fase == 'Pronta' %}Ultimo passo: si conferma toccando l'adesivo quando l'auto è pronta.{% else %}Si conferma dal telefono, toccando l'adesivo dell'auto.{% endif %}</p>
+    </div>
+    <span class="pillola-stato {{ 'in-attesa' if bloccata }}"><i aria-hidden="true"></i>{% if bloccata %}In attesa{% elif rit %}In ritardo di {{ rit }}{% elif p.pronta_entro_at %}Nei tempi{% else %}Orario da fissare{% endif %}</span>
   </div>
   <ol class="passi-nomi">
     {% for f in p.FASI %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}"><span class="barretta" aria-hidden="true"></span>
-      <b>{{ f }}</b><small>{{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') if loop.index0 < fatti else (('in attesa: prima il danno' if bloccata_da_danni(p) else 'in corso') if loop.index0 == fatti else '') }}</small></li>{% endfor %}
+      <b>{{ f }}</b><small>{{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') if loop.index0 < fatti else (('' if bloccata else 'da fare ora') if loop.index0 == fatti else '') }}</small></li>{% endfor %}
   </ol>
+  {% if p.pronta_entro_at %}
+  {% set a = p.creata_at %}{% set prev = p.pronta_entro_at %}{% set fine = adesso() %}
+  {% set tot = [(fine - a).total_seconds(), (prev - a).total_seconds(), 1]|max %}
+  {% set fp = ((prev - a).total_seconds() / tot * 100)|round(1) %}{% set fo = ([(fine - a).total_seconds(), 0]|max / tot * 100)|round(1) %}
+  <div class="lavoro-tempo" role="img" aria-label="Messa in preparazione il {{ a|data('%d/%m') }}, pronta entro {{ prev|slot }}">
+    <div class="lavoro-binario">
+      <span class="fatto" style="width:{{ [fo, fp]|min }}%"></span>
+      {% if fo > fp %}<span class="oltre" style="left:{{ fp }}%;width:{{ fo - fp }}%"></span>{% endif %}
+      <span class="tacca prevista" style="left:{{ fp }}%"></span>
+      <span class="tacca adesso" style="left:{{ fo }}%"></span>
+    </div>
+    {% set punti = [(0, 'Messa in preparazione', a|data('%d/%m %H:%M')), (fp, 'Pronta entro', prev|slot), (fo, 'Oggi', adesso()|data('%d/%m %H:%M'))] %}
+    <ol class="lavoro-punti">{% for pos, nome, quando in punti|sort(attribute='0') %}<li class="{{ 'adesso' if nome == 'Oggi' }}"><small>{{ nome }}</small><b>{{ quando }}</b></li>{% endfor %}</ol>
+  </div>
+  {% endif %}
+  <div class="lavoro-numeri">
+    <div><small>Avanzamento</small><b>{{ p.avanzamento }}% · {{ fatti }} di {{ p.FASI|length }} passi</b></div>
+    {# la data di "pronta entro" è già sulla linea del tempo: qui quanto manca o di quanto è in ritardo #}
+    {% if rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }}</b></div>
+    {% elif p.pronta_entro_at %}<div class="esito"><small>Tempo che resta</small><b>{{ durata(p.pronta_entro_at - adesso()) }}</b></div>
+    {% else %}<div class="esito"><small>Pronta entro</small><b>da fissare</b></div>{% endif %}
+  </div>
   {% if p.fasi %}<div class="blocco-azioni">{{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.veicolo', veicolo_id=v.id)) }}</div>{% endif %}
 </section>
 {% elif (v.da_consegnare or v.fase == 'consegnato') and ultima_prep %}
@@ -240,6 +269,12 @@
 </a>
 {% endif %}
 
+{% if storico %}
+<section class="ddt-telaio">
+  <h2>{{ i('doc') }} DDT su questo telaio <span class="conta-titolo">{{ storico|length }}</span></h2>
+  <div class="ddt-telaio-griglia">{% for m in storico %}{{ ddt_mini(m.ddt) }}{% endfor %}</div>
+</section>
+{% endif %}
 </div>
 
 <div class="col-sotto">
@@ -274,10 +309,7 @@
 <a class="btn pieno btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}" style="margin-top:14px">{{ i('attenzione') }} Segnala danno</a>
 {% endif %}
 
-{% if storico %}
-<h2>{{ i('doc') }} DDT su questo telaio <span class="conta-titolo">{{ storico|length }}</span></h2>
-{% for m in storico %}{{ ddt_mini(m.ddt) }}{% endfor %}
-{% endif %}
+
 
 </div>
 </div>

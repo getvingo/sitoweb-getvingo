@@ -3,7 +3,10 @@
 {# Carta dell'auto: si riconosce a colpo d'occhio (logo, modello, versione, colore, targa, adesivo, telaio).
    Il bordo luminoso in alto ha il colore della fase in cui si trova l'auto. #}
 {% macro carta_auto(v, con_stato=True, modificabile=False) %}
-<section class="carta-auto {{ v.fase }}">
+{# 14/11/2026 sera: intestazione dell'anagrafica in due piani. Sopra (scuro, col colore della fase sul bordo):
+   logo, marca · tipologia, modello e versione, lo stato e "Modifica dati". Sotto (chiaro): i dati come in un
+   libretto, ognuno con la sua etichetta: telaio, targa, colore, alimentazione e anno, condizione, adesivo #}
+<section class="carta-auto anagrafica {{ v.fase }}">
   <div class="carta-auto-testa">
     {{ marchio(v) }}
     <div class="carta-auto-nome">
@@ -11,19 +14,17 @@
       <b role="heading" aria-level="1">{{ v.modello or '—' }}</b>
       <span>{{ v.versione or 'Versione non indicata' }}</span>
     </div>
-    {% if con_stato %}<div class="carta-auto-stato">{{ badge_veicolo(v) }}{{ dettaglio_stato(v) }}</div>{% endif %}
+    <div class="carta-auto-stato">{% if con_stato %}{{ badge_veicolo(v) }}{% endif %}
+      {% if modificabile %}<a class="btn piccolo modifica-auto" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}</div>
   </div>
-  <div class="carta-auto-chip">
-    {{ badge_condizione(v) }}
-    {% if v.colore %}<span class="chip-dato">{{ v.colore }}</span>{% endif %}
-    {% if v.alimentazione %}<span class="chip-dato">{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}</span>{% elif v.anno %}<span class="chip-dato">{{ v.anno }}</span>{% endif %}
-    {% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="chip-dato tenue">Senza targa</span>{% endif %}
-    {% if v.tag %}<span class="chip-dato">{{ i('nfc', 's') }} {{ v.tag.codice }}</span>{% endif %}
-  </div>
-  <div class="carta-auto-vin">
-    <div><small>Telaio</small>{{ v.vin|vin }}</div>
-    {% if modificabile %}<a class="btn piccolo modifica-auto" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}
-  </div>
+  <dl class="anagrafica-dati">
+    <div class="dato-telaio"><dt>Telaio</dt><dd>{{ v.vin|vin }}</dd></div>
+    <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="tenue">Senza targa</span>{% endif %}</dd></div>
+    <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
+    <div><dt>{{ 'Alimentazione · anno' if v.alimentazione else 'Anno' }}</dt><dd>{% if v.alimentazione %}{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}{% else %}{{ v.anno or '—' }}{% endif %}</dd></div>
+    <div><dt>Condizione</dt><dd>{{ badge_condizione(v) or '—' }}</dd></div>
+    <div><dt>Adesivo</dt><dd>{% if v.tag %}{{ i('nfc', 's') }} {{ v.tag.codice }}{% else %}<span class="tenue">non abbinato</span>{% endif %}</dd></div>
+  </dl>
 </section>
 {% endmacro %}
 
