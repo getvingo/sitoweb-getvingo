@@ -115,13 +115,13 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
 {% endif %}
 
 {# Panoramica (14/11/2026): stesso stile delle altre pagine. In alto una riga di numeri a pillole (ognuno porta
-   alla sua pagina; in ordine di urgenza: ritiri, viaggi, fornitori, preparazione, pronte, stock), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
+   alla sua pagina; in ordine: viaggi, fornitori, ritiri, preparazione, pronte, stock), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
 <div class="panoramica-righe">
 <nav class="numeri-riga" aria-label="Le auto oggi">
   {% macro numero(url, fase, icona, n, etichetta) %}<a href="{{ url }}" class="numero-voce {{ fase }} {{ 'zero' if not n }}"><span class="numero-icona">{{ i(icona, 's') }}</span><b>{{ n }}</b><span>{{ etichetta }}</span></a>{% endmacro %}
-  {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
   {{ numero(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio, 'In viaggio') }}
   {{ numero(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
+  {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
   {{ numero(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
   {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
   {{ numero(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}

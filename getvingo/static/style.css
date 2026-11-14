@@ -2852,3 +2852,9 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .tabella-fasi .c-azione { width: 216px; } .tabella-pronte .c-azione { width: 256px; } .tabella-pronte .c-auto { width: 32%; }
 /* Home: "Cosa fare" sulla riga del primo gruppo, scritta come le intestazioni di colonna */
 .tabella-stock .riga-gruppo th.etichetta-colonna { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .05em; padding-left: 10px; vertical-align: bottom; }
+/* ---- Più aria (14/11/2026 sera): Stock sopra mappa e intestazione; Home tra stato e testo ---- */
+.pillole-sedi { margin: 16px 0 18px; }
+.stock-layout:has(.tabella-stock) .tabella-stock { margin-top: -6px; }
+.stock-layout .tabella-stock thead th { padding-top: 0; padding-bottom: 4px; }
+.tabella-fare .cella-stato .pillola-stato { margin-bottom: 6px; }
+.tabella-fare .cella-stato small { display: block; }
