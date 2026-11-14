@@ -140,14 +140,14 @@
   <div class="prep-ora">
     <small>{{ m.sede_arrivo_effettiva.nome }} · {{ m.lavorazione }}</small>
     <b>{% if finita %}Finita, da ritirare{% elif ritardo %}In ritardo di {{ ritardo }} {{ 'giorno' if ritardo == 1 else 'giorni' }}{% else %}In lavorazione{% endif %}</b>
-    <span class="tenue piccolo">{% if finita %}finita il {{ finita|data('%d/%m alle %H:%M') }}{% else %}stimata pronta il {{ m.lavorazione_prevista_at|data('%d/%m') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }} stimati{% endif %}</span>
+    <span class="tenue piccolo">{% if finita %}finita il {{ finita|data('%d/%m alle %H:%M') }}{% else %}stimata pronta il {{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }} stimati{% endif %}</span>
   </div>
 </div>
 {% else %}
 <div class="barra-lavoro lavoro-{{ stato }}">
   <div class="barra-avanzamento"><span data-riempi="{{ m.avanzamento_lavorazione }}" style="width:{{ m.avanzamento_lavorazione }}%"></span></div>
   <div class="piccolo"><b>{% if finita %}Finita, da ritirare{% elif ritardo %}In ritardo di {{ ritardo }} {{ 'giorno' if ritardo == 1 else 'giorni' }}{% else %}Giorno {{ giorno }} di {{ m.stima_giorni }}{% endif %}</b>
-    · {% if finita %}il {{ finita|data('%d/%m') }}{% else %}stimata pronta il {{ m.lavorazione_prevista_at|data('%d/%m') }}{% endif %}</div>
+    · {% if finita %}il {{ finita|data('%d/%m') }}{% else %}stimata pronta il {{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }}{% endif %}</div>
 </div>
 {% endif %}
 {% endmacro %}
@@ -166,7 +166,7 @@
   <form method="post" action="{{ url_for('main.sollecito', mov_id=m.id) }}" class="scheda" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="torna" value="{{ torna }}">
     <label class="campo"><span>Messaggio <span class="tenue">(facoltativo: c'è già un testo pronto)</span></span>
-      <textarea name="messaggio" rows="3" maxlength="500" placeholder="La lavorazione doveva finire il {{ m.lavorazione_prevista_at|data('%d/%m') }}. Ci indicate il motivo del ritardo e quando sarà pronta?"></textarea></label>
+      <textarea name="messaggio" rows="3" maxlength="500" placeholder="La lavorazione doveva finire il {{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }}. Ci indicate il motivo del ritardo e quando sarà pronta?"></textarea></label>
     <button class="btn primario">{{ i('invia', 's') }} Invia sollecito</button>
     <small class="tenue">Il fornitore lo trova appena entra in Getvingo e risponde con il motivo e una nuova data.</small>
   </form>
@@ -178,7 +178,7 @@
 {% macro cambia_stima(m, torna) %}
 {# la fine prevista si fissa con una data (come il calendario della preparazione); il server la converte in giorni #}
 <details class="cambia-stima">
-  <summary>{{ i('orologio', 's') }} Cambia la fine prevista <span class="tenue">({{ m.lavorazione_prevista_at|data('%d/%m') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }})</span></summary>
+  <summary>{{ i('orologio', 's') }} Cambia la fine prevista <span class="tenue">({{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }})</span></summary>
   <form method="post" action="{{ url_for('main.stima_lavorazione', mov_id=m.id) }}" class="azioni" style="align-items:flex-end" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="torna" value="{{ torna }}">
     <label class="campo" style="margin:0;max-width:220px"><span>Deve essere finita il</span>

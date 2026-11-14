@@ -64,7 +64,7 @@
       <td class="cella-avanz"><span class="pillola-stato"><i aria-hidden="true"></i>{% if stato_m == 'finita' %}Finita, da ritirare{% elif stato_m == 'ritardo' %}In ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
         <div class="mini-barra" aria-hidden="true"><span style="width:{{ m.avanzamento_lavorazione }}%"></span></div>
         <small>{% if stato_m == 'finita' %}finita il {{ m.lavorazione_completata_at|data('%d/%m') }}{% if v.movimento_predisposto %} · DDT di rientro {{ v.movimento_predisposto.ddt.sigla }} pronto{% endif %}{% else %}giorno {{ giorno }} di {{ m.stima_giorni }}{% endif %}{% set s = m.ultimo_sollecito %}{% if s and not s.risposta_at %} · sollecitata{% endif %}</small></td>
-      <td class="cella-entro">{{ m.lavorazione_prevista_at|data('%d/%m') if not m.lavorazione_completata_at else '—' }}</td>
+      <td class="cella-entro">{{ m.lavorazione_prevista_at|data('%d/%m %H:%M') if not m.lavorazione_completata_at else '—' }}</td>
       <td class="cella-da">{{ (m.arrivo_at|da_tempo)|replace('da ', '') }}</td>
       <td class="cella-azione">
         {% if stato_m == 'finita' and not v.movimento_predisposto %}<a class="btn piccolo btn-predisponi" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#predisponi">Predisponi rientro</a>

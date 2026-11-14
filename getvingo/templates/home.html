@@ -34,7 +34,7 @@
     {% for v, m in in_lavorazione %}
     <a class="per-te-voce {{ 'ritardo' if m.giorni_ritardo else 'lavorazione' }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
       <span><b>{{ v.descrizione }} · {{ v.sede.nome }}</b>
-        <small>{{ m.lavorazione }} · {% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}fine stimata {{ m.lavorazione_prevista_at|data('%d/%m') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+        <small>{{ m.lavorazione }} · {% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}fine stimata {{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
     {% endfor %}
   </div>
   {% endif %}

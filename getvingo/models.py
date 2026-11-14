@@ -535,8 +535,17 @@ class Movimento(PerOrganizzazione, db.Model):
 
     @property
     def lavorazione_prevista_at(self):
-        """Quando la lavorazione dovrebbe finire: arrivo dal fornitore + giorni stimati."""
-        return self.arrivo_at + timedelta(days=self.stima_giorni) if self.arrivo_at else None
+        """Quando la lavorazione dovrebbe finire (14/11/2026): dall'arrivo, giorni stimati × 8 ore lavorative del
+        fornitore (8–12, 13–17, senza weekend, feste e giorni chiusi), arrotondata alla mezz'ora per eccesso."""
+        if not self.arrivo_at:
+            return None
+        chiave = (self.arrivo_at, self.stima_giorni)
+        memo = getattr(self, "_prevista_memo", None)
+        if memo is None or memo[0] != chiave:
+            from .servizi import fine_lavori_prevista
+            memo = (chiave, fine_lavori_prevista(self.arrivo_at, self.stima_giorni))
+            self._prevista_memo = memo
+        return memo[1]
 
     @property
     def avanzamento_lavorazione(self):

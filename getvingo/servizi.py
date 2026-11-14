@@ -1286,17 +1286,56 @@ def puo_gestire_lavorazione(mov, utente):
     return utente.interno or (utente.sede_id is not None and utente.sede_id == mov.sede_arrivo_effettiva.id)
 
 
+# Orari delle aziende esterne (14/11/2026): 8–12 e 13–17, giorni lavorativi (niente weekend, feste e giorni chiusi)
+FASCE_FORNITORI = ((time(8, 0), time(12, 0)), (time(13, 0), time(17, 0)))
+ORE_GIORNO_FORNITORE = 8
+
+
+def _primo_momento_lavorativo(t, chiusi):
+    """Il primo istante in cui un fornitore lavora a partire da t."""
+    while True:
+        if motivo_chiusura(t.date(), chiusi) is None:
+            for inizio, fine in FASCE_FORNITORI:
+                a, b = datetime.combine(t.date(), inizio), datetime.combine(t.date(), fine)
+                if t < b:
+                    return max(t, a)
+        t = datetime.combine(t.date() + timedelta(days=1), FASCE_FORNITORI[0][0])
+
+
+def fine_lavori_prevista(arrivo, giorni):
+    """Fine prevista della lavorazione (14/11/2026): dal momento di arrivo si contano giorni × 8 ore lavorative
+    (8–12 e 13–17, saltando weekend, feste e giorni chiusi); l'orario si arrotonda per eccesso alla mezz'ora
+    o all'ora intera (12:10 → 12:30, 15:40 → 16:00)."""
+    chiusi = giorni_chiusi(arrivo.date(), arrivo.date() + timedelta(days=giorni * 3 + 40))
+    resto = timedelta(hours=giorni * ORE_GIORNO_FORNITORE)
+    t = _primo_momento_lavorativo(arrivo.replace(second=0, microsecond=0), chiusi)
+    while True:
+        fine_fascia = next(datetime.combine(t.date(), f) for i, f in FASCE_FORNITORI if datetime.combine(t.date(), f) > t)
+        disponibile = fine_fascia - t
+        if resto <= disponibile:
+            t += resto
+            break
+        resto -= disponibile
+        t = _primo_momento_lavorativo(fine_fascia, chiusi)
+    if t.minute % 30 or t.second:
+        t = t.replace(second=0, microsecond=0) + timedelta(minutes=30 - t.minute % 30)
+    return t
+
+
 def giorni_fino_a(mov, testo_data):
-    """Fine prevista scelta come data (AAAA-MM-GG) → giorni di lavorazione dall'arrivo dal fornitore."""
+    """Fine prevista scelta come data (AAAA-MM-GG) → giorni lavorativi di lavorazione dall'arrivo: il numero
+    più piccolo con cui la fine calcolata cade in quel giorno (o subito dopo, se quel giorno il fornitore è chiuso)."""
     try:
         fine = datetime.strptime(testo_data, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         raise Vietato("Data di fine non valida.")
     if not mov.arrivo_at:
         raise Vietato("L'auto non è ancora arrivata dal fornitore.")
-    giorni = (fine - mov.arrivo_at.date()).days
-    if giorni < 1:
+    if (fine - mov.arrivo_at.date()).days < 1:
         raise Vietato(f"La fine deve essere dopo l'arrivo dal fornitore ({mov.arrivo_at:%d/%m}).")
+    giorni = 1
+    while fine_lavori_prevista(mov.arrivo_at, giorni).date() < fine and giorni < 120:
+        giorni += 1
     return giorni
 
 
@@ -1325,7 +1364,7 @@ def sollecita(mov, utente, messaggio=""):
     v = mov.veicolo
     testo = (messaggio or "").strip()[:500] or (
         f"{v.descrizione} (telaio …{v.vin[-8:]}): la lavorazione “{mov.lavorazione}” doveva finire il "
-        f"{mov.lavorazione_prevista_at:%d/%m}. Ci indicate il motivo del ritardo e quando sarà pronta?")
+        f"{mov.lavorazione_prevista_at:%d/%m alle %H:%M}. Ci indicate il motivo del ritardo e quando sarà pronta?")
     s = Sollecito(movimento=mov, utente_id=utente.id, messaggio=testo)
     db.session.add(s)
     return s

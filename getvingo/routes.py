@@ -263,15 +263,15 @@ def _eventi_calendario(dal, al, tipi=("preparazione", "lavorazione")):
                     continue
                 aggiungi(max(m.lavorazione_prevista_at.date(), oggi), m.lavorazione_prevista_at, "lavorazione",
                          "ritardo" if m.giorni_ritardo else "previsto", v,
-                         m.sede_arrivo_effettiva.nome + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else ""),
-                         "fine lavori", url_for("main.veicolo", veicolo_id=v.id))
+                         "fine lavori · " + m.sede_arrivo_effettiva.nome + (f" · in ritardo di {m.giorni_ritardo} gg" if m.giorni_ritardo else ""),
+                         m.lavorazione_prevista_at.strftime("%H:%M"), url_for("main.veicolo", veicolo_id=v.id))
         finite = (Movimento.query.filter(Movimento.lavorazione_completata_at.isnot(None),
                                          Movimento.lavorazione_completata_at >= datetime.combine(dal, datetime.min.time()))
                   .all())
         for m in finite:
             if m.con_lavorazione and m.lavorazione_prevista_at and m.lavorazione_completata_at < m.lavorazione_prevista_at:
                 aggiungi(m.lavorazione_completata_at.date(), m.lavorazione_completata_at, "lavorazione", "anticipo", m.veicolo,
-                         f"{m.sede_arrivo_effettiva.nome} · finita in anticipo (prevista {m.lavorazione_prevista_at:%d/%m})",
+                         f"{m.sede_arrivo_effettiva.nome} · finita in anticipo (prevista {m.lavorazione_prevista_at:%d/%m %H:%M})",
                          "finita", url_for("main.veicolo", veicolo_id=m.veicolo_id))
     ordine = {"ritardo": 0, "anticipo": 1, "previsto": 2}
     out.sort(key=lambda e: (e["data"], ordine[e["stato"]], e["tipo"] != "preparazione", e["at"]))
@@ -671,7 +671,7 @@ def stima_lavorazione(mov_id):
         servizi.imposta_stima(mov, g.utente, giorni)
         db.session.commit()
         flash(f"{mov.veicolo.descrizione}: lavorazione stimata in {mov.stima_giorni} giorni, "
-              f"pronta il {mov.lavorazione_prevista_at:%d/%m}.", "ok")
+              f"pronta il {mov.lavorazione_prevista_at:%d/%m alle %H:%M}.", "ok")
     except Vietato as e:
         db.session.rollback()
         flash(str(e), "errore")

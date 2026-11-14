@@ -21,7 +21,7 @@
     {% for v, m in in_corso_tel %}
     <a class="per-te-voce {{ 'ritardo' if m.giorni_ritardo else 'lavorazione' }}" href="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}"><span class="per-te-barra" aria-hidden="true"></span>
       <span><b>{{ v.descrizione }} · {{ m.lavorazione }}</b>
-        <small>{% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}da finire entro il {{ m.lavorazione_prevista_at|data('%d/%m') }}{% endif %} · finito? tocca l'adesivo</small></span>{{ i('chevron', 's') }}</a>
+        <small>{% if m.giorni_ritardo %}<span class="testo-ritardo">in ritardo di {{ m.giorni_ritardo }} {{ 'giorno' if m.giorni_ritardo == 1 else 'giorni' }}</span>{% else %}da finire entro il {{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }}{% endif %} · finito? tocca l'adesivo</small></span>{{ i('chevron', 's') }}</a>
     {% else %}<p class="vuoto-telefono">Nessuna auto in lavorazione.</p>{% endfor %}
   </div>
   <h2 class="sezione-t">Pronte · {{ pronte_tel|length }}</h2>

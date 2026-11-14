@@ -43,7 +43,7 @@
   {% if ultimo.lavorazione_note %}<p class="blocco-nota">{{ ultimo.lavorazione_note }}</p>{% endif %}
   {% if ultimo.con_lavorazione %}
   <div class="mini-barra larga" aria-hidden="true"><span style="width:{{ ultimo.avanzamento_lavorazione }}%"></span></div>
-  <small class="blocco-sotto">{% if finita %}finita {{ finita|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}{% else %}{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m') }} · giorno {{ giorno }} di {{ ultimo.stima_giorni }} · fine prevista {{ ultimo.lavorazione_prevista_at|data('%d/%m') }}{% endif %}</small>
+  <small class="blocco-sotto">{% if finita %}finita {{ finita|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}{% else %}{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m') }} · giorno {{ giorno }} di {{ ultimo.stima_giorni }} · fine prevista {{ ultimo.lavorazione_prevista_at|data('%d/%m %H:%M') }}{% endif %}</small>
   <div class="blocco-azioni">
     {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
     {% if not finita %}{{ cambia_stima(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}

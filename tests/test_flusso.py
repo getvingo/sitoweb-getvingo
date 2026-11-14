@@ -1614,19 +1614,18 @@ class TestLavorazioniStimaESolleciti(Base):
         vid, mid = self.in_carrozzeria(2)
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
-            self.assertEqual((m.stima_giorni, m.avanzamento_lavorazione, m.giorni_ritardo), (5, 40, 0))
-        # stima uguale ai giorni passati: tutto il tempo è trascorso ma non è ancora in ritardo
-        # (13/11/2026: con la fine prevista esattamente "adesso" il test dipendeva dai millisecondi)
+            # 14/11/2026: 5 giorni lavorativi del fornitore (8 ore, 8–12 e 13–17) dall'arrivo, orario alla mezz'ora
+            self.assertEqual((m.stima_giorni, m.giorni_ritardo), (5, 0))
+            self.assertEqual(m.lavorazione_prevista_at, servizi.fine_lavori_prevista(m.arrivo_at, 5))
+            self.assertIn(m.lavorazione_prevista_at.minute, (0, 30))
+            self.assertTrue(0 < m.avanzamento_lavorazione < 100)
+        self.c.post(f"/movimento/{mid}/stima", data={"giorni": "1"})  # stima più corta: già oltre la fine
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
-            m.arrivo_at = adesso() - timedelta(days=2) + timedelta(minutes=10)
-            db.session.commit()
-        self.c.post(f"/movimento/{mid}/stima", data={"giorni": "2"})
-        with self.app.app_context():
-            m = db.session.get(Movimento, mid)
-            self.assertEqual((m.avanzamento_lavorazione, m.giorni_ritardo), (100, 0))
+            self.assertEqual(m.stima_giorni, 1)
+            self.assertEqual(m.avanzamento_lavorazione, 100 if m.lavorazione_prevista_at <= adesso() else m.avanzamento_lavorazione)
         stock = self.c.get("/stock").get_data(as_text=True)
-        self.assertIn("lavoro-corso", self.c.get("/lavorazioni").get_data(as_text=True))  # riga nei tempi (13/11/2026)
+        self.assertRegex(self.c.get("/lavorazioni").get_data(as_text=True), r"lavoro-(corso|ritardo)")  # riga colorata per stato
         self.assertIn("lavoro-breve", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))  # dal 12/11/2026 barra compatta
 
     def test_sollecito_solo_in_ritardo_e_risposta_del_fornitore(self):
@@ -1638,7 +1637,10 @@ class TestLavorazioniStimaESolleciti(Base):
             db.session.get(Movimento, mid).arrivo_at = adesso() - timedelta(days=8)
             db.session.commit()
         pagina = self.c.get("/lavorazioni").get_data(as_text=True)
-        self.assertIn("In ritardo di 3 giorni", pagina)
+        with self.app.app_context():
+            n = db.session.get(Movimento, mid).giorni_ritardo  # giorni oltre la fine prevista (orari dei fornitori)
+        self.assertGreater(n, 0)
+        self.assertIn(f"In ritardo di {n} {'giorno' if n == 1 else 'giorni'}", pagina)
         self.assertIn("Invia sollecito", pagina)
         self.c.post(f"/movimento/{mid}/sollecito")
         self.c.post(f"/movimento/{mid}/sollecito")  # una sola richiesta aperta alla volta
@@ -3376,7 +3378,7 @@ class TestControlliDellaSera(Base):
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Viaggi in ritardo", pagina)
         self.assertIn("Da verificare", pagina)
-        self.assertIn("Preparazioni · oggi", pagina)
+        self.assertIn("Pronte oggi", pagina)  # 14/11/2026: al posto di "Preparazioni · oggi"
 
     def test_viaggio_dal_fornitore_senza_stima(self):
         """Rientro da un fornitore senza posizione sulla mappa: l'arrivo non si stima, ma dopo 3 ore è da verificare."""
@@ -3824,3 +3826,17 @@ class TestCalendarioPanoramica(Base):
         cal = self.c.get("/calendario").get_data(as_text=True)  # il mese intero: preparazioni e lavorazioni insieme
         self.assertIn('class="cal-voce lavorazione previsto', cal)
         self.assertIn("fine lavori", cal)
+
+
+class TestFinePrevistaFornitori(unittest.TestCase):
+    """Fine lavori con gli orari delle aziende esterne (14/11/2026): 8–12 e 13–17, giorni lavorativi, alla mezz'ora."""
+    def test_calcolo(self):
+        app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "t"})
+        usa_org_1(app)
+        with app.app_context():
+            db.create_all()
+            f = servizi.fine_lavori_prevista
+            self.assertEqual(f(datetime(2026, 11, 16, 10, 10), 1), datetime(2026, 11, 17, 10, 30))  # 10:10 → arrotondata 10:30
+            self.assertEqual(f(datetime(2026, 11, 14, 10, 0), 1), datetime(2026, 11, 16, 17, 0))    # arrivata sabato: lunedì
+            self.assertEqual(f(datetime(2026, 11, 16, 16, 50), 2), datetime(2026, 11, 18, 17, 0))
+            self.assertEqual(f(datetime(2026, 12, 23, 15, 20), 2), datetime(2026, 12, 28, 15, 30))  # Natale e Santo Stefano saltati
