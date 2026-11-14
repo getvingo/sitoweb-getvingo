@@ -124,7 +124,6 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
   {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
   {{ numero(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
   {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
-  {{ numero(url_for('main.piazzale'), 'in_sede', 'auto', conteggi.stock, 'In stock') }}
 </nav>
 
 {% if danni %}

@@ -34,16 +34,40 @@
 {% if v.stato == 'in_sede' and v.sede and v.sede.esterna and ultimo %}
 {% set finita = ultimo.lavorazione_completata_at %}{% set rit = ultimo.giorni_ritardo %}
 {% set giorno = (adesso() - ultimo.arrivo_at).days + 1 if ultimo.arrivo_at else 0 %}
-<section class="blocco-fase lavoro-{{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
-  <div class="blocco-testa">
-    <span class="pillola-stato"><i aria-hidden="true"></i>{% if not ultimo.con_lavorazione %}Solo trasferimento{% elif finita %}Finita, da ritirare{% elif rit %}In ritardo di {{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
-    <b>{{ ultimo.lavorazione if ultimo.con_lavorazione else 'Nessuna lavorazione' }}</b><span class="tenue">presso {{ v.sede.nome }}</span>
-    {% if ultimo.ddt %}<a class="blocco-link" href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}">DDT {{ ultimo.ddt.sigla }}</a>{% endif %}
+<section class="blocco-fase blocco-lavoro lavoro-{{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
+  {# 14/11/2026 sera: grafica dedicata alla lavorazione. Dove si trova l'auto lo dice già la striscia sopra:
+     qui solo cosa si fa, la linea del tempo (arrivo · fine prevista · oggi/finita) e le azioni #}
+  <div class="lavoro-testa">
+    <span class="lavoro-icona" aria-hidden="true">{{ i('chiave') }}</span>
+    <div class="lavoro-titolo">
+      <small>Lavorazione{% if ultimo.ddt %} · <a href="{{ url_for('main.ddt_dettaglio', ddt_id=ultimo.ddt.id) }}">DDT {{ ultimo.ddt.sigla }}</a>{% endif %}</small>
+      <h2>{{ ultimo.lavorazione if ultimo.con_lavorazione else 'Solo trasferimento' }}</h2>
+      {% if ultimo.lavorazione_note %}<p>{{ ultimo.lavorazione_note }}</p>{% endif %}
+    </div>
+    <span class="pillola-stato"><i aria-hidden="true"></i>{% if not ultimo.con_lavorazione %}Nessuna lavorazione{% elif finita %}Finita, da ritirare{% elif rit %}In ritardo di {{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}{% else %}Nei tempi{% endif %}</span>
   </div>
-  {% if ultimo.lavorazione_note %}<p class="blocco-nota">{{ ultimo.lavorazione_note }}</p>{% endif %}
-  {% if ultimo.con_lavorazione %}
-  <div class="mini-barra larga" aria-hidden="true"><span style="width:{{ ultimo.avanzamento_lavorazione }}%"></span></div>
-  <small class="blocco-sotto">{% if finita %}finita {{ finita|da_quanto }}{% if ultimo.lavorazione_note_fine %} · {{ ultimo.lavorazione_note_fine }}{% endif %}{% else %}{{ 'qui dal' if ultimo.senza_ddt else 'arrivata il' }} {{ ultimo.arrivo_at|data('%d/%m') }} · giorno {{ giorno }} di {{ ultimo.stima_giorni }} · fine prevista {{ ultimo.lavorazione_prevista_at|data('%d/%m %H:%M') }}{% endif %}</small>
+  {% if ultimo.con_lavorazione and ultimo.arrivo_at %}
+  {% set a = ultimo.arrivo_at %}{% set prev = ultimo.lavorazione_prevista_at %}{% set fine = finita or adesso() %}
+  {% set tot = [(fine - a).total_seconds(), (prev - a).total_seconds(), 1]|max %}
+  {% set fp = ((prev - a).total_seconds() / tot * 100)|round(1) %}{% set fo = ((fine - a).total_seconds() / tot * 100)|round(1) %}
+  <div class="lavoro-tempo" role="img" aria-label="Arrivata il {{ a|data('%d/%m') }}, fine prevista {{ prev|data('%d/%m %H:%M') }}, {{ 'finita il ' ~ finita|data('%d/%m') if finita else 'oggi giorno ' ~ giorno }}">
+    <div class="lavoro-binario">
+      <span class="fatto" style="width:{{ [fo, fp]|min }}%"></span>
+      {% if fo > fp %}<span class="oltre" style="left:{{ fp }}%;width:{{ fo - fp }}%"></span>{% endif %}
+      <span class="tacca prevista" style="left:{{ fp }}%"></span>
+      <span class="tacca adesso" style="left:{{ fo }}%"></span>
+    </div>
+    {% set punti = [(0, 'Arrivata', a|data('%d/%m')), (fp, 'Fine prevista', prev|data('%d/%m %H:%M')), (fo, 'Finita' if finita else 'Oggi', finita|data('%d/%m') if finita else 'giorno ' ~ giorno)] %}
+    <ol class="lavoro-punti">{% for pos, nome, quando in punti|sort(attribute='0') %}<li class="{{ 'prevista' if nome == 'Fine prevista' else ('adesso' if pos == fo and nome != 'Arrivata' else '') }}"><small>{{ nome }}</small><b>{{ quando }}</b></li>{% endfor %}</ol>
+  </div>
+  <div class="lavoro-numeri">
+    <div><small>Tempo stimato</small><b>{{ ultimo.stima_giorni }} {{ 'giorno' if ultimo.stima_giorni == 1 else 'giorni' }}</b></div>
+    <div><small>{{ 'Ci è rimasta' if finita else 'Dal fornitore da' }}</small><b>{{ giorno }} {{ 'giorno' if giorno == 1 else 'giorni' }}</b></div>
+    {% if finita %}{% set oltre = ((finita - prev).total_seconds() / 86400)|round(0, 'ceil')|int %}
+    <div class="esito {{ 'ritardo' if oltre > 0 else 'ok' }}"><small>{{ 'Finita in ritardo' if oltre > 0 else 'Finita nei tempi' }}</small><b>{% if oltre > 0 %}di {{ oltre }} {{ 'giorno' if oltre == 1 else 'giorni' }}{% else %}{{ finita|da_quanto }}{% endif %}</b>{% if ultimo.lavorazione_note_fine %}<span>{{ ultimo.lavorazione_note_fine }}</span>{% endif %}</div>
+    {% elif rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}</b></div>
+    {% else %}<div class="esito"><small>Fine prevista</small><b>{{ prev|data('%d/%m %H:%M') }}</b></div>{% endif %}
+  </div>
   <div class="blocco-azioni">
     {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
     {% if not finita %}{{ cambia_stima(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}{% endif %}
@@ -67,23 +91,20 @@
 
 {# ---- Preparazione per la consegna (13/11/2026 notte: compatta, i 4 passi in fila con data) ---- #}
 {% if preparazione %}{% set p = preparazione %}{% set fatti = p.fasi|length %}{% set rit = p.pronta_entro_at|ritardo if p.pronta_entro_at else none %}
-<section class="blocco-fase prep-{{ 'ritardo' if rit else 'tempo' }}" id="preparazione" style="scroll-margin-top:16px">
+<section class="blocco-fase blocco-prep prep-{{ 'ritardo' if rit else 'tempo' }}" id="preparazione" style="scroll-margin-top:16px">
   <div class="blocco-testa">
     <span class="pillola-stato"><i aria-hidden="true"></i>Passo {{ fatti + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}</span>
     {% if p.pronta_entro_at %}<span class="tenue">pronta entro <b style="color:var(--testo)">{{ p.pronta_entro_at|slot }}</b></span>{% if rit %}<b class="testo-ritardo">in ritardo di {{ rit }}</b>{% endif %}{% else %}<span class="tenue">orario non fissato</span>{% endif %}
   </div>
   <ol class="passi-nomi">
     {% for f in p.FASI %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}"><span class="barretta" aria-hidden="true"></span>
-      <b>{{ f }}</b><small>{{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') if loop.index0 < fatti else ('in corso' if loop.index0 == fatti else '') }}</small></li>{% endfor %}
+      <b>{{ f }}</b><small>{{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') if loop.index0 < fatti else (('in attesa: prima il danno' if bloccata_da_danni(p) else 'in corso') if loop.index0 == fatti else '') }}</small></li>{% endfor %}
   </ol>
-  {% if bloccata_da_danni(p) %}{% set dn = v.danni_aperti[0] %}
-  <a class="blocco-danno" href="{{ url_for('main.danno', danno_id=dn.id, torna=url_for('main.veicolo', veicolo_id=v.id)) }}">{{ i('attenzione', 's') }}<span><b>{{ p.prossima_fase }} bloccato:</b> danno da verificare ({{ dn.zona|lower }}). Risolvilo con una foto per continuare.</span></a>
-  {% endif %}
   {% if p.fasi %}<div class="blocco-azioni">{{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.veicolo', veicolo_id=v.id)) }}</div>{% endif %}
 </section>
 {% elif (v.da_consegnare or v.fase == 'consegnato') and ultima_prep %}
-<div class="scheda" style="margin-bottom:12px">
-  <h3>{{ i('cronometro', 's') }} Tempi di lavorazione</h3>
+<div class="scheda tempi-auto" style="margin-bottom:12px">
+  <h3>{{ i('cronometro', 's') }} {{ 'Tempi della preparazione' if not ultima_prep.riepilogo.esterni is not none else 'Tempi di lavorazione e preparazione' }}</h3>
   {{ riepilogo_lavorazione(ultima_prep) }}
   {{ tappe_preparazione(ultima_prep) }}
   {% if v.stato == 'consegnato' %}{{ annulla(annullabile(v.id, 'consegna'), 'Annulla consegna', url_for('main.veicolo', veicolo_id=v.id)) }}

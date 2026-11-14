@@ -2858,3 +2858,62 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .stock-layout .tabella-stock thead th { padding-top: 0; padding-bottom: 4px; }
 .tabella-fare .cella-stato .pillola-stato { margin-bottom: 6px; }
 .tabella-fare .cella-stato small { display: block; }
+
+/* ---- Scheda auto da computer (14/11/2026 sera): due colonne, niente doppioni, grafica della lavorazione ---- */
+/* lo stato di dettaglio nella carta ripeteva quello del riquadro sotto (giorni, passo, consegna): qui basta lo stato */
+.solo-computer .scheda-auto-testa .carta-auto-stato .dettaglio-stato { display: none; }
+/* con la lavorazione aperta "arrivata il … con DDT" lo dice la linea del tempo */
+.solo-computer:has(.blocco-lavoro) .info-striscia > div:nth-child(2) { display: none; }
+@media (min-width: 1100px) {
+  .scheda-colonna { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 0 24px; align-items: start; }
+  .scheda-colonna .col-sotto { position: sticky; top: 16px; }
+  .col-sotto > h2:first-of-type { margin-top: 0; }
+  .col-sotto #mappa { height: 240px; }
+  .col-sotto .ddt-mini { display: block; width: auto; margin-right: 0; }
+  .col-sotto .btn-danno { min-height: var(--alt-normale); }
+  .col-principale > :last-child { margin-bottom: 0; }
+}
+.blocco-fase { padding: 16px 18px; gap: 12px; }
+.blocco-lavoro { gap: 16px; }
+.lavoro-testa { display: flex; align-items: flex-start; gap: 14px; }
+.lavoro-icona { width: 48px; height: 48px; flex: none; border-radius: 14px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--fase) 14%, var(--carta)); color: var(--fase); }
+.lavoro-icona .icona { width: 26px; height: 26px; }
+.lavoro-titolo { flex: 1; min-width: 0; }
+.lavoro-titolo small { display: block; font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--testo-2); }
+.lavoro-titolo small a { text-transform: none; letter-spacing: 0; }
+.lavoro-titolo h2 { margin: 2px 0 0; font-size: var(--fs-20); text-transform: none; letter-spacing: 0; color: var(--testo); }
+.lavoro-titolo p { margin: 4px 0 0; color: var(--testo-2); font-size: var(--fs-15); }
+.lavoro-testa .pillola-stato { flex: none; }
+.lavoro-tempo { display: grid; gap: 8px; }
+.lavoro-binario { position: relative; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--in-tempo) 14%, var(--superficie)); margin: 6px 0 0; }
+.lavoro-binario .fatto { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: var(--in-tempo); }
+.lavoro-finita .lavoro-binario .fatto { background: var(--pronta-verde); }
+.lavoro-binario .oltre { position: absolute; top: 0; bottom: 0; border-radius: 0 5px 5px 0;
+  background: repeating-linear-gradient(45deg, var(--in-ritardo) 0 4px, color-mix(in srgb, var(--in-ritardo) 55%, transparent) 4px 8px); }
+.lavoro-binario .tacca { position: absolute; top: -5px; width: 3px; height: 20px; border-radius: 2px; transform: translateX(-50%); background: var(--testo); }
+.lavoro-binario .tacca.adesso { width: 14px; height: 14px; top: -2px; border-radius: 50%; background: var(--carta); border: 3px solid var(--fase); }
+.lavoro-punti { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; gap: 12px; }
+.lavoro-punti li { display: grid; gap: 1px; }
+.lavoro-punti li:nth-child(2) { text-align: center; } .lavoro-punti li:last-child { text-align: right; }
+.lavoro-punti small { font-size: var(--fs-12); color: var(--testo-2); font-weight: 600; }
+.lavoro-punti b { font-size: var(--fs-14); }
+.lavoro-punti .adesso b { color: var(--fase); }
+.lavoro-numeri { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lavoro-numeri > div { background: var(--superficie); border-radius: var(--r-s); padding: 10px 12px; display: grid; gap: 2px; }
+.lavoro-numeri small { font-size: var(--fs-12); color: var(--testo-2); font-weight: 650; }
+.lavoro-numeri b { font-size: var(--fs-17, 17px); }
+.lavoro-numeri span { font-size: var(--fs-13); color: var(--testo-2); }
+.lavoro-numeri .esito.ritardo { background: var(--in-ritardo-tenue); } .lavoro-numeri .esito.ritardo b { color: var(--in-ritardo-testo); }
+.lavoro-numeri .esito.ok { background: var(--ok-tenue); } .lavoro-numeri .esito.ok b { color: var(--ok); }
+.blocco-lavoro .blocco-azioni { padding-top: 12px; border-top: 1px solid var(--bordo); }
+.blocco-lavoro .blocco-azioni:empty { display: none; }
+.blocco-prep .passi-nomi .ora small { color: var(--fase); font-weight: 650; }
+/* la consegna (cosa fare) prima dei tempi (cosa è stato fatto); un'azione sola prende tutta la riga */
+.col-principale { display: flex; flex-direction: column; }
+.col-principale > .consegna { order: -1; margin-bottom: 12px; }
+.azioni-auto.senza-prepara { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .col-sotto .portami-dove { display: none; } .col-sotto .portami { flex-direction: row; } }
+/* Home: pillole dei numeri un po' più larghe (14/11/2026 sera) */
+.numeri-riga { gap: 10px; }
+.numero-voce { min-height: 48px; padding: 0 22px 0 8px; gap: 10px; }
