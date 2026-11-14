@@ -341,6 +341,118 @@ def _da_fare_per_te(quante=5):
     return voci[:quante]
 
 
+FASCE_DA_FARE = (("adesso", "Adesso", "attenzione"), ("oggi", "Oggi", "orologio"), ("prossimi", "Prossimi giorni", "bandiera"))
+REPARTI_DA_FARE = {"viaggi": ("Viaggio", "camion"), "ritiri": ("Ritiro", "ritiro"), "lavorazioni": ("Lavorazione", "chiave"),
+                   "preparazione": ("Preparazione", "brilla"), "consegna": ("Consegna", "bandiera")}
+
+
+def _da_fare_home(gruppi, attivi):
+    """"Da fare" della Home da computer (14/11/2026 sera): solo ciò che chiede un intervento, in tre fasce di
+    urgenza (Adesso · Oggi · Prossimi giorni), una voce per auto (la più urgente) con l'azione da fare sulla riga.
+    Le preparazioni regolari e le fini previste di oggi non ci sono: stanno in "Pronte oggi".
+    "Solo le mie" (?mie=1): le voci che toccano a chi guarda, per persona (ritiro assegnato, DDT creato o viaggio
+    partito da lui, auto di cui è il venditore) o per mansione (Preparatore → preparazioni, Consegne → ritiri e
+    consegne, Backoffice e Resp. commerciale → lavorazioni e consegne). Restituisce (fasce, totale, solo_mie)."""
+    io, ruolo = g.utente.id, g.utente.ruolo
+    ordine_fascia = {"adesso": 0, "oggi": 1, "prossimi": 2}
+    voci = {}
+
+    def aggiungi(reparto, fascia, etichetta, v, testo, url, azione=None, persone=(), ruoli=()):
+        x = {"reparto": reparto, "fascia": fascia, "etichetta": etichetta, "v": v, "testo": testo, "url": url,
+             "azione": azione, "mia": io in persone or (v.venditore_id == io) or ruolo in ruoli}
+        if v.id not in voci or ordine_fascia[fascia] < ordine_fascia[voci[v.id]["fascia"]]:
+            voci[v.id] = x
+
+    ora = adesso()
+    # viaggi oltre l'arrivo stimato di più di un'ora: una voce per DDT (il DDT multiplo non si ripete per ogni auto)
+    visti = set()
+    for v in gruppi["in_viaggio"]:
+        m = v.movimento_aperto
+        ritardo = servizi.viaggio_in_ritardo(m) if m else None
+        if ritardo is not None and ritardo > 60 and m.ddt_id not in visti:
+            visti.add(m.ddt_id)
+            altre = [x for x in m.ddt.movimenti if x.veicolo_id != v.id]
+            ore, (_, stimato) = ritardo // 60, servizi.arrivo_atteso(m)
+            tratta = f"da {m.da_sede.nome} a {m.a_sede.nome}" if m.da_sede else f"verso {m.a_sede.nome}"
+            partita = f"partita alle {m.partenza_at:%H:%M}" + (f" del {m.partenza_at:%d/%m}" if m.partenza_at.date() != ora.date() else "")
+            tratta += f" con altre {len(altre)} auto" if altre else ""
+            testo = (f"DDT {m.ddt.sigla} {tratta}: doveva arrivare da {ore} {'ora' if ore == 1 else 'ore'}" if stimato else
+                     f"DDT {m.ddt.sigla} {tratta}: in viaggio da oltre {int((ora - m.partenza_at).total_seconds() // 3600)} ore (arrivo non stimabile: manca la posizione di un luogo)") + f" · {partita}"
+            url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
+            aggiungi("viaggi", "adesso", "Arrivo in ritardo", v, testo, url, ("Verifica il viaggio", url),
+                     persone=(m.partenza_utente_id, m.ddt.creato_da_id), ruoli=("consegne",))
+    # ritiri predisposti
+    tra_un_giorno = ora + timedelta(hours=24)
+    for m in _movimenti("predisposto").order_by(Movimento.ritiro_entro_at):
+        url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
+        chi = f" · lo ritira {m.assegnato_a.nome}" if m.assegnato_a else " · nessuno incaricato"
+        persone, ruoli = (m.assegnato_a_id, m.ddt.creato_da_id), ("consegne",)
+        if m.scaduto:
+            aggiungi("ritiri", "adesso", "Ritiro scaduto", m.veicolo, f"DDT {m.ddt.sigla}: scaduto il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
+                     url, ("Rinnova il ritiro", url), persone, ruoli)
+        elif m.ritiro_entro_at and m.ritiro_entro_at <= tra_un_giorno:
+            aggiungi("ritiri", "oggi", "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: entro le {m.ritiro_entro_at:%H:%M del %d/%m} presso "
+                     f"{m.da_sede.nome if m.da_sede else '—'}{chi}", url, ("Apri il DDT", url), persone, ruoli)
+        else:
+            aggiungi("ritiri", "prossimi", "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: presso {m.da_sede.nome if m.da_sede else '—'}"
+                     + (f" entro il {m.ritiro_entro_at:%d/%m}" if m.ritiro_entro_at else "") + chi, url, ("Apri il DDT", url), persone, ruoli)
+    # lavorazioni: stessa regola della pagina Lavorazioni (ritardo sulla fine prevista)
+    for v in attivi:
+        url = url_for("main.veicolo", veicolo_id=v.id)
+        if v.fase == "da_ritirare" and v.movimento_predisposto is None:
+            m = v.arrivo_qui
+            aggiungi("lavorazioni", "oggi", "Finita, manca il rientro", v,
+                     f"{m.lavorazione if m else 'Lavorazione'} finita presso {v.sede.nome}: prepara il DDT di rientro", url,
+                     ("Predisponi rientro", url + "#predisponi"), persone=(m.ddt.creato_da_id,) if m and m.ddt else (),
+                     ruoli=("backoffice", "resp_commerciale"))
+        elif v.fase == "lavorazione" and v.arrivo_qui and v.arrivo_qui.con_lavorazione and v.arrivo_qui.giorni_ritardo:
+            m = v.arrivo_qui
+            rit, s = m.giorni_ritardo, m.ultimo_sollecito
+            in_attesa = s is not None and not s.risposta_at
+            aggiungi("lavorazioni", "adesso", "In ritardo", v,
+                     f"{m.lavorazione} presso {v.sede.nome}: in ritardo di {rit} {'giorno' if rit == 1 else 'giorni'} "
+                     f"(fine prevista {m.lavorazione_prevista_at:%d/%m})" + (" · sollecitata, in attesa di risposta" if in_attesa else ""),
+                     url, ("Vedi il sollecito" if in_attesa else f"Sollecita {v.sede.nome}", url),
+                     persone=(m.ddt.creato_da_id,) if m.ddt else (), ruoli=("backoffice", "resp_commerciale"))
+    # preparazioni che chiedono qualcosa: bloccate, in ritardo, senza orario
+    for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
+        v, url = prep.veicolo, url_for("main.veicolo", veicolo_id=prep.veicolo_id)
+        ruoli = ("preparatore",)
+        if servizi.bloccata_da_danni(prep):
+            d = v.danni_aperti[0]
+            aggiungi("preparazione", "adesso", "Bloccata da un danno", v, f"Ferma prima di “{prep.prossima_fase}”: {d.zona.lower()} da verificare",
+                     url, ("Verifica il danno", url_for("main.danno", danno_id=d.id, torna=url_for("main.home"))), ruoli=ruoli + ("backoffice",))
+        elif prep.pronta_entro_at and prep.pronta_entro_at < ora:
+            aggiungi("preparazione", "adesso", "In ritardo", v,
+                     f"Doveva essere pronta il {prep.pronta_entro_at:%d/%m alle %H:%M} · ora: {prep.prossima_fase}", url,
+                     ("Apri la preparazione", url + "#preparazione"), ruoli=ruoli)
+        elif not prep.pronta_entro_at:
+            aggiungi("preparazione", "prossimi", "Orario da fissare", v, f"Non è in calendario · ora: {prep.prossima_fase}", url,
+                     ("Fissa l'orario", url_for("main.preparazione")), ruoli=ruoli + ("backoffice",))
+    # auto pronte: cosa manca per consegnarle
+    for v in gruppi["pronta"]:
+        url = url_for("main.veicolo", veicolo_id=v.id) + "#consegna"
+        ruoli = ("consegne", "backoffice")
+        if v.verso_consegna:
+            continue
+        if not v.consegna_sede:
+            aggiungi("consegna", "prossimi", "Sede da indicare", v, "Pronta: indica in quale sede si consegna", url,
+                     ("Indica la sede di consegna", url), ruoli=ruoli)
+        elif v.sede_id != v.consegna_sede_id:
+            aggiungi("consegna", "oggi", "Da spostare", v, f"Pronta a {v.sede.nome}, si consegna a {v.consegna_sede.nome}", url,
+                     ("Crea l'ultimo DDT", url), ruoli=ruoli)
+        elif not v.targa:
+            aggiungi("consegna", "prossimi", "Senza targa", v, "Pronta nella sede di consegna: manca la targa", url,
+                     ("Inserisci la targa", url), ruoli=ruoli)
+
+    tutte = list(voci.values())
+    mie = request.args.get("mie") == "1"
+    elenco = [x for x in tutte if x["mia"]] if mie else tutte
+    fasce = [(k, titolo, icona, [x for x in elenco if x["fascia"] == k]) for k, titolo, icona in FASCE_DA_FARE]
+    return fasce, {"tutte": len(tutte), "mie": sum(1 for x in tutte if x["mia"]), "mostrate": len(elenco)}, mie
+
+
+
 @bp.route("/")
 @login_richiesto
 def home():
@@ -365,80 +477,12 @@ def home():
     conteggi = {k: len(lista) for k, lista in gruppi.items()}
     conteggi["ddt_in_viaggio"] = len({v.movimento_aperto.ddt_id for v in gruppi["in_viaggio"] if v.movimento_aperto})
 
-    # da fare, in due gruppi: lavorazioni e ritiri / preparazione. Livello = colore (1 urgente, 2 presto,
-    # 3 normale); l'etichetta dice cosa sta succedendo. Una voce per auto (la più grave).
-    voci = {}
-
-    def aggiungi(gruppo, livello, etichetta, v, testo, url):
-        if v.id not in voci or livello < voci[v.id]["livello"]:
-            voci[v.id] = {"gruppo": gruppo, "livello": livello, "etichetta": etichetta, "v": v, "testo": testo, "url": url}
-
-    # viaggi oltre l'arrivo stimato di più di un'ora: da verificare (cosa sta succedendo?)
-    for v in gruppi["in_viaggio"]:
-        m = v.movimento_aperto
-        ritardo = servizi.viaggio_in_ritardo(m) if m else None
-        if ritardo is not None and ritardo > 60:
-            ore, (_, stimato) = ritardo // 60, servizi.arrivo_atteso(m)
-            tratta = f"da {m.da_sede.nome} a {m.a_sede.nome}" if m.da_sede else f"verso {m.a_sede.nome}"
-            partita = f"partita alle {m.partenza_at:%H:%M}" + (
-                f" del {m.partenza_at:%d/%m}" if m.partenza_at.date() != adesso().date() else "")
-            ritardo_txt = f"da {ore} {'ora' if ore == 1 else 'ore'}"
-            aggiungi("viaggi", 1 if ritardo > 180 else 2, "Da verificare", v,
-                     f"DDT {m.ddt.sigla} {tratta}: " + (f"doveva arrivare {ritardo_txt}" if stimato else
-                     f"in viaggio da oltre {int((adesso() - m.partenza_at).total_seconds() // 3600)} ore (arrivo non stimabile: "
-                     "manca la posizione di un luogo)") + f" · {partita}",
-                     url_for("main.ddt_dettaglio", ddt_id=m.ddt.id))
-    tra_un_giorno = adesso() + timedelta(hours=24)
-    for m in _movimenti("predisposto").order_by(Movimento.ritiro_entro_at):
-        url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
-        if m.scaduto:
-            aggiungi("lavorazioni", 1, "Urgente", m.veicolo,
-                     f"DDT {m.ddt.sigla}: ritiro scaduto il {m.ritiro_entro_at:%d/%m alle %H:%M}, va rinnovato", url)
-        elif m.ritiro_entro_at and m.ritiro_entro_at <= tra_un_giorno:
-            aggiungi("lavorazioni", 2, "Entro oggi", m.veicolo,
-                     f"DDT {m.ddt.sigla}: da ritirare entro le {m.ritiro_entro_at:%H:%M del %d/%m}", url)
-        else:
-            aggiungi("lavorazioni", 3, "Da ritirare", m.veicolo,
-                     f"DDT {m.ddt.sigla}: da ritirare presso {m.da_sede.nome if m.da_sede else '—'}", url)
-    for v in attivi:
-        if v.fase == "da_ritirare" and v.movimento_predisposto is None:
-            aggiungi("lavorazioni", 3, "Attesa DDT", v, f"Lavorazione finita presso {v.sede.nome}: manca il DDT di rientro",
-                     url_for("main.veicolo", veicolo_id=v.id))
-        elif v.fase == "lavorazione":
-            m = v.arrivo_qui
-            giorni = (m.giorni_lavorazione or 0) if m else 0
-            if giorni >= 7:
-                aggiungi("lavorazioni", 1 if giorni >= 14 else 2, "Urgente" if giorni >= 14 else "Da sollecitare", v,
-                         f"Ferma presso {v.sede.nome} da {giorni} giorni",
-                         url_for("main.ddt_dettaglio", ddt_id=m.ddt.id) if m.ddt
-                         else url_for("main.veicolo", veicolo_id=v.id))
-    for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
-        url = url_for("main.veicolo", veicolo_id=prep.veicolo_id)
-        if servizi.bloccata_da_danni(prep):
-            aggiungi("preparazione", 2, "Bloccata", prep.veicolo,
-                     f"Ferma prima di “{prep.prossima_fase}”: c'è un danno da risolvere", url)
-        else:
-            fatte = len(prep.fasi)
-            aggiungi("preparazione", 3, "Da completare", prep.veicolo,
-                     f"Attività {fatte + 1} di {len(Preparazione.FASI)}: {prep.prossima_fase}", url)
-    for prep in Preparazione.query.filter(Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at.isnot(None)):
-        url = url_for("main.veicolo", veicolo_id=prep.veicolo_id)
-        if prep.pronta_entro_at < adesso():
-            aggiungi("preparazione", 1, "In ritardo", prep.veicolo,
-                     f"Doveva essere pronta il {prep.pronta_entro_at:%d/%m alle %H:%M} · ora: {prep.prossima_fase}", url)
-        elif prep.pronta_entro_at.date() == adesso().date():
-            aggiungi("preparazione", 2, "Entro oggi", prep.veicolo,
-                     f"Pronta entro le {prep.pronta_entro_at:%H:%M} · ora: {prep.prossima_fase}", url)
-    ordinate = sorted(voci.values(), key=lambda x: x["livello"])
-    oggi_d = adesso().date()
-    oggi = [e for e in _eventi_preparazione() if e["at"].date() == oggi_d or e["ritardo"]]
-    da_fare = [("viaggi", "Viaggi in ritardo", "camion", [x for x in ordinate if x["gruppo"] == "viaggi"]),
-               ("lavorazioni", "Lavorazioni e ritiri", "chiave", [x for x in ordinate if x["gruppo"] == "lavorazioni"]),
-               ("preparazione", "Preparazione", "brilla", [x for x in ordinate if x["gruppo"] == "preparazione"])]
-    return render_template("home.html", da_fare=da_fare, totale_da_fare=len(ordinate), danni=danni, per_te=_da_fare_per_te(),
-                           pronte_oggi=_eventi_calendario(adesso().date(), adesso().date()),
+    da_fare, totale_da_fare, mie = _da_fare_home(gruppi, attivi)
+    return render_template("home.html", da_fare=da_fare, totale_da_fare=totale_da_fare, solo_mie=mie, REPARTI_DA_FARE=REPARTI_DA_FARE, danni=danni, per_te=_da_fare_per_te(),
+                           # i ritardi stanno in "Da fare" (con la loro azione): qui solo il programma di oggi
+                           pronte_oggi=[e for e in _eventi_calendario(adesso().date(), adesso().date()) if e["stato"] != "ritardo"],
                            **_home_telefono(),
-                           conteggi=conteggi, oggi=oggi, oggi_data=oggi_d, tipi_evento=TIPI_EVENTO,
+                           conteggi=conteggi, tipi_evento=TIPI_EVENTO,
                            ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
 
 

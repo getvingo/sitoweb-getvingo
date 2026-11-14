@@ -1572,8 +1572,8 @@ class TestRegoleNuove(Base):
         self.assertEqual(self.c.get("/piazzale").status_code, 302)  # vecchio indirizzo
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Da ritirare", pagina)
-        self.assertIn("Attività 1 di 4: Controllo rientro", pagina)
-        self.assertIn("Da completare", pagina)
+        self.assertIn("attività 1 di 4: Controllo rientro", pagina)  # home dal telefono: In preparazione
+        self.assertNotIn("Da completare", pagina)  # 14/11 sera: le preparazioni regolari non sono "da fare"
         with self.app.app_context():
             prep = Preparazione.query.one()
             prep.completata_at = prep.creata_at  # pronta per la consegna: resta in stock fino alla consegna
@@ -1879,8 +1879,7 @@ class TestRegoleLavorazioneECalendario(Base):
         self.assertIn("cal-auto ev pronta_entro", cal)
         if slot.date() == adesso().date():
             home = self.c.get("/").get_data(as_text=True)
-            self.assertIn("oggi-voce ev pronta_entro", home)
-            self.assertIn("Entro oggi", home)
+            self.assertIn("cal-voce preparazione", home)  # 14/11 sera: sta in "Pronte oggi", non in Da fare
 
     def test_preparazione_solo_negli_slot_di_30_minuti(self):
         vid = self.abbina()
@@ -3372,14 +3371,14 @@ class TestControlliDellaSera(Base):
     def test_viaggio_oltre_un_ora_dall_arrivo_stimato(self):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
-        self.assertNotIn("Viaggi in ritardo", self.c.get("/").get_data(as_text=True))
+        self.assertNotIn("Arrivo in ritardo", self.c.get("/").get_data(as_text=True))
         with self.app.app_context():
             m = self.mov(self.ddt())
             m.partenza_at = adesso() - timedelta(minutes=(m.stima_viaggio_min or 20) + 90)
             db.session.commit()
         pagina = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Viaggi in ritardo", pagina)
-        self.assertIn("Da verificare", pagina)
+        self.assertIn("Arrivo in ritardo", pagina)
+        self.assertIn("Verifica il viaggio", pagina)
         self.assertIn("Pronte oggi", pagina)  # 14/11/2026: al posto di "Preparazioni · oggi"
 
     def test_viaggio_dal_fornitore_senza_stima(self):
@@ -3392,13 +3391,13 @@ class TestControlliDellaSera(Base):
             m.stima_viaggio_min = None
             m.partenza_at = adesso() - timedelta(hours=2)
             db.session.commit()
-        self.assertNotIn("Viaggi in ritardo", self.c.get("/").get_data(as_text=True))
+        self.assertNotIn("Arrivo in ritardo", self.c.get("/").get_data(as_text=True))
         with self.app.app_context():
             m = self.mov(self.ddt())
             m.partenza_at = adesso() - timedelta(hours=4)
             db.session.commit()
         pagina = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Viaggi in ritardo", pagina)
+        self.assertIn("Arrivo in ritardo", pagina)
         self.assertIn("arrivo non stimabile", pagina)
 
     def test_analisi_solo_admin(self):

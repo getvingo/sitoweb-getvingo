@@ -2977,3 +2977,18 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .lavoro-fatto-dati dd { margin: 0; font-size: var(--fs-14); font-weight: 650; }
 .testo-ok { color: var(--ok); }
 @media (max-width: 1240px) { .sotto-fase.con-lavoro { grid-template-columns: minmax(0, 1fr); } }
+/* ---- "Da fare" per urgenza (14/11/2026 sera): Adesso (rosso) · Oggi (arancio) · Prossimi giorni (neutro) ---- */
+.riga-stock.fare-adesso { --fase: var(--in-ritardo); } .riga-stock.fare-oggi { --fase: var(--arancio); } .riga-stock.fare-prossimi { --fase: var(--bordo-forte); }
+.riga-stock.fare-adesso .pillola-stato { background: var(--in-ritardo); color: #fff; } .riga-stock.fare-adesso .pillola-stato i { background: #fff; }
+.riga-stock.fare-oggi .pillola-stato { background: color-mix(in srgb, var(--arancio) 18%, var(--carta)); color: #8A4A05; }
+.riga-stock.fare-prossimi .pillola-stato { background: var(--superficie); color: var(--testo); }
+.fascia-adesso .riga-gruppo th { color: var(--in-ritardo-testo); } .fascia-oggi .riga-gruppo th { color: #8A4A05; }
+.fare-riga-testa { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.fare-riga-testa .pillola-stato { margin: 0 !important; }
+.fare-riga-testa .reparto { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-12); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); }
+.tabella-fare .c-auto { width: 30%; } .tabella-fare .c-azione { width: 230px; }
+.tabella-fare .cella-stato small { color: var(--testo); font-weight: 500; }
+.fare-testa .interruttore { margin: 0; }
+.tabella-fare .riga-stock .cella-stato small, .tabella-fare .riga-stock:not(.in_sede) .cella-stato small:not(.testo-ritardo) { color: var(--testo); font-weight: 500; }
+.tabella-fare .fascia-adesso .btn.piccolo { border-color: var(--in-ritardo); color: var(--in-ritardo-testo); }
+.tabella-fare .fascia-adesso .btn.piccolo:hover { background: var(--in-ritardo-tenue); text-decoration: none; }
