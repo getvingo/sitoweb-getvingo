@@ -3366,6 +3366,21 @@ class TestQui(Base):
         self.assertNotIn("Completate · da ritirare", self.c.get("/?stato=ritardo").get_data(as_text=True))
 
 
+class TestDaFareSoloLeMie(Base):
+    """14/11/2026 sera: "Solo le mie" di base per le mansioni operative, "Tutte" per admin e resp. commerciale."""
+    def test_vista_iniziale_per_mansione(self):
+        home = self.c.get("/").get_data(as_text=True)  # admin
+        self.assertRegex(home, r'href="/\?mie=0" class="attivo"')
+        self.assertIn('href="/?mie=1" class=""', home)
+        with self.app.app_context():
+            u = Utente.query.filter_by(email="admin@t.it").one()
+            u.ruolo = "preparatore"
+            db.session.commit()
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertIn('href="/?mie=1" class="attivo"', home)
+        self.assertIn('href="/?mie=0" class="attivo"', self.c.get("/?mie=0").get_data(as_text=True))
+
+
 class TestControlliDellaSera(Base):
     """Viaggi in ritardo da verificare, Analisi solo all'admin, ricezione in sede solo dalla concessionaria."""
     def test_viaggio_oltre_un_ora_dall_arrivo_stimato(self):

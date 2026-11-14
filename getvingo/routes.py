@@ -341,6 +341,7 @@ def _da_fare_per_te(quante=5):
     return voci[:quante]
 
 
+RUOLI_TUTTO_DA_FARE = ("admin", "resp_commerciale")
 FASCE_DA_FARE = (("adesso", "Adesso", "attenzione"), ("oggi", "Oggi", "orologio"), ("prossimi", "Prossimi giorni", "bandiera"))
 REPARTI_DA_FARE = {"viaggi": ("Viaggio", "camion"), "ritiri": ("Ritiro", "ritiro"), "lavorazioni": ("Lavorazione", "chiave"),
                    "preparazione": ("Preparazione", "brilla"), "consegna": ("Consegna", "bandiera")}
@@ -350,7 +351,7 @@ def _da_fare_home(gruppi, attivi):
     """"Da fare" della Home da computer (14/11/2026 sera): solo ciò che chiede un intervento, in tre fasce di
     urgenza (Adesso · Oggi · Prossimi giorni), una voce per auto (la più urgente) con l'azione da fare sulla riga.
     Le preparazioni regolari e le fini previste di oggi non ci sono: stanno in "Pronte oggi".
-    "Solo le mie" (?mie=1): le voci che toccano a chi guarda, per persona (ritiro assegnato, DDT creato o viaggio
+    "Solo le mie" (?mie=1, di base per tutte le mansioni tranne admin e resp. commerciale; ?mie=0 = tutte): le voci che toccano a chi guarda, per persona (ritiro assegnato, DDT creato o viaggio
     partito da lui, auto di cui è il venditore) o per mansione (Preparatore → preparazioni, Consegne → ritiri e
     consegne, Backoffice e Resp. commerciale → lavorazioni e consegne). Restituisce (fasce, totale, solo_mie)."""
     io, ruolo = g.utente.id, g.utente.ruolo
@@ -446,7 +447,9 @@ def _da_fare_home(gruppi, attivi):
                      ("Inserisci la targa", url), ruoli=ruoli)
 
     tutte = list(voci.values())
-    mie = request.args.get("mie") == "1"
+    # di base "Solo le mie" per chi lavora su una parte del processo; admin e resp. commerciale vedono tutto
+    scelta = request.args.get("mie")
+    mie = scelta == "1" if scelta in ("0", "1") else ruolo not in RUOLI_TUTTO_DA_FARE
     elenco = [x for x in tutte if x["mia"]] if mie else tutte
     fasce = [(k, titolo, icona, [x for x in elenco if x["fascia"] == k]) for k, titolo, icona in FASCE_DA_FARE]
     return fasce, {"tutte": len(tutte), "mie": sum(1 for x in tutte if x["mia"]), "mostrate": len(elenco)}, mie
