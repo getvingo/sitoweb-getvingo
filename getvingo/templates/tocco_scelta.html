@@ -119,10 +119,10 @@
   <form method="post" action="{{ url_for('main.tocco_passo', veicolo_id=v.id) }}" data-una-volta class="tocco-fondo">
     {{ csrf_input() }}
     <button class="btn primario pieno btn-fatto">{{ i('check') }} {{ 'Segna come pronta' if prep.prossima_fase == 'Pronta' else prep.prossima_fase ~ (' fatta' if prep.prossima_fase == 'Preparazione' else ' fatto') }}</button>
-    <small class="suggerimento">Passo {{ fatti + 1 }} di {{ totale }} · vale questo tocco</small>
+    <small class="suggerimento">Attività {{ fatti + 1 }} di {{ totale }} · vale questo tocco</small>
   </form>
   {% else %}
-  <p class="tenue piccolo prep-prossimo"><b>Tocca l'adesivo NFC per il prossimo passo</b>: {{ prep.prossima_fase }}</p>
+  <p class="tenue piccolo prep-prossimo"><b>Tocca l'adesivo NFC per la prossima attività</b>: {{ prep.prossima_fase }}</p>
   {% if config.DEMO and v.tag %}<a class="btn-link piccolo" href="{{ url_for('main.tap', codice=v.tag.codice) }}">Demo: simula il tocco dell'adesivo {{ v.tag.codice }}</a>{% endif %}
   {% endif %}
   {% endif %}

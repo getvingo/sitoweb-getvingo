@@ -402,7 +402,7 @@ class TestSpostamentoColTocco(Base):
         self.c.post(f"/veicolo/{vid}/tocco/passo")
         with self.app.app_context():
             self.assertEqual(fasi(), [])
-        self.assertIn("Tocca l'adesivo NFC per il prossimo passo", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))
+        self.assertIn("Tocca l'adesivo NFC per la prossima attività", self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True))
         self.assertIn(f"/veicolo/{vid}/tocco", self.c.post("/t/ABCD2345", data=POS).headers["Location"])
         pagina = self.c.get(f"/veicolo/{vid}/tocco").get_data(as_text=True)
         self.assertIn("Controllo rientro fatto", pagina)
@@ -1567,12 +1567,12 @@ class TestRegoleNuove(Base):
         self.c.get("/")  # consuma il messaggio di conferma
         stock = self.c.get("/stock").get_data(as_text=True)
         self.assertIn("Zona preparazione", stock)  # in preparazione resta in stock, nella sua zona
-        self.assertIn("Passo 1 di 4 · Controllo rientro", stock)
+        self.assertIn("Attività 1 di 4 · Controllo rientro", stock)
         self.assertIn("Volkswagen Golf", stock)
         self.assertEqual(self.c.get("/piazzale").status_code, 302)  # vecchio indirizzo
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Da ritirare", pagina)
-        self.assertIn("Passo 1 di 4: Controllo rientro", pagina)
+        self.assertIn("Attività 1 di 4: Controllo rientro", pagina)
         self.assertIn("Da completare", pagina)
         with self.app.app_context():
             prep = Preparazione.query.one()

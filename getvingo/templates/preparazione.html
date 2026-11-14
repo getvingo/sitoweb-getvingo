@@ -6,7 +6,7 @@
 {# Elimina la preparazione: solo amministratore (14/11/2026) #}
 {% macro elimina_prep(p, torna=none) %}{% if g.utente.ruolo == 'admin' %}
 <form method="post" action="{{ url_for('main.elimina_preparazione', prep_id=p.id) }}" class="annulla" data-una-volta
-      onsubmit="return confirm('Eliminare la preparazione di {{ p.veicolo.descrizione }}? L\'auto torna in sede e i passi fatti si perdono.')">
+      onsubmit="return confirm('Eliminare la preparazione di {{ p.veicolo.descrizione }}? L\'auto torna in sede e le attività fatte si perdono.')">
   {{ csrf_input() }}<input type="hidden" name="torna" value="{{ torna or url_for('main.preparazione') }}">
   <button class="btn-link testo-pericolo">{{ i('attenzione', 's') }} Elimina la preparazione</button>
 </form>{% endif %}{% endmacro %}
@@ -17,10 +17,10 @@
     <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"><b>{{ v.descrizione }}</b></a>
       <small>{{ badge_condizione(v) }}{% if v.targa %} <span class="targa-chip">{{ v.targa }}</span>{% endif %} <span class="vin">{{ v.vin[-8:] }}</span></small></span></div></td>
   {# 14/11/2026: stesse colonne delle Lavorazioni (Auto · Cosa · Avanzamento · Entro · Da) #}
-  <td class="cella-cosa">{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }}: in attesa</b><small>prima va verificato il danno</small>{% else %}<b>{{ p.prossima_fase }}</b><small>passo {{ fatti + 1 }} di 4{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small>{% endif %}</td>
+  <td class="cella-cosa">{% if bloccata %}<b class="testo-ritardo">{{ p.prossima_fase }}: in attesa</b><small>prima va verificato il danno</small>{% else %}<b>{{ p.prossima_fase }}</b><small>attività {{ fatti + 1 }} di 4{% if v.sede %} · {{ v.sede.nome }}{% endif %}</small>{% endif %}</td>
   <td class="cella-avanz"><span class="pillola-stato"><i aria-hidden="true"></i>{% if rit %}In ritardo di {{ rit }}{% else %}Nei tempi{% endif %}</span>
-    <ol class="passi-riga" aria-label="Passo {{ fatti + 1 }} di 4">{% for f in fasi %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}" title="{{ f }}{% if loop.index0 < fatti %} · {{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') }}{% endif %}"></li>{% endfor %}</ol>
-    <small>{{ fatti }} di 4 passi fatti</small></td>
+    <ol class="passi-riga" aria-label="Attività {{ fatti + 1 }} di 4">{% for f in fasi %}<li class="{{ 'fatto' if loop.index0 < fatti else ('ora' if loop.index0 == fatti) }}" title="{{ f }}{% if loop.index0 < fatti %} · {{ p.fasi_fatte[loop.index0].at|data('%d/%m %H:%M') }}{% endif %}"></li>{% endfor %}</ol>
+    <small>{{ fatti }} di 4 attività fatte</small></td>
   <td class="cella-entro">{% if p.pronta_entro_at %}{{ p.pronta_entro_at|slot }}{% else %}<span class="tenue">da fissare</span>{% endif %}</td>
   <td class="cella-da">{{ (p.creata_at|da_tempo)|replace('da ', '') }}</td>
   <td class="cella-azione">
@@ -44,7 +44,7 @@
 {% endmacro %}
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>Preparazione</h1>
-  <p class="descrizione-pagina">Auto vendute da preparare per la consegna: controllo rientro, preparazione, lavaggio, pronta. Ogni passo si conferma dal telefono, toccando l'adesivo dell'auto.</p></div>
+  <p class="descrizione-pagina">Auto vendute da preparare per la consegna: controllo rientro, preparazione, lavaggio, pronta. Ogni attività si conferma dal telefono, toccando l'adesivo dell'auto.</p></div>
   {% if da_preparare %}<button type="button" class="btn piccolo primario" data-apri="pannello-prepara" aria-expanded="false">{{ i('brilla', 's') }} Metti in preparazione</button>{% endif %}</div>
 
 {% if da_preparare %}
@@ -85,7 +85,7 @@
 {% if not (vista == 'consegnate') %}
 <form class="stock-cerca" method="get">
   <input type="hidden" name="vista" value="{{ vista }}">{% if stato_prep %}<input type="hidden" name="stato" value="{{ stato_prep }}">{% endif %}{% if modo == 'calendario' %}<input type="hidden" name="modo" value="calendario">{% endif %}
-  <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, passo, sede…" aria-label="Cerca tra le preparazioni"></div>
+  <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, attività, sede…" aria-label="Cerca tra le preparazioni"></div>
 </form>
 {% endif %}
 

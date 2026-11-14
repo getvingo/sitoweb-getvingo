@@ -45,7 +45,7 @@
     {% for p in preparazioni %}{% set rit = p.pronta_entro_at and p.pronta_entro_at < adesso() %}
     <a class="per-te-voce {{ 'ritardo' if rit else 'preparazione' }}" href="{{ url_for('main.veicolo', veicolo_id=p.veicolo_id) }}"><span class="per-te-barra" aria-hidden="true"></span>
       <span><b>{{ p.veicolo.descrizione }} · {{ p.avanzamento }}%</b>
-        <small>passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}: {{ p.prossima_fase }}{% if p.pronta_entro_at %} · {{ 'doveva essere pronta' if rit else 'pronta entro' }} {{ p.pronta_entro_at|data('%d/%m %H:%M') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
+        <small>attività {{ p.fasi|length + 1 }} di {{ p.FASI|length }}: {{ p.prossima_fase }}{% if p.pronta_entro_at %} · {{ 'doveva essere pronta' if rit else 'pronta entro' }} {{ p.pronta_entro_at|data('%d/%m %H:%M') }}{% endif %}</small></span>{{ i('chevron', 's') }}</a>
     {% endfor %}
   </div>
   {% endif %}

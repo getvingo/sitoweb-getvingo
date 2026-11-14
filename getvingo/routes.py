@@ -335,7 +335,7 @@ def _da_fare_per_te(quante=5):
         for prep in (Preparazione.query.filter_by(completata_at=None)
                      .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).limit(quante)):
             voci.append({"tipo": "preparazione", "titolo": prep.prossima_fase, "v": prep.veicolo,
-                         "testo": f"passo {len(prep.fasi) + 1} di {len(Preparazione.FASI)}"
+                         "testo": f"attività {len(prep.fasi) + 1} di {len(Preparazione.FASI)}"
                          + (f" · pronta entro {prep.pronta_entro_at:%d/%m %H:%M}" if prep.pronta_entro_at else ""),
                          "url": url_for("main.tocco_scelta", veicolo_id=prep.veicolo_id)})
     return voci[:quante]
@@ -420,7 +420,7 @@ def home():
         else:
             fatte = len(prep.fasi)
             aggiungi("preparazione", 3, "Da completare", prep.veicolo,
-                     f"Passo {fatte + 1} di {len(Preparazione.FASI)}: {prep.prossima_fase}", url)
+                     f"Attività {fatte + 1} di {len(Preparazione.FASI)}: {prep.prossima_fase}", url)
     for prep in Preparazione.query.filter(Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at.isnot(None)):
         url = url_for("main.veicolo", veicolo_id=prep.veicolo_id)
         if prep.pronta_entro_at < adesso():
@@ -1267,7 +1267,7 @@ def tocco_passo(veicolo_id):
     if prep is None:
         return redirect(url_for("main.tocco_scelta", veicolo_id=v.id))
     if not _tocco_valido(v):
-        flash("Tocca l'adesivo NFC dell'auto: ogni passo della preparazione si conferma con un tocco.", "errore")
+        flash("Tocca l'adesivo NFC dell'auto: ogni attività della preparazione si conferma con un tocco.", "errore")
         return redirect(url_for("main.tocco_scelta", veicolo_id=v.id))
     prima = prep.avanzamento
     try:

@@ -97,9 +97,9 @@
   <div class="lavoro-testa">
     <span class="lavoro-icona" aria-hidden="true">{{ i('brilla') }}</span>
     <div class="lavoro-titolo">
-      <small>Preparazione per la consegna · passo {{ fatti + 1 }} di {{ p.FASI|length }}</small>
+      <small>Preparazione per la consegna · attività {{ fatti + 1 }} di {{ p.FASI|length }}</small>
       <h2>{{ p.prossima_fase }}</h2>
-      <p>{% if bloccata %}In attesa: prima va verificato il danno qui sopra.{% elif p.prossima_fase == 'Pronta' %}Ultimo passo: si conferma toccando l'adesivo quando l'auto è pronta.{% else %}Si conferma dal telefono, toccando l'adesivo dell'auto.{% endif %}</p>
+      <p>{% if bloccata %}In attesa: prima va verificato il danno qui sopra.{% elif p.prossima_fase == 'Pronta' %}Ultima attività: si conferma toccando l'adesivo quando l'auto è pronta.{% else %}Si conferma dal telefono, toccando l'adesivo dell'auto.{% endif %}</p>
     </div>
     <span class="pillola-stato {{ 'in-attesa' if bloccata }}"><i aria-hidden="true"></i>{% if bloccata %}In attesa{% elif rit %}In ritardo di {{ rit }}{% elif p.pronta_entro_at %}Nei tempi{% else %}Orario da fissare{% endif %}</span>
   </div>
@@ -123,7 +123,7 @@
   </div>
   {% endif %}
   <div class="lavoro-numeri">
-    <div><small>Avanzamento</small><b>{{ p.avanzamento }}% · {{ fatti }} di {{ p.FASI|length }} passi</b></div>
+    <div><small>Avanzamento</small><b>{{ p.avanzamento }}% · {{ fatti }} di {{ p.FASI|length }} attività</b></div>
     {# la data di "pronta entro" è già sulla linea del tempo: qui quanto manca o di quanto è in ritardo #}
     {% if rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }}</b></div>
     {% elif p.pronta_entro_at %}<div class="esito"><small>Tempo che resta</small><b>{{ durata(p.pronta_entro_at - adesso()) }}</b></div>

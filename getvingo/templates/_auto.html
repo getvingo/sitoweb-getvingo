@@ -92,7 +92,7 @@
       <div class="anello-testo"><b data-percento>{{ prep.avanzamento }}%</b><small>{{ fatti }} di {{ totale }}</small></div>
     </div>
     <div class="prep-ora">
-      <small>{{ 'Preparazione completata' if prep.completata_at else 'In preparazione · passo ' ~ (fatti + 1) ~ ' di ' ~ totale }}</small>
+      <small>{{ 'Preparazione completata' if prep.completata_at else 'In preparazione · attività ' ~ (fatti + 1) ~ ' di ' ~ totale }}</small>
       <b>{{ 'Pronta per la consegna' if prep.completata_at else prep.prossima_fase }}</b>
       {% if fatto is not none and prep.fasi_fatte|length > fatto %}<span class="prep-appena">{{ i('check', 's') }} “{{ prep.fasi_fatte[fatto].nome }}” confermato col tocco</span>{% endif %}
       {% if prep.pronta_entro_at and not prep.completata_at %}{% set rit = prep.pronta_entro_at|ritardo %}<span class="slot-calendario {{ 'in-ritardo' if rit }}">{{ i('orologio', 's') }} In calendario {{ prep.pronta_entro_at|slot }}{% if rit %} · in ritardo di {{ rit }}{% endif %}</span>{% endif %}
@@ -114,7 +114,7 @@
 {% macro dettaglio_stato(v, collegato=True) %}{% set f = v.fase %}{% set tag = 'a' if collegato else 'span' %}
 {% if f == 'preparazione' and v.preparazione_attiva %}{% set p = v.preparazione_attiva %}
 <{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"{% endif %}>
-  <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · passo {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</{{ tag }}>
+  <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · attività {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</{{ tag }}>
 {% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}
 <{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}"{% endif %}>{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</{{ tag }}>
 {% elif f == 'in_viaggio' and v.movimento_aperto %}

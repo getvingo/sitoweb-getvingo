@@ -839,7 +839,7 @@ class Azione(PerOrganizzazione, db.Model):
         "presa_in_carico": "Presa in carico",
         "arrivo": "Arrivo confermato",
         "lavorazione_completata": "Lavorazione completata",
-        "preparazione_fase": "Passo di preparazione",
+        "preparazione_fase": "Attività di preparazione",
         "consegna": "Consegna al cliente",
         "annullamento": "DDT cancellato",
         "danno": "Danno segnalato",
