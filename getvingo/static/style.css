@@ -3135,3 +3135,6 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .catalogo-marca summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 6px; }
 .catalogo-marca ul { margin: 6px 0 4px; padding-left: 18px; display: grid; gap: 6px; font-size: var(--fs-14); }
 .azioni-catalogo { margin: 14px 0 0; }
+
+/* impronta dell'auto nell'intestazione del DDT (16/11/2026), come in quella dell'auto */
+.ddt-testata-alto .testa-impronta .impronta { width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 6px 16px rgba(0,0,0,.18); }

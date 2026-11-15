@@ -43,6 +43,8 @@
       <h1 class="num">N. {{ d.sigla }}</h1><span>{{ m.causale }}{% if m.con_lavorazione %} · {{ m.lavorazione }}{% endif %}</span></div>
     <div class="ddt-testata-dx">{{ badge_ddt(d) }}
       <div class="azioni">{{ azioni_ddt(d, piccoli=True) }}{% if puo_modificare %}<a class="btn piccolo" href="{{ url_for('main.ddt_modifica', ddt_id=d.id) }}">{{ i('matita', 's') }} Modifica</a>{% endif %}</div></div>
+    {# 16/11/2026: impronta dell'auto in alto a destra, come nell'intestazione dell'auto (non nel DDT multiplo) #}
+    {% if not d.multiplo and m.veicolo and m.veicolo.impronta is not none %}<div class="testa-impronta">{{ m.veicolo.impronta|impronta(72, riquadro=True, titolo='Impronta di questa auto') }}</div>{% endif %}
   </div>
   <div class="ddt-percorso">
     <div class="ddt-luogo"><small>Da</small><b>{{ m.da_sede.nome if m.da_sede else '—' }}</b>{% if m.da_sede and m.da_sede.dove %}<span>{{ m.da_sede.dove }}</span>{% endif %}</div>
