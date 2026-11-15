@@ -10,7 +10,7 @@ from . import vin as vin_mod
 from .auth import ruolo_richiesto
 from datetime import datetime, timedelta
 
-from .models import AccessoSupporto, Azienda, GiornoChiuso, Sede, Tag, Utente, Veicolo, Vettore, adesso, db
+from .models import AccessoSupporto, Azienda, CatalogoAuto, GiornoChiuso, Sede, Tag, Utente, Veicolo, Vettore, adesso, db
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -586,6 +586,60 @@ def uniforma_auto():
               "allo stesso modo." if n else "Niente da correggere.", "ok")
         return redirect(url_for("admin.uniforma_auto"))
     return render_template("admin/uniforma.html", elenco=uniforma.proposte())
+
+
+@bp.route("/catalogo", methods=["GET", "POST"])
+@ruolo_richiesto("admin")
+def catalogo():
+    """Catalogo delle vetture (15/11/2026): file CSV o Excel con marca, modello e versione scritti come li vuole
+    la concessionaria. Ogni caricamento sostituisce il precedente. È la base per correggere i dati delle auto
+    al salvataggio e per le opzioni proposte quando si carica un'auto (uniforma.da_catalogo / opzioni_catalogo)."""
+    if request.method == "POST":
+        if request.form.get("azione") == "svuota":
+            n = CatalogoAuto.query.delete()
+            db.session.commit()
+            uniforma.svuota_cache_catalogo()
+            flash(f"Catalogo svuotato ({n} voci tolte)." if n else "Il catalogo era già vuoto.", "ok")
+            return redirect(url_for("admin.catalogo"))
+        file = request.files.get("file")
+        if not file or not file.filename:
+            flash("Scegli un file CSV o Excel (.xlsx).", "errore")
+            return redirect(url_for("admin.catalogo"))
+        try:
+            voci, scartate = uniforma.leggi_file_catalogo(file.filename, file.read())
+        except Exception:
+            current_app.logger.exception("catalogo: file non leggibile")
+            voci, scartate = [], []
+        if not voci:
+            flash("Nel file non ho trovato voci con marca e modello: controlla le colonne (marca, modello, versione).",
+                  "errore")
+            return redirect(url_for("admin.catalogo"))
+        CatalogoAuto.query.delete()
+        db.session.add_all(CatalogoAuto(marca=m, modello=mo, versione=ve) for m, mo, ve in voci)
+        db.session.commit()
+        uniforma.svuota_cache_catalogo()
+        c = uniforma.catalogo()
+        flash(f"Catalogo caricato: {len(c['marche'])} marche, {sum(len(x) for x in c['modelli'].values())} modelli, "
+              f"{sum(len(x) for x in c['versioni'].values())} versioni.", "ok")
+        if scartate:
+            flash(f"Righe senza marca o modello, saltate: {', '.join(map(str, scartate[:30]))}"
+                  f"{'…' if len(scartate) > 30 else ''}", "errore")
+        return redirect(url_for("admin.catalogo"))
+    voci = CatalogoAuto.query.order_by(CatalogoAuto.id).all()
+    if request.args.get("scarica"):
+        out = io.StringIO()
+        w = csv.writer(out, delimiter=";")
+        w.writerow(["marca", "modello", "versione"])
+        w.writerows((v.marca, v.modello, v.versione or "") for v in voci)
+        return current_app.response_class("\ufeff" + out.getvalue(), mimetype="text/csv", headers={
+            "Content-Disposition": "attachment; filename=catalogo-vetture.csv"})
+    albero = {}
+    for v in voci:
+        albero.setdefault(v.marca, {}).setdefault(v.modello, [])
+        if v.versione:
+            albero[v.marca][v.modello].append(v.versione)
+    n_correzioni = sum(1 for _, campo, *_ in uniforma.proposte() if campo != "colore") if voci else 0
+    return render_template("admin/catalogo.html", albero=albero, n_voci=len(voci), n_correzioni=n_correzioni)
 
 
 @bp.route("/import", methods=["GET", "POST"])

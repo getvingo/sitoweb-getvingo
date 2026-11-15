@@ -3501,6 +3501,66 @@ class TestUniformaEsistenti(Base):
         self.assertIn("Niente da correggere", self.c.get("/admin/uniforma").get_data(as_text=True))
 
 
+class TestCatalogoVetture(Base):
+    """Gestione → Catalogo delle vetture (15/11/2026): file CSV o Excel con marca, modello e versione;
+    al salvataggio vince la sua scrittura e le sue versioni sono le prime proposte."""
+    CSV = ("Marca;Modello;Versione\nVolkswagen;T-Roc;1.5 eTSI 150 CV Life\nVolkswagen;T-Roc;2.0 TDI R-Line\n"
+           "volkswagen;t-roc;1.5 ETSI 150 cv life\nPeugeot;e-2008;GT 156 CV\n;Senza marca;x\n")
+
+    def _xlsx(self):
+        import zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("xl/sharedStrings.xml", '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                       '<si><t>marca</t></si><si><t>modello</t></si><si><t>allestimento</t></si>'
+                       '<si><t>Peugeot</t></si><si><t>2008</t></si><si><t>Allure 1.2 PureTech 130</t></si></sst>')
+            z.writestr("xl/worksheets/sheet1.xml", '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                       '<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>'
+                       '<row r="2"><c r="A2" t="s"><v>3</v></c><c r="B2" t="s"><v>4</v></c><c r="C2" t="s"><v>5</v></c></row>'
+                       '<row r="3"><c r="A3" t="s"><v>3</v></c><c r="B3"><v>3008</v></c></row></sheetData></worksheet>')
+        return buf.getvalue()
+
+    def test_carica_corregge_e_propone(self):
+        r = self.c.post("/admin/catalogo", data={"file": (io.BytesIO(self.CSV.encode()), "catalogo.csv")},
+                        content_type="multipart/form-data", follow_redirects=True)
+        pagina = r.get_data(as_text=True)
+        self.assertIn("2 marche", pagina)
+        self.assertIn("saltate: 6", pagina)
+        with self.app.app_context():
+            from getvingo import uniforma
+            from getvingo.models import CatalogoAuto
+            self.assertEqual(CatalogoAuto.query.count(), 3)  # la riga ripetuta conta una volta
+            self.assertEqual(uniforma.valore("modello", "troc", marca="volkswagen"), "T-Roc")
+            self.assertEqual(uniforma.valore("versione", "2.0 tdi r line", marca="Volkswagen", modello="T-Roc"), "2.0 TDI R-Line")
+            self.assertEqual(uniforma.valore("modello", "E 2008", marca="Peugeot"), "e-2008")
+        d = self.c.get("/api/versioni?marca=volkswagen&modello=t-roc").get_json()
+        self.assertEqual(d["catalogo"], ["1.5 eTSI 150 CV Life", "2.0 TDI R-Line"])
+        d = self.c.get("/api/catalogo?marca=peugeot").get_json()
+        self.assertEqual((d["marche"], d["modelli"]), (["Volkswagen", "Peugeot"], ["e-2008"]))
+        self.assertIn("Dal catalogo", self.c.get("/static/datiauto.js").get_data(as_text=True))
+        # un'auto caricata con una scrittura diversa prende quella del catalogo
+        vid = self.abbina()
+        base = {"vin": VIN, "condizione": "nuovo", "tipologia": "vettura", "in_stock_dal": adesso().date().isoformat(),
+                "anno": "2024", "alimentazione": "Benzina", "colore": "Nero"}
+        self.c.post(f"/veicolo/{vid}/modifica", data={**base, "marca": "VW", "modello": "troc", "versione": "2.0 tdi r-line"})
+        with self.app.app_context():
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.marca, v.modello, v.versione), ("Volkswagen", "T-Roc", "2.0 TDI R-Line"))
+        # Excel: sostituisce il catalogo, intestazione "allestimento", versione facoltativa, numeri come testo
+        self.c.post("/admin/catalogo", data={"file": (io.BytesIO(self._xlsx()), "listino.xlsx")}, content_type="multipart/form-data")
+        with self.app.app_context():
+            from getvingo.models import CatalogoAuto
+            self.assertEqual({(c.marca, c.modello, c.versione) for c in CatalogoAuto.query},
+                             {("Peugeot", "2008", "Allure 1.2 PureTech 130"), ("Peugeot", "3008", "")})
+        self.assertIn("marca;modello;versione", self.c.get("/admin/catalogo?scarica=1").get_data(as_text=True))
+        self.c.post("/admin/catalogo", data={"azione": "svuota"})
+        with self.app.app_context():
+            from getvingo.models import CatalogoAuto
+            self.assertEqual(CatalogoAuto.query.count(), 0)
+        self.entra("ufficio")
+        self.assertNotEqual(self.c.get("/admin/catalogo").status_code, 200)  # solo l'amministratore
+
+
 class TestTelefonoSnello(Base):
     """Telefono snello (12/11/2026): il tocco mostra una cosa da fare, "scorri per confermare",
     "Annulla" per pochi secondi a chi ha appena fatto l'azione."""

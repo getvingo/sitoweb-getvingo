@@ -1724,7 +1724,11 @@ def api_versioni():
     marca, modello = request.args.get("marca", "").strip(), request.args.get("modello", "").strip()
     anno = request.args.get("anno", type=int)
     if not marca or not modello:
-        return {"anno": [], "altre": [], "colori": []}
+        return {"catalogo": [], "anno": [], "altre": [], "colori": []}
+    # prima le versioni del catalogo delle vetture (Gestione), nella scrittura del catalogo
+    del_catalogo = uniforma.opzioni_catalogo(uniforma.da_catalogo("marca", marca) or marca,
+                                             uniforma.da_catalogo("modello", modello, marca) or modello)["versioni"]
+    k_catalogo = {uniforma.chiave(x) for x in del_catalogo}
     k_marca, k_modello = uniforma.chiave(marca), uniforma.chiave(modello)
     stesso, altre, colori = Counter(), Counter(), Counter()
     for vv in Veicolo.query.with_entities(Veicolo.marca, Veicolo.modello, Veicolo.versione, Veicolo.anno, Veicolo.colore):
@@ -1735,9 +1739,19 @@ def api_versioni():
         if uniforma.chiave(vv.modello) != k_modello or not vv.versione:
             continue
         (stesso if anno and vv.anno == anno else altre)[uniforma.formatta(vv.versione)] += 1
-    prima = [x for x, _ in stesso.most_common()]
-    return {"anno": prima, "altre": [x for x, _ in altre.most_common() if x not in prima],
+    prima = [x for x, _ in stesso.most_common() if uniforma.chiave(x) not in k_catalogo]
+    return {"catalogo": del_catalogo, "anno": prima,
+            "altre": [x for x, _ in altre.most_common() if x not in prima and uniforma.chiave(x) not in k_catalogo],
             "colori": [x for x, _ in colori.most_common(30)]}
+
+
+@bp.route("/api/catalogo")
+@solo_interni
+def api_catalogo():
+    """Marche del catalogo delle vetture e modelli della marca scritta: suggerimenti per i campi dell'auto."""
+    marca = request.args.get("marca", "").strip()
+    o = uniforma.opzioni_catalogo(uniforma.da_catalogo("marca", marca) or marca if marca else None)
+    return {"marche": o["marche"], "modelli": o["modelli"]}
 
 
 @bp.route("/api/formatta")

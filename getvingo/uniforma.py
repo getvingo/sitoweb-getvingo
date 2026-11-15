@@ -8,9 +8,18 @@ Al salvataggio marca, modello, versione e colore si correggono da soli:
 3. la marca prende il nome ufficiale se è tra quelle note (VW → Volkswagen, mercedes → Mercedes-Benz);
 4. altrimenti: iniziale maiuscola per parola ("grigio moonstone" → "Grigio Moonstone"); le sigle restano
    maiuscole (GTI, TDI, BMW), le parole con cifre in maiuscolo (a3 → A3, cx-30 → CX-30) e quelle già
-   scritte a lettere miste restano come sono (eTSI, iX)."""
+   scritte a lettere miste restano come sono (eTSI, iX).
+Prima di tutto (15/11/2026) vale il **catalogo delle vetture** caricato da Gestione (CatalogoAuto): se marca,
+modello o versione corrispondono a una sua voce (stessa chiave), si usa la scrittura del catalogo così com'è."""
+import csv
+import io
+import re
 import unicodedata
+import zipfile
 from collections import Counter
+from xml.etree import ElementTree
+
+from flask import g, has_app_context
 
 from .vin import WMI
 
@@ -88,6 +97,9 @@ def valore(campo, testo, escludi_id=None, marca=None, modello=None):
     testo = " ".join((testo or "").split())
     if not testo:
         return testo
+    dal_catalogo = da_catalogo(campo, testo, marca, modello)
+    if dal_catalogo:
+        return dal_catalogo
     if campo == "marca" and testo.lower() in MARCHE:
         return MARCHE[testo.lower()]
     filtri = {"marca": marca} if campo == "modello" else (
@@ -125,7 +137,7 @@ def proposte():
     def pulito(t):
         return " ".join((t or "").split())
 
-    def uniforma_campo(campo, contesto, ufficiale=None):
+    def uniforma_campo(campo, contesto, ufficiale=None, catalogo_=lambda v, t: None):
         gruppi = {}
         for v in auto_:
             t = pulito(getattr(v, campo))
@@ -137,11 +149,14 @@ def proposte():
             if not t:
                 nuova[v.id][campo] = getattr(v, campo)
             else:
-                nuova[v.id][campo] = (ufficiale or {}).get(t.lower()) or scelte[(contesto(v), chiave(t))]
+                nuova[v.id][campo] = catalogo_(v, t) or (ufficiale or {}).get(t.lower()) \
+                    or scelte[(contesto(v), chiave(t))]
 
-    uniforma_campo("marca", lambda v: "", MARCHE)
-    uniforma_campo("modello", lambda v: chiave(nuova[v.id]["marca"]))
-    uniforma_campo("versione", lambda v: (chiave(nuova[v.id]["marca"]), chiave(nuova[v.id]["modello"])))
+    uniforma_campo("marca", lambda v: "", MARCHE, lambda v, t: da_catalogo("marca", t))
+    uniforma_campo("modello", lambda v: chiave(nuova[v.id]["marca"]),
+                   catalogo_=lambda v, t: da_catalogo("modello", t, nuova[v.id]["marca"]))
+    uniforma_campo("versione", lambda v: (chiave(nuova[v.id]["marca"]), chiave(nuova[v.id]["modello"])),
+                   catalogo_=lambda v, t: da_catalogo("versione", t, nuova[v.id]["marca"], nuova[v.id]["modello"]))
     uniforma_campo("colore", lambda v: "")
     elenco = []
     for v in auto_:
@@ -158,3 +173,131 @@ def applica():
     for v, campo, _, _, dopo in elenco:
         setattr(v, campo, dopo)
     return len(elenco)
+
+
+# ---------------------------------------------------------------- catalogo delle vetture (Gestione, 15/11/2026)
+
+def catalogo():
+    """Il catalogo della concessionaria pronto per i confronti (una lettura per richiesta):
+    {"marche": {k: Marca}, "modelli": {k_marca: {k: Modello}}, "versioni": {(k_marca, k_modello): {k: Versione}}}."""
+    from .models import CatalogoAuto, org_attiva
+    tieni = has_app_context()
+    if tieni and g.get("_catalogo_auto") is not None and g.get("_catalogo_org") == org_attiva():
+        return g._catalogo_auto
+    c = {"marche": {}, "modelli": {}, "versioni": {}}
+    for r in CatalogoAuto.query.order_by(CatalogoAuto.id):
+        km, kmod = chiave(r.marca), chiave(r.modello)
+        c["marche"].setdefault(km, r.marca)
+        c["modelli"].setdefault(km, {}).setdefault(kmod, r.modello)
+        if r.versione:
+            c["versioni"].setdefault((km, kmod), {}).setdefault(chiave(r.versione), r.versione)
+    if tieni:
+        g._catalogo_auto, g._catalogo_org = c, org_attiva()
+    return c
+
+
+def svuota_cache_catalogo():
+    if has_app_context():
+        g.pop("_catalogo_auto", None)
+
+
+def da_catalogo(campo, testo, marca=None, modello=None):
+    """La scrittura del catalogo per questo valore (stessa chiave), o None se il catalogo non lo ha."""
+    k = chiave(testo)
+    if not k:
+        return None
+    c = catalogo()
+    km = chiave(c["marche"].get(chiave(marca), marca)) if marca else ""
+    if campo == "marca":
+        return c["marche"].get(k)
+    if campo == "modello":
+        return c["modelli"].get(km, {}).get(k)
+    if campo == "versione":
+        return c["versioni"].get((km, chiave(modello)), {}).get(k)
+    return None
+
+
+def opzioni_catalogo(marca=None, modello=None):
+    """Marche, modelli della marca e versioni del modello del catalogo, nell'ordine del file."""
+    c = catalogo()
+    km, kmod = chiave(marca), chiave(modello)
+    return {"marche": list(c["marche"].values()),
+            "modelli": list(c["modelli"].get(km, {}).values()) if km else [],
+            "versioni": list(c["versioni"].get((km, kmod), {}).values()) if km and kmod else []}
+
+
+def _righe_xlsx(dati):
+    """Righe del primo foglio di un file Excel .xlsx (solo i valori, senza librerie esterne)."""
+    ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(io.BytesIO(dati)) as z:
+        condivise = []
+        if "xl/sharedStrings.xml" in z.namelist():
+            for si in ElementTree.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", ns):
+                condivise.append("".join(t.text or "" for t in si.iter("{%s}t" % ns["m"])))
+        fogli = sorted(n for n in z.namelist() if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n))
+        if not fogli:
+            return []
+        foglio = "xl/worksheets/sheet1.xml" if "xl/worksheets/sheet1.xml" in fogli else fogli[0]
+        righe = []
+        for riga in ElementTree.fromstring(z.read(foglio)).iter("{%s}row" % ns["m"]):
+            celle = {}
+            for c in riga.findall("m:c", ns):
+                lettere = re.match(r"[A-Z]+", c.get("r", "")).group(0) if c.get("r") else None
+                col = 0
+                for ch in lettere or "":
+                    col = col * 26 + ord(ch) - 64
+                col = col - 1 if lettere else len(celle)
+                t, v = c.get("t"), c.find("m:v", ns)
+                if t == "s" and v is not None:
+                    testo = condivise[int(v.text)]
+                elif t == "inlineStr":
+                    testo = "".join(x.text or "" for x in c.iter("{%s}t" % ns["m"]))
+                else:
+                    testo = v.text if v is not None and v.text else ""
+                    if re.fullmatch(r"-?\d+\.0", testo):
+                        testo = testo[:-2]  # numeri interi salvati come 2.0
+                celle[col] = testo
+            if celle:
+                righe.append([celle.get(i, "") for i in range(max(celle) + 1)])
+        return righe
+
+
+def leggi_file_catalogo(nome, dati):
+    """Voci (marca, modello, versione) da un file CSV (; , o tab) o Excel .xlsx.
+    Colonne riconosciute dall'intestazione (marca/brand, modello/model, versione/allestimento); senza intestazione
+    valgono nell'ordine marca, modello, versione. Ritorna (voci, righe_scartate)."""
+    if (nome or "").lower().endswith(".xlsx") or dati[:2] == b"PK":
+        righe = _righe_xlsx(dati)
+    else:
+        testo = dati.decode("utf-8-sig", errors="replace")
+        if "\ufffd" in testo:
+            testo = dati.decode("cp1252", errors="replace")  # CSV salvato da Excel per Windows
+        prima = next((r for r in testo.splitlines() if r.strip()), "")
+        sep = max(";,\t", key=prima.count) if prima else ";"
+        righe = list(csv.reader(io.StringIO(testo), delimiter=sep))
+    righe = [[(x or "").strip() for x in r] for r in righe if any((x or "").strip() for x in r)]
+    if not righe:
+        return [], []
+    nomi = {"marca": ("marca", "brand", "marchio", "costruttore", "make"),
+            "modello": ("modello", "model", "modelli"),
+            "versione": ("versione", "versioni", "allestimento", "version", "variante", "trim")}
+    testa = [chiave(x) for x in righe[0]]
+    pos = {campo: next((i for i, t in enumerate(testa) if t in alias), None) for campo, alias in nomi.items()}
+    inizio = 1
+    if pos["marca"] is not None and pos["modello"] is not None:
+        righe, inizio = righe[1:], 2
+    else:
+        pos = {"marca": 0, "modello": 1, "versione": 2}
+    voci, scartate, viste = [], [], set()
+    for n, r in enumerate(righe, start=inizio):
+        prendi = lambda campo: " ".join(r[pos[campo]].split()) if pos[campo] is not None and pos[campo] < len(r) else ""  # noqa: E731
+        marca, modello, versione = prendi("marca")[:80], prendi("modello")[:120], prendi("versione")[:120]
+        if not marca or not modello:
+            scartate.append(n)
+            continue
+        k = (chiave(marca), chiave(modello), chiave(versione))
+        if k in viste:
+            continue
+        viste.add(k)
+        voci.append((marca, modello, versione))
+    return voci, scartate

@@ -35,23 +35,28 @@
         var attuale = scritta.value.trim();
         scelta.innerHTML = '';
         opzione('Scegli la versione…', '');
+        d.catalogo = d.catalogo || [];
+        if (d.catalogo.length) {
+          var g0 = document.createElement('optgroup'); g0.label = 'Dal catalogo'; scelta.appendChild(g0);
+          d.catalogo.forEach(function (v) { opzione(v, v, g0); });
+        }
         if (d.anno.length) {
           var g1 = document.createElement('optgroup'); g1.label = 'Anno ' + anno; scelta.appendChild(g1);
           d.anno.forEach(function (v) { opzione(v, v, g1); });
         }
         if (d.altre.length) {
-          var g2 = document.createElement('optgroup'); g2.label = d.anno.length || anno ? 'Altri anni' : 'Versioni di ' + modello; scelta.appendChild(g2);
+          var g2 = document.createElement('optgroup'); g2.label = d.catalogo.length ? 'Già usate' : (d.anno.length || anno ? 'Altri anni' : 'Versioni di ' + modello); scelta.appendChild(g2);
           d.altre.forEach(function (v) { opzione(v, v, g2); });
         }
         opzione('Altra versione (la scrivo)…', ALTRA);
-        var tutte = d.anno.concat(d.altre);
+        var tutte = d.catalogo.concat(d.anno, d.altre);
         if (!tutte.length) {
           scelta.hidden = true; modoScrittura(true);
           aiuto.textContent = 'Prima ' + marca + ' ' + modello + ' in Getvingo: scrivi la versione, la prossima volta si sceglierà dall’elenco.';
           return;
         }
         scelta.hidden = false;
-        aiuto.textContent = d.anno.length ? '' : (anno ? 'Nessuna versione già usata per il ' + anno + ': scegli tra quelle degli altri anni o scrivila.' : 'Scegli prima l’anno per vedere le sue versioni.');
+        aiuto.textContent = d.anno.length || d.catalogo.length ? '' : (anno ? 'Nessuna versione già usata per il ' + anno + ': scegli tra quelle degli altri anni o scrivila.' : 'Scegli prima l’anno per vedere le sue versioni.');
         var uguale = tutte.filter(function (v) { return v.toLowerCase() === attuale.toLowerCase(); })[0];
         if (uguale) { scelta.value = uguale; scritta.value = uguale; modoScrittura(false); }
         else if (attuale) { scelta.value = ALTRA; modoScrittura(true); }
@@ -68,6 +73,32 @@
     campo(n).addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(carica, 600); });
   });
   document.addEventListener('vin-precompilato', function () { setTimeout(carica, 50); });
+
+  // marche e modelli del catalogo delle vetture (Gestione) come suggerimenti
+  function lista(n) {
+    var el = campo(n), id = 'catalogo-' + n, dl = document.getElementById(id);
+    if (!dl) { dl = document.createElement('datalist'); dl.id = id; form.appendChild(dl); el.setAttribute('list', id); el.autocomplete = 'off'; }
+    return dl;
+  }
+  function riempi(dl, voci) {
+    dl.innerHTML = voci.map(function (c) { return '<option value="' + c.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">'; }).join('');
+  }
+  var ultimaMarca = null;
+  function caricaCatalogo() {
+    var marca = campo('marca').value.trim();
+    if (marca === ultimaMarca) return;
+    ultimaMarca = marca;
+    fetch('/api/catalogo?' + new URLSearchParams({ marca: marca }))
+      .then(function (r) { return r.ok ? r.json() : { marche: [], modelli: [] }; })
+      .then(function (d) {
+        if (d.marche.length) riempi(lista('marca'), d.marche);
+        if (d.marche.length) riempi(lista('modello'), d.modelli);
+      }).catch(function () {});
+  }
+  campo('marca').addEventListener('change', caricaCatalogo);
+  campo('marca').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { carica(); caricaCatalogo(); }, 600); });
+  document.addEventListener('vin-precompilato', function () { setTimeout(caricaCatalogo, 50); });
+  caricaCatalogo();
 
   // scrittura uniforme, uscendo dal campo
   ['marca', 'modello', 'versione', 'colore'].forEach(function (n) {

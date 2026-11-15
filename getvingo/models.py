@@ -223,6 +223,16 @@ class GiornoChiuso(PerOrganizzazione, db.Model):
     motivo = db.Column(db.String(120), default="")
 
 
+class CatalogoAuto(PerOrganizzazione, db.Model):
+    """Catalogo delle vetture caricato da Gestione (15/11/2026): marca, modello e versione scritti come li vuole
+    la concessionaria. È la base per correggere i dati delle auto e per le opzioni proposte (uniforma.py).
+    Versione vuota = riga che dà solo marca e modello."""
+    id = db.Column(db.Integer, primary_key=True)
+    marca = db.Column(db.String(80), nullable=False)
+    modello = db.Column(db.String(120), nullable=False)
+    versione = db.Column(db.String(120), default="")
+
+
 class Vettore(PerOrganizzazione, ConIndirizzo, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)

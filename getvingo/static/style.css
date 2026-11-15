@@ -3129,3 +3129,9 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .dati-testa .testa-impronta .impronta { width: 56px; height: 56px; border-radius: var(--r-s); }
 @media (max-width: 480px) { .anagrafica .carta-auto-testa .testa-impronta { position: absolute; top: 22px; right: 24px; } }
 .dati-testa:has(.testa-impronta) { grid-template-columns: 56px 1fr auto; }
+
+/* Catalogo delle vetture (Gestione, 15/11/2026) */
+.catalogo-marca { border-top: 1px solid var(--bordo); padding: 10px 0; }
+.catalogo-marca summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 6px; }
+.catalogo-marca ul { margin: 6px 0 4px; padding-left: 18px; display: grid; gap: 6px; font-size: var(--fs-14); }
+.azioni-catalogo { margin: 14px 0 0; }

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}Catalogo delle vetture · Getvingo{% endblock %}
+{% block contenuto %}
+{# Catalogo delle vetture (15/11/2026, uniforma.leggi_file_catalogo): la base per correggere marca, modello e versione
+   al salvataggio e per le opzioni proposte quando si carica un'auto #}
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div>
+  <h1>Catalogo delle vetture</h1>
+  <p class="descrizione-pagina">Marche, modelli e versioni scritti come li volete. Quando si carica o si modifica un'auto, quello che corrisponde al catalogo prende la sua scrittura e le versioni del catalogo sono le prime proposte.</p></div></div>
+
+<form method="post" enctype="multipart/form-data" class="scheda" data-una-volta>
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <label class="campo"><span>{{ 'Sostituisci il catalogo con un nuovo file' if n_voci else 'Carica il file' }}</span>
+    <input type="file" name="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+  <p class="tenue piccolo">File Excel (.xlsx) o CSV, una riga per versione, con le colonne <b>marca</b>, <b>modello</b> e <b>versione</b> (la versione si può lasciare vuota). Es. <code>Volkswagen ; T-Roc ; 1.5 eTSI 150 CV Life</code>.
+    Righe ripetute e maiuscole diverse contano una volta sola. Il nuovo file sostituisce tutto il catalogo.</p>
+  <button class="btn primario pieno">{{ i('carica') }} Carica il catalogo</button>
+</form>
+
+{% if n_voci %}
+<section class="scheda">
+  <h2>Nel catalogo</h2>
+  <p>{{ albero|length }} {{ 'marca' if albero|length == 1 else 'marche' }} · {{ albero.values()|map('length')|sum }} modelli · {{ n_voci }} righe</p>
+  {% for marca, modelli in albero.items() %}
+  <details class="catalogo-marca">
+    <summary><b>{{ marca }}</b> <span class="tenue">· {{ modelli|length }} {{ 'modello' if modelli|length == 1 else 'modelli' }}</span></summary>
+    <ul>
+    {% for modello, versioni in modelli.items() %}
+      <li><b>{{ modello }}</b>{% if versioni %} <span class="tenue">· {{ versioni|join(' · ') }}</span>{% endif %}</li>
+    {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
+  <p class="azioni-catalogo"><a class="btn" href="{{ url_for('admin.catalogo', scarica=1) }}">{{ i('doc', 's') }} Scarica il catalogo (CSV)</a></p>
+</section>
+
+<section class="scheda">
+  <h2>Auto già caricate</h2>
+  {% if n_correzioni %}
+  <p>{{ n_correzioni }} {{ 'dato' if n_correzioni == 1 else 'dati' }} di marca, modello o versione delle auto già presenti {{ 'si può' if n_correzioni == 1 else 'si possono' }} allineare al catalogo (e alle altre regole di scrittura).</p>
+  <a class="btn" href="{{ url_for('admin.uniforma_auto') }}">{{ i('matita', 's') }} Controlla e applica le correzioni</a>
+  {% else %}
+  <p class="tenue">Marca, modello e versione delle auto già presenti sono già allineati al catalogo.</p>
+  {% endif %}
+</section>
+
+<details class="ripiega zona-pericolo" style="margin-top:24px">
+  <summary>Svuota il catalogo</summary>
+  <form method="post" onsubmit="return confirm('Svuotare il catalogo? Le auto restano come sono.')">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="azione" value="svuota">
+    <p class="tenue">Le auto già caricate restano come sono; da qui in poi valgono solo le regole di scrittura e le versioni già usate.</p>
+    <button class="btn pericolo">Svuota il catalogo</button>
+  </form>
+</details>
+{% else %}
+<div class="vuoto">{{ i('doc') }}Catalogo vuoto: finché non carichi un file valgono le regole di scrittura e le versioni già usate.</div>
+{% endif %}
+{% endblock %}
