@@ -188,14 +188,9 @@ def pdf(ddt, invariante=False):
     c.setFont("Helvetica-Bold", 10)
     c.drawRightString(bx + bw - 4 * mm, y - 10 * mm, f"{ddt.emesso_at:%d/%m/%Y}")
 
-    # la corsia: fascia asfalto con la linea tratteggiata verde, chiude l'intestazione
-    c.setFillColor(NOTTE)
-    c.rect(sx, y - 18.6 * mm, larg, 1.6 * mm, stroke=0, fill=1)
-    c.setFillColor(HexColor(marchio.VERDE_VIA))
-    k = sx + 1.5 * mm
-    while k < sx + larg - 4 * mm:
-        c.rect(k, y - 18.0 * mm, 5 * mm, 0.4 * mm, stroke=0, fill=1)
-        k += 8 * mm
+    # sotto l'intestazione una sola linea verde piena, nel verde del marchio per i fondi chiari (15/11/2026)
+    c.setFillColor(VERDE)
+    c.rect(sx, y - 18.4 * mm, larg, 0.8 * mm, stroke=0, fill=1)
 
     y -= 23 * mm
     # Tratta: da dove a dove, e quando parte (il dato che si cerca per primo)
