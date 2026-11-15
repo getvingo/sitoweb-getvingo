@@ -272,6 +272,9 @@ class Veicolo(PerOrganizzazione, db.Model):
     creato_at = db.Column(db.DateTime, default=adesso)
     consegnato_at = db.Column(db.DateTime)
     venduta_il = db.Column(db.Date)  # data di vendita al cliente (analisi: dalla vendita alla consegna)
+    # impronta del bene (marchio v1.0, getvingo/impronte.py): numero d'ordine unico su tutto il portale, dato
+    # all'ingresso in stock (il più basso libero); torna libero solo se l'auto viene eliminata
+    impronta = db.Column(db.Integer, unique=True)
     # auto pronta: dove e quando verrà consegnata al cliente (l'ultimo DDT la porta lì)
     consegna_sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     consegna_prevista_at = db.Column(db.DateTime)
@@ -891,3 +894,18 @@ class Evento(PerOrganizzazione, db.Model):
                 "inserimento": "all'inserimento in stock",
                 "tocco": "toccando l'adesivo",
                 "fine_lavorazione": "alla fine della lavorazione"}.get(self.tipo, "a mano")
+
+
+@event.listens_for(Session, "before_flush")
+def _impronta_alle_auto_nuove(sessione, contesto, istanze):
+    """Ogni auto che entra (tocco, Stock, import, demo) prende subito la sua impronta: il numero libero più basso."""
+    nuove = [o for o in sessione.new if isinstance(o, Veicolo) and o.impronta is None]
+    if not nuove:
+        return
+    from . import impronte
+    with sessione.no_autoflush:
+        usati = impronte.numeri_usati()
+    usati |= {o.impronta for o in sessione.new if isinstance(o, Veicolo) and o.impronta is not None}
+    gen = impronte.liberi(usati)
+    for v in nuove:
+        v.impronta = next(gen)

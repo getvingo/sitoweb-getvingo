@@ -8,15 +8,16 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader, simpleSplit
 from reportlab.pdfgen import canvas
 
-from . import servizi
+from . import marchio, servizi
 
-INCHIOSTRO = HexColor("#1C1533")
-NOTTE = HexColor("#2C1A5C")
-BLU = HexColor("#1F6FB2")
-ARANCIO = HexColor("#F28C1E")
-TENUE = HexColor("#5A5470")
-BORDO = HexColor("#DFDBE9")
-FONDO = HexColor("#F6F5FA")
+# colori del marchio v1.0 (getvingo/marchio.py): asfalto, verde testi per le etichette, grigio asfalto
+INCHIOSTRO = HexColor(marchio.ASFALTO)
+NOTTE = HexColor(marchio.ASFALTO)
+BLU = HexColor(marchio.VERDE_TESTI)   # etichette dei riquadri (nome storico)
+VERDE = HexColor(marchio.VERDE_VIA_SCURO)
+TENUE = HexColor(marchio.GRIGIO_ASFALTO)
+BORDO = HexColor("#DCE0DA")
+FONDO = HexColor(marchio.BIANCO_SEGNALETICA)
 ROSSO = HexColor("#B42318")
 # stessi colori di stato del portale (style.css, --fase)
 STATO = {"predisposto": ("Da ritirare", HexColor("#DB2777")), "aperto": ("In viaggio", HexColor("#7C3AED")),
@@ -95,39 +96,6 @@ def _coppia(c, sx, dx, y, meta, a, b):
     return h
 
 
-def _marchio(c, x, y, s):
-    """Pittogramma Getvingo "G a ruota": pneumatico, barra e asterisco del VIN in un unico
-    tratto viola notte (stesso disegno di brand-getvingo/getvingo-pittogramma.svg, griglia 48)."""
-    u = s / 48
-
-    def P(px, py):  # coordinate della griglia SVG (y verso il basso) -> pagina
-        return x + px * u, y + s - py * u
-
-    c.setStrokeColor(NOTTE)
-    c.setLineWidth(4.5 * u)
-    c.setLineCap(1)
-    c.setLineJoin(1)
-    p = c.beginPath()
-    p.moveTo(*P(14.5, 24))
-    p.lineTo(*P(42, 24))
-    p.arcTo(*P(6, 42), *P(42, 6), startAng=0, extent=-320)  # pneumatico r 18, apertura 40°
-    c.drawPath(p, stroke=1, fill=0)
-    for (x1, y1), (x2, y2) in (((19.25, 15.77), (28.75, 32.23)), ((28.75, 15.77), (19.25, 32.23))):
-        c.line(*P(x1, y1), *P(x2, y2))
-
-
-def _scritta(c, x_destra, y, corpo):
-    """Scritta "getVINgo" allineata a destra: get viola notte, VIN blu, go arancio."""
-    font = "Helvetica-BoldOblique"
-    parti = (("get", NOTTE), ("VIN", BLU), ("go", ARANCIO))
-    x = x_destra - sum(c.stringWidth(t, font, corpo) for t, _ in parti)
-    c.setFont(font, corpo)
-    for t, colore in parti:
-        c.setFillColor(colore)
-        c.drawString(x, y, t)
-        x += c.stringWidth(t, font, corpo)
-
-
 def _firma(c, x, y, w, h, dato):
     """Disegna una firma PNG (data URL) dentro il riquadro, mantenendo le proporzioni."""
     if not dato:
@@ -194,13 +162,18 @@ def pdf(ddt, invariante=False):
 
     # Testata: marchio e titolo a sinistra, numero e data in evidenza a destra
     y = H - 14 * mm
-    _marchio(c, sx, y - 12 * mm, 12 * mm)
+    # firma del marchio (manuale v1.0): impronta alta quanto il logo, due celle di spazio, logo a destra
+    alto = 10 * mm
+    marchio.impronta_pdf(c, sx, y - 12 * mm, alto)
+    lx = sx + alto + 2 * marchio.PASSO / 100 * alto
+    lx += marchio.logo_pdf(c, lx, y - 12 * mm, alto)
+    tx = lx + 5 * mm
     c.setFillColor(NOTTE)
-    c.setFont("Helvetica-Bold", 17)
-    c.drawString(sx + 16 * mm, y - 6 * mm, "Documento di trasporto")
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(tx, y - 6 * mm, "Documento di trasporto")
     c.setFillColor(TENUE)
-    c.setFont("Helvetica", 8.5)
-    c.drawString(sx + 16 * mm, y - 11 * mm, "D.D.T. ai sensi del D.P.R. 472/1996")
+    c.setFont("Helvetica", 8)
+    c.drawString(tx, y - 10.5 * mm, "D.D.T. ai sensi del D.P.R. 472/1996")
 
     bw, bh = 54 * mm, 17 * mm
     bx = sx + larg - bw
@@ -215,7 +188,16 @@ def pdf(ddt, invariante=False):
     c.setFont("Helvetica-Bold", 10)
     c.drawRightString(bx + bw - 4 * mm, y - 10 * mm, f"{ddt.emesso_at:%d/%m/%Y}")
 
-    y -= 21 * mm
+    # la corsia: fascia asfalto con la linea tratteggiata verde, chiude l'intestazione
+    c.setFillColor(NOTTE)
+    c.rect(sx, y - 18.6 * mm, larg, 1.6 * mm, stroke=0, fill=1)
+    c.setFillColor(HexColor(marchio.VERDE_VIA))
+    k = sx + 1.5 * mm
+    while k < sx + larg - 4 * mm:
+        c.rect(k, y - 18.0 * mm, 5 * mm, 0.4 * mm, stroke=0, fill=1)
+        k += 8 * mm
+
+    y -= 23 * mm
     # Tratta: da dove a dove, e quando parte (il dato che si cerca per primo)
     c.setFillColor(FONDO)
     c.roundRect(sx, y - 14 * mm, larg, 14 * mm, 2 * mm, stroke=0, fill=1)

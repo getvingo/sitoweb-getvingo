@@ -9,12 +9,12 @@
   {{ tocca_adesivo() }}
 
   {# 14/11/2026 sera: dal telefono lo stesso "Da fare" del computer (fasce Adesso · Oggi · Prossimi giorni,
-     Tutte · Solo le mie con la stessa vista iniziale per mansione); al posto di "Da andare a prendere",
+     Solo le mie (predefinito, a sinistra) · Tutte); al posto di "Da andare a prendere",
      "Fornitori in ritardo" e "In preparazione", che erano le stesse auto. Poi "I tuoi lavori" senza doppioni. #}
   <div class="tel-fare-testa"><h2 class="sezione-t">Da fare{% if totale_da_fare.mostrate %} · {{ totale_da_fare.mostrate }}{% endif %}</h2>
     <nav class="interruttore filtro-gruppo in-riga" aria-label="Quali voci">
-      <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte</a>
-      <a href="{{ url_for('main.home', mie=1) }}" class="{{ 'attivo' if solo_mie }}">Mie</a></nav></div>
+      <a href="{{ url_for('main.home', mie=1) }}" class="{{ 'attivo' if solo_mie }}">Mie</a>
+      <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte</a></nav></div>
   {% set gia = [] %}
   {% for chiave, titolo, icona, voci in da_fare if voci %}
   <h3 class="tel-fascia fascia-{{ chiave }}">{{ i(icona, 's') }} {{ titolo }}</h3>
@@ -143,8 +143,8 @@ Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi I
    cosa succede e il pulsante dell'azione. "Solo le mie": le voci che toccano a chi guarda (routes._da_fare_home) #}
 <div class="fare-testa"><h2>Da fare{% if totale_da_fare.tutte %} <span class="conta-arancio">{{ totale_da_fare.tutte }}</span>{% endif %}</h2>
   <nav class="interruttore filtro-gruppo in-riga" aria-label="Quali voci">
-    <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte <span class="n">{{ totale_da_fare.tutte }}</span></a>
     <a href="{{ url_for('main.home', mie=1) }}" class="{{ 'attivo' if solo_mie }}">{{ i('utente', 's') }} Solo le mie <span class="n">{{ totale_da_fare.mie }}</span></a>
+    <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte <span class="n">{{ totale_da_fare.tutte }}</span></a>
   </nav></div>
 {% if not totale_da_fare.mostrate %}<div class="vuoto">{{ i('check') }}{{ 'Niente che tocchi a te adesso.' if solo_mie else 'Niente da fare adesso.' }}</div>
 {% else %}

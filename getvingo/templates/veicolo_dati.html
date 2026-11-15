@@ -14,7 +14,7 @@
 
   <h2 class="sezione-t">Il veicolo</h2>
   <dl class="dati-righe">
-    <div><dt>Telaio (VIN)</dt><dd class="vin">{{ v.vin|vin }}</dd></div>
+    <div><dt>Telaio (VIN)</dt><dd class="vin con-impronta">{{ v.impronta|impronta(28) }}{{ v.vin|vin }}</dd></div>
     <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa-grande">{{ v.targa }}</span>{% else %}<span class="tenue">non ancora targata</span>{% endif %}</dd></div>
     <div><dt>Marca</dt><dd>{{ v.marca or '—' }}</dd></div>
     <div><dt>Modello</dt><dd>{{ v.modello or '—' }}</dd></div>

@@ -176,12 +176,16 @@ def aggiungi_colonne():
              ("movimento", "assegnato_a_id", "INTEGER REFERENCES utente(id)"),
              # 13/11/2026: anno modello dell'auto (dal VIN o scelto all'ingresso in stock)
              ("veicolo", "anno", "INTEGER"),
-             ("veicolo", "alimentazione", "VARCHAR(30) DEFAULT ''")]
+             ("veicolo", "alimentazione", "VARCHAR(30) DEFAULT ''"),
+             # 15/11/2026: impronta del bene (numero d'ordine, unico su tutto il portale)
+             ("veicolo", "impronta", "INTEGER")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE {tabella} ADD COLUMN {colonna} {tipo}")
             aggiunte.append(f"{tabella}.{colonna}")
+    with db.engine.begin() as conn:  # un'impronta = un'auto (più NULL ammessi, sia SQLite sia Postgres)
+        conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_veicolo_impronta ON veicolo (impronta)")
     return aggiunte
 
 

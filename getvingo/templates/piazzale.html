@@ -119,7 +119,7 @@
     GetvingoMappa.sfondo(mappa);
     function colore(fase) {
       var el = document.createElement('i'); el.className = fase; document.body.appendChild(el);
-      var c = getComputedStyle(el).getPropertyValue('--fase').trim() || '#1F6FB2'; el.remove(); return c;
+      var c = getComputedStyle(el).getPropertyValue('--fase').trim() || '#00A86B'; el.remove(); return c;
     }
     function popup(titolo, sotto, url, link) {
       var d = document.createElement('div');

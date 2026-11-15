@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import click
 from flask import Flask
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .models import db
@@ -93,6 +93,11 @@ def create_app(config=None):
                 migrazioni.aggiorna_ruoli()
             except OperationalError:
                 pass
+            try:  # 15/11/2026: impronta alle auto caricate prima, nell'ordine di caricamento
+                from . import impronte
+                impronte.assegna_mancanti()
+            except (OperationalError, IntegrityError):  # un altro processo del server le ha appena assegnate
+                db.session.rollback()
 
 
     from . import admin, archivio, auth, filtri, piattaforma, routes

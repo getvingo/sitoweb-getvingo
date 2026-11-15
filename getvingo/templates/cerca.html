@@ -83,7 +83,7 @@
     GetvingoMappa.sfondo(mappa);
     function colore(fase) {
       var t = document.createElement('i'); t.className = fase; document.body.appendChild(t);
-      var c = getComputedStyle(t).getPropertyValue('--fase').trim() || '#1F6FB2'; t.remove(); return c;
+      var c = getComputedStyle(t).getPropertyValue('--fase').trim() || '#00A86B'; t.remove(); return c;
     }
     var strato_luoghi = L.featureGroup(), strato_auto = L.featureGroup();
     piazzali.forEach(function (p) {

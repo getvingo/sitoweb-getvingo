@@ -18,7 +18,8 @@
       {% if modificabile %}<a class="btn piccolo modifica-auto" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}</div>
   </div>
   <dl class="anagrafica-dati">
-    <div class="dato-telaio"><dt>Telaio</dt><dd>{{ v.vin|vin }}</dd></div>
+    {# impronta del bene (marchio v1.0): unica per auto, sempre accanto al VIN #}
+    <div class="dato-telaio"><dt>Telaio</dt><dd class="con-impronta">{{ v.impronta|impronta(34, titolo='Impronta di questa auto') }}{{ v.vin|vin }}</dd></div>
     <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="tenue">Senza targa</span>{% endif %}</dd></div>
     <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
     <div><dt>{{ 'Alimentazione · anno' if v.alimentazione else 'Anno' }}</dt><dd>{% if v.alimentazione %}{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}{% else %}{{ v.anno or '—' }}{% endif %}</dd></div>
@@ -220,7 +221,7 @@
   {{ marchio(v) }}
   <div class="auto-breve-dati">
     <b>{{ v.descrizione }}</b>{{ condizione(v) }}
-    <div class="auto-breve-vin">{{ v.vin|vin }}{% if v.targa %} <span class="targa">{{ v.targa }}</span>{% endif %}</div>
+    <div class="auto-breve-vin con-impronta">{{ v.impronta|impronta(20) }}{{ v.vin|vin }}{% if v.targa %} <span class="targa">{{ v.targa }}</span>{% endif %}</div>
     {% if stato %}<div class="auto-breve-stato"><i aria-hidden="true"></i>{{ testo }}{% if v.sede and v.stato == 'in_sede' %} · {{ v.sede.nome }}{% endif %}</div>
     {{ dettaglio_stato(v, collegato=not dati) }}{% endif %}
   </div>

@@ -1,34 +1,39 @@
 /* Getvingo — design system
-   Marchio e colori: GETVINGO/brand-getvingo/guida-marchio-getvingo-v1.txt · principi UX: GETVINGO/knowledge/analisi-ux-ui-v1.txt */
+   Marchio, colori e caratteri: GETVINGO/brand-getvingo/manuale-v1.0 (Getvingo-Brand-Identity-v1.0.pdf) · principi UX: GETVINGO/knowledge/analisi-ux-ui-v1.txt */
 
+/* Marchio v1.0 (15/11/2026, brand-getvingo/manuale-v1.0): asfalto e verde via. Il verde dice "go": azioni,
+   link, segni del marchio. Gli stati dell'auto (--st-*), l'arancio delle cose da fare e il rosso dei danni restano colori di funzione. */
 :root {
-  --inchiostro: #2C1A5C;   /* viola notte: barra, "get" del marchio */
-  --segnale: #1F6FB2;      /* blu VIN: link, accenti */
-  --segnale-scuro: #185A91;
-  --segnale-tenue: #E6F0F9;
-  --primario: #2C1A5C; --primario-hover: #3D2779; --primario-testo: #FFFFFF;
-  --superficie: #F4F2F8;
+  --font-titoli: "Red Hat Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-testo: "Red Hat Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --inchiostro: #11171D;   /* asfalto: barra in alto, testi, logo */
+  --segnale: #007A4E;      /* verde testi: link e accenti su chiaro (contrasto 5,4) */
+  --segnale-scuro: #00603D;
+  --segnale-tenue: #E2F4EB;
+  --primario: #11171D; --primario-hover: #232D36; --primario-testo: #FFFFFF;
+  --superficie: #F3F4F0;   /* bianco segnaletica */
   --carta: #FFFFFF;
-  --testo: #1C1533;
-  --testo-2: #5A5470;
-  --bordo: #DFDBE9;
-  --bordo-forte: #BDB6CF;
-  --ok: #0F7A43;      --ok-tenue: #E3F4EA;
+  --testo: #11171D;
+  --testo-2: #5A6672;      /* grigio asfalto */
+  --bordo: #E0E3DE;
+  --bordo-forte: #C9CEC8;  /* filo */
+  --ok: #007A4E;      --ok-tenue: #E2F4EB;
   --viaggio: #9A4A07; --viaggio-tenue: #FDF0DD;
-  --spento: #5A5470;  --spento-tenue: #ECE9F2;
+  --spento: #5A6672;  --spento-tenue: #ECEEEA;
   --errore: #B42318;  --errore-tenue: #FDEBE9;
   --arancio: #F28C1E; --arancio-tenue: #FEF1E2; --arancio-testo: #A8560A;  /* da fare, cose importanti */
   --danno: #E11D2E;   --danno-tenue: #FFE4E6;   --danno-scuro: #BE1222;    /* danni da verificare */
   --liv-1: #C2410C; --liv-1-fondo: #FFE3D3; --liv-1-testo: #A33A08;      /* da fare: urgente */
   --liv-2: #F28C1E;                                                      /* da fare: presto */
   --liv-3: #F6C98A; --liv-3-fondo: #FDF1DE; --liv-3-testo: #8A5A00;      /* da fare: da pianificare */
-  --ombra: 0 1px 2px rgba(28, 21, 51, .06), 0 2px 8px rgba(28, 21, 51, .04);
+  --ombra: 0 1px 2px rgba(17, 23, 29, .06), 0 2px 8px rgba(17, 23, 29, .04);
   --r: 14px; --r-s: 12px;
   --barra-sotto: 68px;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* — Sistema (10/11/2026): valori unici da usare ovunque al posto dei numeri scritti a mano — */
-  /* colori fissi del marchio (uguali anche nel tema scuro: carta dell'auto, foglio DDT, testi su arancio) */
-  --marchio-viola: #2C1A5C; --marchio-blu: #1F6FB2; --marchio-arancio: #F28C1E; --notte: #120B26; --inchiostro-fisso: #1C1533;
+  /* colori fissi del marchio (uguali anche nel tema scuro: carta dell'auto, foglio DDT, barre scure) */
+  --marchio-asfalto: #11171D; --marchio-verde: #00A86B; --marchio-via: #00D68F; --riquadro: #EEF0EC;
+  --notte: #0A0F14; --inchiostro-fisso: #11171D; --asfalto-2: #1C252D; --asfalto-3: #26323C;
   /* colori di stato dell'auto (fase) e varianti piene per gli sfondi con testo */
   --st-viaggio: #7C3AED; --st-lavoro: #CA8A04; --st-ritiro: #DB2777; --st-prep: #0D9488; --st-pronta: #16A34A; --st-sede: #475569;
   --st-lavoro-pieno: #A16207; --st-ritiro-pieno: #BE185D; --st-prep-pieno: #0F766E; --st-pronta-pieno: #15803D;
@@ -43,13 +48,13 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --segnale: #5FA8E8; --segnale-scuro: #8CC2F0; --segnale-tenue: #14273D;
-    --primario: #A99BF0; --primario-hover: #C2B8F6; --primario-testo: #120B26;
-    --superficie: #0D0919; --carta: #171128; --testo: #EEEBF6; --testo-2: #A8A1BE;
-    --bordo: #2C2442; --bordo-forte: #433A5E;
-    --ok: #4ADE8B;      --ok-tenue: #10301F;
+    --segnale: #00D68F; --segnale-scuro: #5FE6B4; --segnale-tenue: #0E2A20;
+    --primario: #00D68F; --primario-hover: #3FE3A9; --primario-testo: #11171D;
+    --superficie: #0B0F13; --carta: #151B21; --testo: #EEF0EC; --testo-2: #9BA6AF;
+    --bordo: #242D35; --bordo-forte: #36414B;
+    --ok: #3FE3A9;      --ok-tenue: #0E2A20;
     --viaggio: #FBB454; --viaggio-tenue: #36260F;
-    --spento: #A8A1BE;  --spento-tenue: #221B36;
+    --spento: #9BA6AF;  --spento-tenue: #1C232A;
     --errore: #FF8A7A;  --errore-tenue: #3A1714;
     --arancio: #F59E3B; --arancio-tenue: #3A2410; --arancio-testo: #FBB86B;
     --danno: #C81E2E;   --danno-tenue: #45121A;   --danno-scuro: #E5394A;
@@ -66,13 +71,15 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--superficie); color: var(--testo);
-  font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font: 17px/1.45 var(--font-testo);
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--segnale); text-decoration: none; }
 a:hover { text-decoration: underline; }
-h1 { font-size: var(--fs-24); line-height: 1.2; font-weight: 750; margin: 0; letter-spacing: -.01em; }
-h2 { font-size: var(--fs-13); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+/* caratteri del marchio: titoli Red Hat Display 800, etichette Display 700 maiuscolo, testi Red Hat Text, codici IBM Plex Mono */
+h1, h3, h4, .sezione-t { font-family: var(--font-titoli); }
+h1 { font-size: var(--fs-24); line-height: 1.2; font-weight: 800; margin: 0; letter-spacing: -.015em; }
+h2 { font-family: var(--font-titoli); font-size: var(--fs-13); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--testo-2); margin: 28px 0 10px; }
 h3 { font-size: var(--fs-17); margin: 0 0 4px; }
 .icona { width: 22px; height: 22px; flex: none; stroke: currentColor; fill: none; stroke-width: 2;
@@ -88,10 +95,10 @@ h3 { font-size: var(--fs-17); margin: 0 0 4px; }
 .marchio img { height: 28px; width: auto; display: block; }
 .marchio:hover { text-decoration: none; }
 .nav-alto { display: none; gap: 4px; align-items: center; }
-.nav-alto a, .nav-alto button { color: #D3CCE8; padding: 8px 12px; border-radius: var(--r-m); font-size: var(--fs-15);
+.nav-alto a, .nav-alto button { color: #C9CEC8; padding: 8px 12px; border-radius: var(--r-m); font-size: var(--fs-15);
   background: none; border: 0; font: inherit; cursor: pointer; }
 .nav-alto a.attivo, .nav-alto a:hover { color: #fff; background: rgba(255, 255, 255, .1); text-decoration: none; }
-.utente { display: flex; align-items: center; gap: 8px; color: #D3CCE8; font-size: var(--fs-14); }
+.utente { display: flex; align-items: center; gap: 8px; color: #C9CEC8; font-size: var(--fs-14); }
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--segnale); color: #fff;
   display: grid; place-items: center; font-weight: 700; font-size: var(--fs-13); }
 
@@ -160,11 +167,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px calc(var(--barra-so
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
   padding: 0 18px; border-radius: var(--r-s); border: 1px solid var(--bordo-forte); background: var(--carta);
   color: var(--testo); font: inherit; font-weight: 650; cursor: pointer; text-align: center;
-  box-shadow: 0 1px 2px rgba(28, 21, 51, .06); transition: background-color .15s, border-color .15s, transform .1s; }
+  box-shadow: 0 1px 2px rgba(17, 23, 29, .06); transition: background-color .15s, border-color .15s, transform .1s; }
 .btn:hover { text-decoration: none; border-color: var(--testo-2); background: var(--superficie); }
 .btn:active { transform: scale(.98); }
 .btn.primario { background: var(--primario); border-color: var(--primario); color: var(--primario-testo);
-  box-shadow: 0 1px 2px rgba(28, 21, 51, .12), 0 4px 12px rgba(44, 26, 92, .18); }
+  box-shadow: 0 1px 2px rgba(17, 23, 29, .12), 0 4px 12px rgba(17, 23, 29, .18); }
 .btn.primario:hover { background: var(--primario-hover); border-color: var(--primario-hover); }
 @media (prefers-color-scheme: dark) { .btn, .btn.primario { box-shadow: none; } }
 .btn.pieno { width: 100%; min-height: 56px; font-size: var(--fs-17); }
@@ -175,7 +182,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px calc(var(--barra-so
 /* Barra azione fissa (zona del pollice) */
 .barra-azione { position: sticky; bottom: calc(var(--barra-sotto) + 8px); z-index: 10; margin-top: 18px;
   padding: 10px; background: var(--carta); border: 1px solid var(--bordo); border-radius: calc(var(--r) + 4px);
-  box-shadow: 0 8px 28px rgba(28, 21, 51, .14); }
+  box-shadow: 0 8px 28px rgba(17, 23, 29, .14); }
 .barra-azione .riepilogo { font-size: var(--fs-13); color: var(--testo-2); text-align: center; margin: 0 0 8px; }
 @media (min-width: 1024px) { .barra-azione { bottom: 16px; } }
 
@@ -351,7 +358,7 @@ code { font-family: var(--mono); font-size: var(--fs-13); word-break: break-all;
 .menu-utente summary::-webkit-details-marker { display: none; }
 .menu-utente[open] .avatar { box-shadow: 0 0 0 3px rgba(255,255,255,.35); }
 .menu-tendina { position: absolute; right: 0; top: 44px; min-width: 230px; background: var(--carta); color: var(--testo);
-  border: 1px solid var(--bordo); border-radius: var(--r); box-shadow: 0 12px 32px rgba(28,21,51,.18); padding: 6px; z-index: 30; }
+  border: 1px solid var(--bordo); border-radius: var(--r); box-shadow: 0 12px 32px rgba(17, 23, 29, .18); padding: 6px; z-index: 30; }
 .menu-tendina a, .menu-tendina button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px;
   border-radius: var(--r-m); color: var(--testo); background: none; border: 0; font: inherit; cursor: pointer; text-align: left; }
 .menu-tendina a:hover, .menu-tendina button:hover { background: var(--superficie); text-decoration: none; }
@@ -438,7 +445,7 @@ h2 .icona { width: 16px; height: 16px; }
 #mappa-piazzale { height: 340px; border-radius: var(--r); border: 1px solid var(--bordo); margin-bottom: 16px; z-index: 0; }
 /* mappa bloccata finché non la si tocca: avviso in basso, i tasti + e − funzionano sempre */
 .mappa-bloccata::after { content: "Tocca la mappa per spostarla"; position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
-  z-index: 1000; pointer-events: none; padding: 4px 10px; border-radius: var(--r-pillola); background: rgba(18, 11, 38, .72); color: #fff;
+  z-index: 1000; pointer-events: none; padding: 4px 10px; border-radius: var(--r-pillola); background: rgba(10, 15, 20, .72); color: #fff;
   font-size: var(--fs-12); white-space: nowrap; }
 .dettagli-auto { margin-top: 10px; border-top: 1px solid var(--bordo); padding-top: 10px; }
 .dettagli-auto summary { cursor: pointer; color: var(--segnale); font-weight: 650; list-style: none; }
@@ -480,7 +487,7 @@ h2.importante .icona { color: var(--arancio); width: 18px; height: 18px; }
 /* chiedi: barra di ricerca che si allarga in chat */
 .chiedi { background: var(--carta); border: 1.5px solid var(--bordo-forte); border-radius: calc(var(--r) + 2px);
   box-shadow: var(--ombra); transition: box-shadow .2s, border-color .2s; overflow: hidden; }
-.chiedi.aperta { border-color: var(--segnale); box-shadow: 0 0 0 4px var(--segnale-tenue), 0 12px 32px rgba(28,21,51,.12); }
+.chiedi.aperta { border-color: var(--segnale); box-shadow: 0 0 0 4px var(--segnale-tenue), 0 12px 32px rgba(17, 23, 29, .12); }
 .chiedi-barra { display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px; }
 .chiedi-barra > .icona { color: var(--testo-2); }
 .chiedi-barra input { border: 0; box-shadow: none !important; min-height: 56px; padding: 0; background: transparent; }
@@ -954,7 +961,7 @@ details.zona-pericolo > summary { color: var(--danno-scuro); font-weight: 650; }
 .prepara-qui[open] > summary { margin-bottom: 10px; }
 /* mappa dello stock: etichette leggibili su stradale e satellite */
 .leaflet-tooltip.etichetta-mappa { background: var(--carta); color: var(--testo); border: 1px solid var(--bordo); border-radius: var(--r-m);
-  box-shadow: 0 2px 8px rgba(28,21,51,.18); font: 600 .78rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 4px 8px; }
+  box-shadow: 0 2px 8px rgba(17, 23, 29, .18); font: 600 .78rem/1.2 var(--font-testo); padding: 4px 8px; }
 .leaflet-tooltip.etichetta-mappa::before { display: none; }
 .sulla-mappa { font-size: var(--fs-13); white-space: nowrap; }
 /* freccia per tornare indietro (pagine dei danni) */
@@ -1182,7 +1189,7 @@ a.destinazione-btn { text-decoration: none; }
 /* Tocco: dati veicolo (carta dell'auto, riquadri informativi, DDT in miniatura) */
 .tocco-dati[open] > summary { margin-bottom: 10px; }
 .carta-auto { position: relative; overflow: hidden; padding: 18px; border-radius: calc(var(--r) + 4px); color: #fff;
-  background: linear-gradient(135deg, var(--marchio-viola) 0%, #3D2779 55%, var(--marchio-blu) 140%); box-shadow: var(--ombra); }
+  background: linear-gradient(135deg, var(--marchio-asfalto) 0%, var(--asfalto-2) 55%, var(--marchio-verde) 140%); box-shadow: var(--ombra); }
 .carta-auto::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%;
   background: radial-gradient(circle, rgba(242,140,30,.35), transparent 70%); pointer-events: none; }
 .carta-auto-testa { display: flex; align-items: center; gap: 14px; }
@@ -1265,11 +1272,11 @@ a.destinazione-btn { text-decoration: none; }
 .viaggio-azioni .btn { flex: 1; }
 
 /* Carta dell'auto: colore della fase sul bordo alto (scheda veicolo e tocco) */
-.carta-auto { border-top: 5px solid var(--fase, var(--marchio-blu)); }
+.carta-auto { border-top: 5px solid var(--fase, var(--marchio-verde)); }
 .carta-auto-testa { position: relative; z-index: 1; }
 .carta-auto-stato { margin-left: auto; align-self: flex-start; }
-.carta-auto-stato .badge { background: rgba(255,255,255,.95); color: var(--marchio-viola); }
-.carta-auto .badge.nuovo, .carta-auto .badge.usato { background: #fff; color: var(--marchio-viola); }
+.carta-auto-stato .badge { background: rgba(255,255,255,.95); color: var(--marchio-asfalto); }
+.carta-auto .badge.nuovo, .carta-auto .badge.usato { background: #fff; color: var(--marchio-asfalto); }
 .carta-auto .badge.nuovo { color: var(--segnale); }
 .scheda-auto-testa { margin-bottom: 14px; }
 /* carta dell'auto a tutta larghezza, i riquadri sotto (in fila da 560 px) */
@@ -1897,12 +1904,12 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   .pagina-anteprima .testata, .pagina-anteprima .nav-basso, .pagina-anteprima .demo-barra { display: none; }
   .pagina-anteprima main { padding: 0 0 calc(24px + env(safe-area-inset-bottom)); }
   .pagina-anteprima .anteprima-barra { position: sticky; top: 0; margin: 0; padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
-    background: var(--marchio-viola); box-shadow: 0 2px 10px rgba(18, 11, 38, .25); flex-wrap: wrap; align-items: center; }
+    background: var(--marchio-asfalto); box-shadow: 0 2px 10px rgba(10, 15, 20, .25); flex-wrap: wrap; align-items: center; }
   .pagina-anteprima .anteprima-nome { display: block; flex: 1 1 auto; order: 1; color: #fff; font-weight: 700; font-size: var(--fs-17); }
   .pagina-anteprima .anteprima-chiudi { order: 2; background: rgba(255,255,255,.14); border-color: transparent; color: #fff; }
   .pagina-anteprima .anteprima-barra .btn:not(.anteprima-chiudi) { order: 3; flex: 1 1 40%; }
-  .pagina-anteprima .anteprima-barra .btn:not(.anteprima-chiudi):not(.primario) { background: #fff; color: var(--marchio-viola); border-color: #fff; }
-  .pagina-anteprima .anteprima-barra .btn.primario { background: var(--marchio-arancio); border-color: var(--marchio-arancio); color: var(--notte); }
+  .pagina-anteprima .anteprima-barra .btn:not(.anteprima-chiudi):not(.primario) { background: #fff; color: var(--marchio-asfalto); border-color: #fff; }
+  .pagina-anteprima .anteprima-barra .btn.primario { background: var(--marchio-via); border-color: var(--marchio-via); color: var(--notte); }
   .pagina-anteprima .anteprima-stato { margin: 12px; }
   .pagina-anteprima .foglio-ddt { border-radius: 0; box-shadow: none; margin: 0; }
   .pagina-anteprima .avviso { margin: 12px; }
@@ -1959,31 +1966,31 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 }
 
 /* Foglio del DDT nell'anteprima (11/11/2026): ricalca il PDF. Sempre su carta bianca, anche nel tema scuro */
-.foglio-ddt { --fg-ink: #1C1533; --fg-ink-2: #5A5470; --fg-linea: #E6E2EE; --fg-fondo: #F6F4FA;
+.foglio-ddt { --fg-ink: #11171D; --fg-ink-2: #5A6672; --fg-linea: #E0E3DE; --fg-fondo: #F3F4F0;
   background: #fff; color: var(--fg-ink); border-radius: var(--r-xs); padding: 24px; box-shadow: 0 6px 24px rgba(20,10,50,.18);
-  border-top: 6px solid var(--marchio-viola); font-size: var(--fs-15); line-height: 1.4; }
+  border-top: 6px solid var(--marchio-asfalto); font-size: var(--fs-15); line-height: 1.4; }
 .foglio-ddt section { margin-top: 20px; }
 .foglio-ddt small { display: block; font-size: var(--fs-12); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-ink-2); }
 .foglio-ddt b { font-weight: 700; }
 .foglio-ddt .vin, .foglio-ddt .vin b { color: var(--fg-ink); }
 .foglio-ddt .targa { background: #fff; color: var(--fg-ink); border-color: var(--fg-ink); }
 .fg-testa { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.fg-titolo b { display: block; font-size: var(--fs-20); color: var(--marchio-viola); }
+.fg-titolo b { display: block; font-size: var(--fs-20); color: var(--marchio-asfalto); }
 .fg-titolo small { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: var(--fs-13); }
-.fg-numero { display: flex; gap: 20px; padding: 10px 16px; border-radius: var(--r-m); background: var(--marchio-viola); color: #fff; }
+.fg-numero { display: flex; gap: 20px; padding: 10px 16px; border-radius: var(--r-m); background: var(--marchio-asfalto); color: #fff; }
 .fg-numero small { color: rgba(255,255,255,.7); }
 .fg-numero b { display: block; font-size: var(--fs-20); font-variant-numeric: tabular-nums; }
 .fg-tratta { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px 20px; padding: 14px 16px; border-radius: var(--r-m);
-  background: var(--fg-fondo); border-left: 4px solid var(--marchio-viola); }
+  background: var(--fg-fondo); border-left: 4px solid var(--marchio-asfalto); }
 .fg-tappa b, .fg-inizio b { display: block; font-size: var(--fs-17); }
 .fg-tappa span { display: block; color: var(--fg-ink-2); font-size: var(--fs-14); }
-.fg-tappa.arrivo small::before { content: "→ "; color: var(--marchio-arancio); }
+.fg-tappa.arrivo small::before { content: "→ "; color: var(--marchio-via); }
 .fg-inizio { text-align: right; }
 .fg-parti { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .fg-riquadro { padding: 12px 14px; border: 1px solid var(--fg-linea); border-radius: var(--r-m); }
 .fg-riquadro b { display: block; margin-top: 2px; }
 .fg-riquadro span { display: block; color: var(--fg-ink-2); font-size: var(--fs-14); }
-.fg-sezione { margin: 0 0 8px; font-size: var(--fs-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--marchio-blu); }
+.fg-sezione { margin: 0 0 8px; font-size: var(--fs-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--marchio-verde); }
 .fg-dati { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 .fg-dati > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--fg-linea); }
 .fg-dati dt { color: var(--fg-ink-2); font-size: var(--fs-14); }
@@ -2009,8 +2016,8 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   .fg-tratta { grid-template-columns: 1fr; gap: 10px; }
   .fg-tappa { position: relative; padding-left: 18px; }
   .fg-tappa::before { content: ""; position: absolute; left: 3px; top: 6px; width: 9px; height: 9px; border-radius: 50%;
-    border: 2px solid var(--marchio-viola); background: #fff; }
-  .fg-tappa.arrivo::before { background: var(--marchio-arancio); border-color: var(--marchio-arancio); }
+    border: 2px solid var(--marchio-asfalto); background: #fff; }
+  .fg-tappa.arrivo::before { background: var(--marchio-via); border-color: var(--marchio-via); }
   .fg-tappa:first-child::after { content: ""; position: absolute; left: 7px; top: 19px; bottom: -12px; border-left: 2px dashed #C9C2DA; }
   .fg-tappa.arrivo small::before { content: none; }
   .fg-inizio { text-align: left; padding-top: 8px; border-top: 1px solid var(--fg-linea); }
@@ -2023,7 +2030,7 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 @media (max-width: 640px) { .fg-tappa { padding-left: 22px; } }
 
 /* "Modifica dati" a destra del telaio nella carta dell'auto (tutto il personale interno) */
-.carta-auto-vin .modifica-auto { background: #fff; color: var(--marchio-viola); border-color: #fff; }
+.carta-auto-vin .modifica-auto { background: #fff; color: var(--marchio-asfalto); border-color: #fff; }
 
 /* Home del fornitore (11/11/2026): chi esegue le lavorazioni esterne. In cima le auto in arrivo, poi i filtri
    Nei tempi · In ritardo · Completate e un solo elenco di carte con tipo di lavorazione e conferma della fine. */
@@ -2062,7 +2069,7 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
    per pochi secondi, foglio di partenza, home "Cosa fai adesso?". Demo: output/demo-mobile-snello-v1.html
    =================================================================================================== */
 /* Scorri per confermare (_macro.scorri) */
-.scorri { position: relative; height: 64px; border-radius: var(--r-pillola); background: var(--marchio-viola); color: #fff;
+.scorri { position: relative; height: 64px; border-radius: var(--r-pillola); background: var(--marchio-asfalto); color: #fff;
   overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: pan-y; margin-top: 14px; }
 .scorri.verde { background: var(--st-pronta-pieno); } .scorri.magenta { background: var(--st-ritiro-pieno); }
 .scorri.rosso { background: var(--danno-scuro); }
@@ -2073,7 +2080,7 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: luce-scorri 2.6s linear infinite; }
 @keyframes luce-scorri { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .scorri-pomo { position: absolute; top: 6px; left: 6px; width: 52px; height: 52px; min-height: 0; padding: 0; border: 0; border-radius: 50%;
-  background: #fff; color: var(--marchio-viola); display: grid; place-items: center; cursor: grab; touch-action: none;
+  background: #fff; color: var(--marchio-asfalto); display: grid; place-items: center; cursor: grab; touch-action: none;
   box-shadow: 0 2px 6px rgba(0,0,0,.25); z-index: 1; }
 .scorri.verde .scorri-pomo { color: var(--st-pronta-pieno); } .scorri.magenta .scorri-pomo { color: var(--st-ritiro-pieno); }
 .scorri-pomo .icona { width: 26px; height: 26px; }
@@ -2097,11 +2104,11 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 .annulla-subito { position: fixed; left: 12px; right: 12px; bottom: calc(var(--barra-sotto) + env(safe-area-inset-bottom) + 10px); z-index: 30;
   max-width: 560px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: var(--notte); color: #fff; border-radius: var(--r); padding: 6px 8px 6px 14px; overflow: hidden;
-  box-shadow: 0 6px 20px rgba(18,11,38,.3); animation: entra-su .2s ease-out; }
+  box-shadow: 0 6px 20px rgba(10, 15, 20, .3); animation: entra-su .2s ease-out; }
 .annulla-subito span { display: flex; align-items: center; gap: 8px; font-size: var(--fs-15); }
 .annulla-subito-btn { background: none; border: 0; color: #FFB86B; font: inherit; font-weight: 700; font-size: var(--fs-16);
   min-height: var(--alt-piccola); padding: 0 12px; cursor: pointer; }
-.annulla-tempo { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--marchio-arancio); animation: tempo-annulla linear forwards; }
+.annulla-tempo { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--marchio-via); animation: tempo-annulla linear forwards; }
 @keyframes tempo-annulla { from { width: 100%; } to { width: 0; } }
 @media (min-width: 1024px) { .annulla-subito { bottom: 20px; } }
 
@@ -2156,7 +2163,7 @@ input.campo-errore { border-color: var(--errore) !important; box-shadow: 0 0 0 3
 /* foglio di partenza (dal basso sul telefono, al centro su computer) */
 dialog.foglio { border: 0; padding: 0; width: 100%; max-width: 560px; max-height: 92vh; margin: auto auto 0; border-radius: var(--r-l) var(--r-l) 0 0;
   background: var(--superficie); color: var(--testo); }
-dialog.foglio::backdrop { background: rgba(18,11,38,.5); }
+dialog.foglio::backdrop { background: rgba(10, 15, 20, .5); }
 dialog.foglio[open] { animation: entra-su .22s ease-out; }
 dialog.foglio form { padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); }
 .foglio-testa { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -2224,14 +2231,14 @@ dialog.foglio form { padding: 14px 16px calc(20px + env(safe-area-inset-bottom))
 .home-telefono h1 { font-size: var(--fs-24); margin: 0 0 12px; }
 .home-telefono.solo-tocco { margin: 0 0 16px; }
 .tocca-adesivo { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; padding: 26px 18px 22px;
-  border: 0; border-radius: var(--r-l); background: linear-gradient(160deg, #3D2779, var(--marchio-viola)); color: #fff;
-  font: inherit; text-align: center; cursor: pointer; box-shadow: 0 10px 24px rgba(44,26,92,.25); }
+  border: 0; border-radius: var(--r-l); background: linear-gradient(160deg, var(--asfalto-2), var(--marchio-asfalto)); color: #fff;
+  font: inherit; text-align: center; cursor: pointer; box-shadow: 0 10px 24px rgba(17, 23, 29, .25); }
 .tocca-adesivo b { font-size: var(--fs-20); }
 .tocca-adesivo small { font-size: var(--fs-14); opacity: .85; }
 .tocca-adesivo .onde-nfc { width: 64px; height: 64px; background: rgba(255,255,255,.14); }
 .tocca-adesivo .onde-nfc i { border-color: rgba(255,255,255,.6); }
 .tocca-adesivo .onde-nfc .icona { width: 30px; height: 30px; }
-.tocca-adesivo.in-ascolto { box-shadow: 0 0 0 4px var(--marchio-arancio); }
+.tocca-adesivo.in-ascolto { box-shadow: 0 0 0 4px var(--marchio-via); }
 .titolo-sezione-piccolo { font-size: var(--fs-13); text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); margin: 20px 0 8px; }
 .per-te { display: grid; gap: 8px; }
 .per-te-voce { display: grid; grid-template-columns: 6px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; min-height: 64px;
@@ -2746,7 +2753,7 @@ details.filtri-stock > summary .icona { color: var(--segnale); }
 /* pannello dei Filtri: si apre come menu sotto il pulsante, senza spostare la ricerca (14/11/2026) */
 .stock-cerca .filtri-stock[open] > :not(summary) { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; margin: 0;
   width: min(680px, 92vw); background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r); padding: 14px;
-  box-shadow: 0 12px 32px rgba(28,21,51,.16); }
+  box-shadow: 0 12px 32px rgba(17, 23, 29, .16); }
 .stock-cerca .filtri-stock > .chiudi-pannello { display: none !important; }
 .stock-cerca .filtri-stock .barra-filtri { margin: 0; }
 .tabella-stock .c-auto { width: 34%; } .tabella-stock .c-stato { width: 39%; }
@@ -2813,7 +2820,7 @@ a.cal-nav:hover { text-decoration: none; border-color: var(--segnale); }
 /* menu "⋯" accanto al pulsante (14/11/2026) */
 .menu-riga-box { position: relative; display: inline-block; vertical-align: middle; }
 .menu-riga { position: absolute; right: 0; top: calc(100% + 6px); z-index: 25; min-width: 240px; display: grid; gap: 2px; padding: 6px;
-  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r-s); box-shadow: 0 10px 28px rgba(28,21,51,.18); text-align: left; white-space: nowrap; }
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--r-s); box-shadow: 0 10px 28px rgba(17, 23, 29, .18); text-align: left; white-space: nowrap; }
 .menu-riga form.annulla { display: block; margin: 0; }
 .menu-riga .btn-link, .menu-riga > a { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 10px; border-radius: var(--r-xs);
   font-size: var(--fs-14); font-weight: 600; color: var(--testo); text-align: left; }
@@ -2832,7 +2839,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .stock-cerca .filtri-stock .barra-filtri { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 200px; gap: 12px; margin: 0; }
 #filtri.stock-cerca .filtri-stock[open] > .scheda { width: min(680px, calc(100vw - 32px)); }
 .stock-cerca .filtri-stock .filtri-avanzati { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; }
-.stock-cerca .filtri-stock input.vin::placeholder { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; letter-spacing: 0; }
+.stock-cerca .filtri-stock input.vin::placeholder { font-family: var(--font-testo); letter-spacing: 0; }
 .stock-cerca .filtri-stock .azioni { justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--bordo); }
 .stock-cerca .filtri-stock .azioni .btn { min-height: var(--alt-piccola); height: var(--alt-piccola); }
 /* Lavorazioni: i tipi in colonna come voci di un menu, nome a sinistra e numero a destra */
@@ -2920,11 +2927,11 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 
 /* ---- Intestazione dell'anagrafica (14/11/2026 sera): piano scuro con nome e stato, piano chiaro con i dati ---- */
 .carta-auto.anagrafica { padding: 0; border-top-width: 5px; background: var(--carta); color: var(--testo); border: 1px solid var(--bordo);
-  border-top: 5px solid var(--fase, var(--marchio-blu)); box-shadow: 0 8px 24px rgba(28,21,51,.08); }
+  border-top: 5px solid var(--fase, var(--marchio-verde)); box-shadow: 0 8px 24px rgba(17, 23, 29, .08); }
 .carta-auto.anagrafica::after { display: none; }
 .anagrafica .carta-auto-testa { padding: 22px 24px; gap: 18px; align-items: center; color: #fff;
-  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--fase, var(--marchio-blu)) 45%, transparent) 0%, transparent 55%),
-              linear-gradient(115deg, var(--marchio-viola) 0%, #3B2A78 60%, #24478A 100%); }
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--fase, var(--marchio-verde)) 45%, transparent) 0%, transparent 55%),
+              linear-gradient(115deg, var(--marchio-asfalto) 0%, var(--asfalto-2) 60%, var(--asfalto-3) 100%); }
 .anagrafica .logo-marca { width: 72px; height: 72px; border-radius: 18px; background: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
 .anagrafica .logo-marca img { width: 54px; height: 54px; }
 .anagrafica .carta-auto-nome small { opacity: .8; }
@@ -2932,7 +2939,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .anagrafica .carta-auto-stato { margin-left: auto; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .anagrafica .carta-auto-stato .badge { font-size: var(--fs-14); padding: 6px 12px; }
 .anagrafica .modifica-auto { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.45); }
-.anagrafica .modifica-auto:hover { background: #fff; color: var(--marchio-viola); text-decoration: none; }
+.anagrafica .modifica-auto:hover { background: #fff; color: var(--marchio-asfalto); text-decoration: none; }
 .anagrafica-dati { margin: 0; padding: 16px 24px 18px; display: grid; grid-template-columns: 1.6fr repeat(5, minmax(0, 1fr)); gap: 12px 20px; }
 .anagrafica-dati > div { min-width: 0; display: grid; gap: 4px; align-content: start; }
 .anagrafica-dati > div + div { border-left: 1px solid var(--bordo); padding-left: 20px; }
@@ -2995,12 +3002,12 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 
 /* ---- Pagina DDT (14/11/2026 sera): intestazione come la scheda auto, veicolo che si apre toccandolo ---- */
 .ddt-testata { --fase: var(--st-viaggio); border-radius: calc(var(--r) + 4px); overflow: hidden; border: 1px solid var(--bordo);
-  border-top: 5px solid var(--fase); background: var(--carta); box-shadow: 0 8px 24px rgba(28,21,51,.08); margin: 0 0 14px; }
+  border-top: 5px solid var(--fase); background: var(--carta); box-shadow: 0 8px 24px rgba(17, 23, 29, .08); margin: 0 0 14px; }
 .ddt-testata.stato-predisposto { --fase: var(--st-ritiro); } .ddt-testata.stato-aperto { --fase: var(--st-viaggio); }
 .ddt-testata.stato-chiuso { --fase: var(--st-pronta); } .ddt-testata.stato-scaduto { --fase: var(--arancio); } .ddt-testata.stato-annullato { --fase: var(--bordo-forte); }
 .ddt-testata-alto { display: flex; align-items: center; gap: 18px; padding: 20px 24px; color: #fff;
   background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--fase) 45%, transparent) 0%, transparent 55%),
-              linear-gradient(115deg, var(--marchio-viola) 0%, #3B2A78 60%, #24478A 100%); }
+              linear-gradient(115deg, var(--marchio-asfalto) 0%, var(--asfalto-2) 60%, var(--asfalto-3) 100%); }
 .ddt-testata-nome { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .ddt-testata-nome small { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .08em; opacity: .8; }
 .ddt-testata-nome h1 { color: #fff; font-size: var(--fs-30); margin: 0; }
@@ -3009,7 +3016,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .ddt-testata-dx .badge { font-size: var(--fs-14); padding: 6px 12px; background: rgba(255,255,255,.95); }
 .ddt-testata-dx .azioni { flex-wrap: nowrap; }
 .ddt-testata-dx .btn { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.45); }
-.ddt-testata-dx .btn:hover { background: #fff; color: var(--marchio-viola); text-decoration: none; }
+.ddt-testata-dx .btn:hover { background: #fff; color: var(--marchio-asfalto); text-decoration: none; }
 .ddt-percorso { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: center; padding: 18px 24px 20px; }
 .ddt-luogo { display: grid; gap: 2px; min-width: 0; }
 .ddt-luogo.a { text-align: right; }
@@ -3035,7 +3042,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .ddt-veicoli { display: grid; gap: 8px; }
 .ddt-veicolo { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--bordo); border-radius: var(--r-s); background: var(--superficie); color: var(--testo); }
 .ddt-veicolo.apribile { cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
-.ddt-veicolo.apribile:hover { text-decoration: none; border-color: var(--segnale); background: var(--carta); box-shadow: 0 4px 14px rgba(28,21,51,.08); }
+.ddt-veicolo.apribile:hover { text-decoration: none; border-color: var(--segnale); background: var(--carta); box-shadow: 0 4px 14px rgba(17, 23, 29, .08); }
 .ddt-veicolo.apribile:focus-visible { outline: 3px solid var(--segnale); outline-offset: 2px; }
 .ddt-veicolo .logo-marca { width: 52px; height: 52px; } .ddt-veicolo .logo-marca img { width: 40px; height: 40px; }
 .ddt-veicolo-nome { flex: 1; min-width: 0; display: grid; gap: 3px; justify-items: start; }
@@ -3072,7 +3079,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .ddt-tel-dati dt { font-size: var(--fs-13); color: var(--testo-2); }
 .ddt-tel-dati dd { margin: 0; font-weight: 650; font-size: var(--fs-15); }
 .ddt-tel-dati dd span { display: block; font-weight: 500; color: var(--testo-2); font-size: var(--fs-13); }
-.ddt-testata-dx .badge { color: var(--marchio-viola) !important; display: inline-flex; align-items: center; gap: 6px; }
+.ddt-testata-dx .badge { color: var(--marchio-asfalto) !important; display: inline-flex; align-items: center; gap: 6px; }
 .ddt-veicolo-nome .riga-nome { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ddt-veicolo-nome .riga-nome b { font-size: var(--fs-17); }
 /* ---- "Da fare" dal telefono (14/11/2026 sera) ---- */
@@ -3103,3 +3110,11 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 /* dal telefono il dettaglio sotto lo stato (giorni, %, attività) lo dice già il riquadro della fase */
 .tocco:has(.fase-tel) .auto-breve .dettaglio-stato { display: none; }
 .fase-tel .passi-nomi .barretta { margin: 0; }
+
+/* Impronta del bene (15/11/2026, marchio v1.0 sez. 05): griglia 5×5 unica per auto, sempre accanto al VIN.
+   Fondo sempre chiaro: dove la carta è scura (tema scuro) sta in un riquadro chiaro. */
+.con-impronta { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.impronta { flex: none; display: block; }
+@media (prefers-color-scheme: dark) {
+  .impronta { background: var(--riquadro); border-radius: 22%; padding: 3px; box-sizing: content-box; }
+}

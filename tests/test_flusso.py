@@ -3367,17 +3367,12 @@ class TestQui(Base):
 
 
 class TestDaFareSoloLeMie(Base):
-    """14/11/2026 sera: "Solo le mie" di base per le mansioni operative, "Tutte" per admin e resp. commerciale."""
+    """15/11/2026: "Solo le mie" di base per tutti (admin compreso), a sinistra di "Tutte"."""
     def test_vista_iniziale_per_mansione(self):
         home = self.c.get("/").get_data(as_text=True)  # admin
-        self.assertRegex(home, r'href="/\?mie=0" class="attivo"')
-        self.assertIn('href="/?mie=1" class=""', home)
-        with self.app.app_context():
-            u = Utente.query.filter_by(email="admin@t.it").one()
-            u.ruolo = "preparatore"
-            db.session.commit()
-        home = self.c.get("/").get_data(as_text=True)
         self.assertIn('href="/?mie=1" class="attivo"', home)
+        self.assertIn('href="/?mie=0" class=""', home)
+        self.assertLess(home.index('href="/?mie=1"'), home.index('href="/?mie=0"'))
         self.assertIn('href="/?mie=0" class="attivo"', self.c.get("/?mie=0").get_data(as_text=True))
 
 
@@ -3856,3 +3851,65 @@ class TestFinePrevistaFornitori(unittest.TestCase):
             self.assertEqual(f(datetime(2026, 11, 14, 10, 0), 1), datetime(2026, 11, 16, 17, 0))    # arrivata sabato: lunedì
             self.assertEqual(f(datetime(2026, 11, 16, 16, 50), 2), datetime(2026, 11, 18, 17, 0))
             self.assertEqual(f(datetime(2026, 12, 23, 15, 20), 2), datetime(2026, 12, 28, 15, 30))  # Natale e Santo Stefano saltati
+
+
+class TestImpronteDeiBeni(Base):
+    """15/11/2026, manuale del marchio v1.0 sez. 05: un'impronta per auto, unica su tutto il portale, in sequenza
+    di caricamento (il numero libero più basso), di nuovo libera solo se l'auto viene eliminata."""
+    def test_regole_del_manuale(self):
+        from getvingo import impronte as I
+        visti = set()
+        gen = I.liberi(set())
+        for _ in range(400):
+            c = I.celle(next(gen))
+            self.assertNotIn(c, visti)
+            visti.add(c)
+            self.assertEqual(c.count("v"), 1)
+            self.assertTrue(10 <= c.count("a") <= 18)
+            righe = [c[i * 5:i * 5 + 5] for i in range(5)]
+            self.assertNotIn(".....", righe)
+            self.assertFalse(any(all(r[j] == "." for r in righe) for j in range(5)))
+            self.assertGreater(sum(x != y for x, y in zip(c, I.BRAND)), 1)
+        self.assertFalse(I.valida(I.BRAND))
+        self.assertFalse(I.valida(I.PRECEDENTE))
+        # la regola è fissa: lo stesso numero dà sempre lo stesso disegno, numeri diversi disegni diversi
+        self.assertEqual(I.celle(12345), I.celle(12345))
+        self.assertEqual(len({I.combinazione(n) for n in range(5000)}), 5000)
+
+    def test_assegnate_in_sequenza_e_riusate_solo_dopo_eliminazione(self):
+        from getvingo import impronte as I
+        attese = I.liberi(set())
+        primi = [next(attese) for _ in range(4)]
+        with self.app.app_context():
+            for k in range(3):
+                db.session.add(Veicolo(vin=f"ZFA3120000012345{k}", marca="Fiat", modello="500", sede_id=1))
+                db.session.commit()
+            auto = Veicolo.query.order_by(Veicolo.id).all()
+            self.assertEqual([v.impronta for v in auto], primi[:3])
+            seconda = auto[1]
+            servizi.elimina_veicolo(seconda, Utente.query.filter_by(email="admin@t.it").one())
+            db.session.commit()
+            nuova = Veicolo(vin="ZFA31200000999999", marca="Fiat", modello="Panda", sede_id=1)
+            db.session.add(nuova)
+            db.session.commit()
+            self.assertEqual(nuova.impronta, primi[1])  # ripresa quella liberata
+            altra = Veicolo(vin="ZFA31200000888888", marca="Fiat", modello="Tipo", sede_id=1)
+            db.session.add(altra)
+            db.session.commit()
+            self.assertEqual(altra.impronta, primi[3])
+            vid = nuova.id
+        pagina = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertIn(f'aria-label="Impronta Getvingo n. {primi[1] + 1}"', pagina)
+
+    def test_auto_gia_caricate_ricevono_impronta_in_ordine(self):
+        from getvingo import impronte as I
+        with self.app.app_context():
+            for k in range(3):
+                db.session.add(Veicolo(vin=f"WVWZZZ1KZAW00099{k}", marca="Volkswagen", modello="Golf", sede_id=1,
+                                       impronta=None))
+            db.session.commit()
+            db.session.execute(db.text("UPDATE veicolo SET impronta = NULL"))
+            db.session.commit()
+            self.assertEqual(I.assegna_mancanti(), 3)
+            gen = I.liberi(set())
+            self.assertEqual([v.impronta for v in Veicolo.query.order_by(Veicolo.id)], [next(gen) for _ in range(3)])
