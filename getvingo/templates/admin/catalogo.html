@@ -1,6 +1,33 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, indietro %}
-{% block titolo %}Catalogo delle vetture · Getvingo{% endblock %}
+{% from "_macro.html" import i, indietro, csrf_input %}
+{% block titolo %}Catalogo delle vetture · Getvingo{# 16/11/2026: loghi aggiornati delle marche del catalogo (stessa fonte di Gestione → Loghi delle marche: hanno la precedenza) #}
+<section class="scheda" id="loghi">
+  <h2>Loghi delle marche</h2>
+  {% if not n_voci %}<p class="tenue piccolo">Catalogo vuoto: qui sotto le marche già in stock.</p>{% endif %}
+  <p class="tenue piccolo">Il logo caricato qui ha la precedenza su tutti gli altri, in tutto il portale. Fonte corretta: la sala stampa (media kit) della casa. SVG (consigliato), PNG, WebP o JPG, massimo 1 MB.</p>
+  <form method="post" action="{{ url_for('admin.catalogo_loghi') }}" enctype="multipart/form-data" class="carica-loghi" data-una-volta>
+    {{ csrf_input() }}
+    <label class="btn">{{ i('carica', 's') }} Carica più loghi insieme
+      <input type="file" name="loghi" multiple accept=".svg,.png,.webp,.jpg,.jpeg,image/svg+xml,image/png,image/webp,image/jpeg" hidden onchange="this.form.submit()"></label>
+    <small class="tenue">Ogni file col nome della sua marca: <code>volkswagen.svg</code>, <code>alfa-romeo.png</code>.</small>
+  </form>
+  <div class="lista loghi-catalogo">
+  {% for marca, l in loghi.items() %}
+    <div class="voce riga-marchio">
+      {% if l.url %}<span class="logo-marca"><img src="{{ l.url }}" alt="{{ marca }}"></span>{% else %}<span class="logo-marca sigla">{{ marca|iniziali }}</span>{% endif %}
+      <div class="corpo"><h3>{{ marca }}</h3>
+        <span class="badge {{ 'chiuso' if l.ufficiale else 'multiplo' }}" style="margin-top:4px">{{ l.nome_fonte }}</span></div>
+      <form method="post" action="{{ url_for('admin.marchi_auto') }}" enctype="multipart/form-data" class="carica-marchio">
+        {{ csrf_input() }}<input type="hidden" name="marca" value="{{ marca }}"><input type="hidden" name="torna" value="catalogo">
+        <label class="btn piccolo">{{ i('carica', 's') }} {{ 'Sostituisci' if l.fonte == 'caricato' else 'Carica logo' }}
+          <input type="file" name="file" accept=".svg,.png,.webp,.jpg,.jpeg,image/svg+xml,image/png,image/webp,image/jpeg" hidden onchange="this.form.submit()"></label>
+        {% if l.fonte == 'caricato' %}<button class="btn-link piccolo" name="azione" value="rimuovi">Togli</button>{% endif %}
+      </form>
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endblock %}
 {% block contenuto %}
 {# Catalogo delle vetture (15/11/2026, uniforma.leggi_file_catalogo): la base per correggere marca, modello e versione
    al salvataggio e per le opzioni proposte quando si carica un'auto #}
@@ -34,6 +61,8 @@
   <p class="azioni-catalogo"><a class="btn" href="{{ url_for('admin.catalogo', scarica=1) }}">{{ i('doc', 's') }} Scarica il catalogo (CSV)</a></p>
 </section>
 
+
+
 <section class="scheda">
   <h2>Auto già caricate</h2>
   {% if n_correzioni %}
@@ -53,6 +82,33 @@
   </form>
 </details>
 {% else %}
-<div class="vuoto">{{ i('doc') }}Catalogo vuoto: finché non carichi un file valgono le regole di scrittura e le versioni già usate.</div>
+<div class="vuoto" style="margin-top:14px">{{ i('doc') }}Catalogo vuoto: finché non carichi un file valgono le regole di scrittura e le versioni già usate.</div>
 {% endif %}
+{# 16/11/2026: loghi aggiornati delle marche del catalogo (stessa fonte di Gestione → Loghi delle marche: hanno la precedenza) #}
+<section class="scheda" id="loghi">
+  <h2>Loghi delle marche</h2>
+  {% if not n_voci %}<p class="tenue piccolo">Catalogo vuoto: qui sotto le marche già in stock.</p>{% endif %}
+  <p class="tenue piccolo">Il logo caricato qui ha la precedenza su tutti gli altri, in tutto il portale. Fonte corretta: la sala stampa (media kit) della casa. SVG (consigliato), PNG, WebP o JPG, massimo 1 MB.</p>
+  <form method="post" action="{{ url_for('admin.catalogo_loghi') }}" enctype="multipart/form-data" class="carica-loghi" data-una-volta>
+    {{ csrf_input() }}
+    <label class="btn">{{ i('carica', 's') }} Carica più loghi insieme
+      <input type="file" name="loghi" multiple accept=".svg,.png,.webp,.jpg,.jpeg,image/svg+xml,image/png,image/webp,image/jpeg" hidden onchange="this.form.submit()"></label>
+    <small class="tenue">Ogni file col nome della sua marca: <code>volkswagen.svg</code>, <code>alfa-romeo.png</code>.</small>
+  </form>
+  <div class="lista loghi-catalogo">
+  {% for marca, l in loghi.items() %}
+    <div class="voce riga-marchio">
+      {% if l.url %}<span class="logo-marca"><img src="{{ l.url }}" alt="{{ marca }}"></span>{% else %}<span class="logo-marca sigla">{{ marca|iniziali }}</span>{% endif %}
+      <div class="corpo"><h3>{{ marca }}</h3>
+        <span class="badge {{ 'chiuso' if l.ufficiale else 'multiplo' }}" style="margin-top:4px">{{ l.nome_fonte }}</span></div>
+      <form method="post" action="{{ url_for('admin.marchi_auto') }}" enctype="multipart/form-data" class="carica-marchio">
+        {{ csrf_input() }}<input type="hidden" name="marca" value="{{ marca }}"><input type="hidden" name="torna" value="catalogo">
+        <label class="btn piccolo">{{ i('carica', 's') }} {{ 'Sostituisci' if l.fonte == 'caricato' else 'Carica logo' }}
+          <input type="file" name="file" accept=".svg,.png,.webp,.jpg,.jpeg,image/svg+xml,image/png,image/webp,image/jpeg" hidden onchange="this.form.submit()"></label>
+        {% if l.fonte == 'caricato' %}<button class="btn-link piccolo" name="azione" value="rimuovi">Togli</button>{% endif %}
+      </form>
+    </div>
+  {% endfor %}
+  </div>
+</section>
 {% endblock %}

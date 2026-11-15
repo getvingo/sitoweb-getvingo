@@ -74,27 +74,40 @@
 {# Filtri di stato: in preparazione nei tempi / in ritardo, pronte, consegnate. Senza filtro si vedono tutte
    le auto in preparazione; toccando di nuovo il filtro attivo si torna lì (niente schede doppie) #}
 {% set attivo = stato_prep if vista == 'corso' else vista %}
-{% set corso = url_for('main.preparazione', vista='corso', tipologia=tipologia) %}
+{% set at = attivita or none %}
+{% set corso = url_for('main.preparazione', vista='corso', tipologia=tipologia, attivita=at) %}
 {{ filtri_stato([
-  ('tempo', conteggi.tempo, 'Nei tempi', 'orologio', corso if attivo == 'tempo' else url_for('main.preparazione', vista='corso', stato='tempo', tipologia=tipologia), True),
-  ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', corso if attivo == 'ritardo' else url_for('main.preparazione', vista='corso', stato='ritardo', tipologia=tipologia), True),
+  ('tempo', conteggi.tempo, 'Nei tempi', 'orologio', corso if attivo == 'tempo' else url_for('main.preparazione', vista='corso', stato='tempo', tipologia=tipologia, attivita=at), True),
+  ('ritardo', conteggi.ritardo, 'In ritardo', 'attenzione', corso if attivo == 'ritardo' else url_for('main.preparazione', vista='corso', stato='ritardo', tipologia=tipologia, attivita=at), True),
   ('pronte', conteggi.pronte, 'Pronte', 'bandiera', corso if attivo == 'pronte' else url_for('main.preparazione', vista='pronte', tipologia=tipologia), True),
   ('consegnate', conteggi.consegnate, 'Consegnate', 'archivio', corso if attivo == 'consegnate' else url_for('main.preparazione', vista='consegnate', tipologia=tipologia), False),
-], attivo if vista != 'corso' or stato_prep else none, tutte=(conteggi.corso, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo if modo == 'calendario' else none), 'Tutte')) }}
+], attivo if vista != 'corso' or stato_prep else none, tutte=(conteggi.corso, url_for('main.preparazione', vista='corso', tipologia=tipologia, attivita=at, modo=modo if modo == 'calendario' else none), 'Tutte')) }}
 {# 13/11/2026: ricerca che filtra mentre si scrive + Filtri chiuso (tipo di veicolo), come Stock e Lavorazioni #}
 {% if not (vista == 'consegnate') %}
 <form class="stock-cerca" method="get">
   <input type="hidden" name="vista" value="{{ vista }}">{% if stato_prep %}<input type="hidden" name="stato" value="{{ stato_prep }}">{% endif %}{% if modo == 'calendario' %}<input type="hidden" name="modo" value="calendario">{% endif %}
   <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, attività, sede…" aria-label="Cerca tra le preparazioni"></div>
+  {# 16/11/2026: filtro per attività da fare (stato di avanzamento), come i tipi in Lavorazioni #}
+  {% if vista == 'corso' and attivita_tutte %}
+  <details class="ripiega filtri-stock {{ 'con-filtro' if attivita }}">
+    <summary>{{ i('gestione', 's') }} Filtri</summary>
+    <div class="filtri-elenco">
+    <p class="filtri-titolo" id="filtri-attivita">Attività da fare</p>
+    <nav class="pillole-tipi" aria-labelledby="filtri-attivita">
+      {% for f, n in attivita_tutte %}<a href="{{ url_for('main.preparazione', vista='corso', attivita=none if attivita == f else f, tipologia=tipologia or none, stato=stato_prep, modo=modo if modo == 'calendario' else none) }}" class="pillola-tipo {{ 'attivo' if attivita == f }}">{{ i('bandiera' if f == 'Pronta' else 'brilla', 's') }} {{ f }} <b>{{ n }}</b>{% if attivita == f %}<span class="pillola-togli" aria-hidden="true">✕</span>{% endif %}</a>{% endfor %}
+    </nav>
+    </div>
+  </details>
+  {% endif %}
 </form>
 {% endif %}
 
 {% if vista == 'corso' %}
   {% set st = stato_prep %}
-  {{ interruttore_modo(modo, url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='elenco'), url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, modo='calendario'),
+  {{ interruttore_modo(modo, url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, attivita=at, modo='elenco'), url_for('main.preparazione', vista='corso', tipologia=tipologia, stato=st, attivita=at, modo='calendario'),
                        '',
-                       url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo) if stato_prep else none,
-                       sinistra=filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato=stato_prep)) }}
+                       url_for('main.preparazione', vista='corso', tipologia=tipologia, modo=modo) if (stato_prep or attivita) else none,
+                       sinistra=filtro_tipologia(tipologia, 'main.preparazione', vista=vista, modo=modo, stato=stato_prep, attivita=at)) }}
   {% if modo == 'calendario' %}
   <p class="legenda-calendario"><span class="ev pronta_entro">Pronta entro</span> <span class="ev ritardo">In ritardo</span></p>
   {{ calendario_mese(calendario, url_for('main.preparazione', vista='corso', tipologia=tipologia, modo='calendario', mese=calendario.prec),

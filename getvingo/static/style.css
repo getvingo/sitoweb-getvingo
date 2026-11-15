@@ -3139,3 +3139,15 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 
 /* impronta dell'auto nell'intestazione del DDT (16/11/2026), come in quella dell'auto */
 .ddt-testata-alto .testa-impronta .impronta { width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+.carica-loghi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 14px; }
+.loghi-catalogo { margin: 0; }
+/* 16/11/2026: righe di Lavorazioni e Preparazione più distribuite (più spazio ai testi, meno vuoto prima delle
+   azioni), "Nuovo/Usato", targa e telaio allineati sulla stessa riga */
+.tabella-fasi .c-auto { width: 24%; } .tabella-fasi .c-cosa { width: 24%; } .tabella-fasi .c-avanz { width: 20%; }
+.tabella-fasi .c-entro { width: 12%; } .tabella-fasi .c-da { width: 10%; } .tabella-fasi .c-azione { width: 224px; }
+.tabella-fasi thead th { white-space: nowrap; }
+.tabella-fasi td { padding-left: 10px; padding-right: 10px; }
+.cella-auto small { display: flex; align-items: center; gap: 6px; line-height: 1.2; margin-top: 3px; }
+.cella-auto small .badge { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; vertical-align: 0; }
+.cella-auto small .vin, .cella-auto small .targa-chip { flex: none; line-height: 18px; }
+details.filtri-stock.con-filtro > summary { border-color: var(--segnale); }  /* filtro attivo senza il numero verde (16/11/2026) */

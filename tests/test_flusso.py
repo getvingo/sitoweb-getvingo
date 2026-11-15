@@ -1979,7 +1979,10 @@ class TestCampiDdtEFiltri(Base):
         d = self.ddt()
         self.arrivo(d)
         self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt").get_data(as_text=True))          # "In corso"
-        self.assertIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=chiuso").get_data(as_text=True))
+        # 16/11/2026: arrivato da un partner → "Arrivati a destinazione", non negli altri arrivati
+        self.assertIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=a_lavorazione").get_data(as_text=True))
+        self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=chiuso").get_data(as_text=True))
+        self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=in_sede").get_data(as_text=True))
         self.assertNotIn("Volkswagen Golf", self.c.get("/lavorazioni").get_data(as_text=True))       # solo trasferimento
 
     def test_filtro_vetture_commerciali_in_preparazione(self):
@@ -3559,6 +3562,41 @@ class TestCatalogoVetture(Base):
             self.assertEqual(CatalogoAuto.query.count(), 0)
         self.entra("ufficio")
         self.assertNotEqual(self.c.get("/admin/catalogo").status_code, 200)  # solo l'amministratore
+
+
+class TestRichieste16Novembre(Base):
+    """16/11/2026: loghi dal catalogo, filtro per attività in Preparazione, Da fare che segue Solo le mie / Tutte."""
+    def test_loghi_dal_catalogo(self):
+        self.app.instance_path = tempfile.mkdtemp()
+        csv_ = "marca;modello\nVolkswagen;Golf\nAlfa Romeo;Tonale\n"
+        self.c.post("/admin/catalogo", data={"file": (io.BytesIO(csv_.encode()), "c.csv")}, content_type="multipart/form-data")
+        pagina = self.c.get("/admin/catalogo").get_data(as_text=True)
+        self.assertIn("Carica più loghi insieme", pagina)
+        svg = b"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><circle r='5'/></svg>"
+        r = self.c.post("/admin/catalogo/loghi", data={"loghi": [(io.BytesIO(svg), "alfa-romeo_logo.svg"),
+                                                                  (io.BytesIO(svg), "volkswagen.svg"),
+                                                                  (io.BytesIO(svg), "boh.svg")]},
+                        content_type="multipart/form-data", follow_redirects=True).get_data(as_text=True)
+        self.assertIn("Loghi caricati: Alfa Romeo, Volkswagen", r)
+        self.assertIn("boh.svg", r)
+        self.assertIn("/marchi/ufficiali/alfa-romeo.svg", self.c.get("/admin/catalogo").get_data(as_text=True))
+        r = self.c.post("/admin/marchi", data={"marca": "Volkswagen", "torna": "catalogo",
+                                               "file": (io.BytesIO(svg), "vw.svg")}, content_type="multipart/form-data")
+        self.assertIn("/admin/catalogo", r.headers["Location"])
+
+    def test_filtro_attivita_e_da_fare(self):
+        vid = self.abbina()
+        self.c.post(f"/veicolo/{vid}/preparazione", data={"torna": "/"})
+        with self.app.app_context():
+            self.assertEqual(Preparazione.query.count(), 1)
+        p = self.c.get("/preparazione").get_data(as_text=True)
+        self.assertIn("Attività da fare", p)
+        self.assertIn("attivita=Controllo", p)
+        self.assertIn("Volkswagen Golf", self.c.get("/preparazione?attivita=Controllo+rientro").get_data(as_text=True))
+        self.assertNotIn("Volkswagen Golf", self.c.get("/preparazione?attivita=Lavaggio").get_data(as_text=True))
+        home = self.c.get("/?mie=1").get_data(as_text=True)
+        self.assertNotIn("Niente che tocchi a te", home)
+        self.assertIn('id="i-contakm"', home)
 
 
 class TestTelefonoSnello(Base):

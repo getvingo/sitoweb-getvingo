@@ -9,7 +9,8 @@ from itertools import groupby
 
 from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect,
                    render_template, request, send_from_directory, session, url_for)
-from sqlalchemy import or_
+from sqlalchemy import and_, func, not_, or_
+from sqlalchemy.orm import aliased
 
 from . import copie
 from . import ddt as ddt_pdf_mod
@@ -741,6 +742,12 @@ def preparazione():
     del_tipo = lambda v: not tipologia or v.tipologia == tipologia  # filtro vetture / commerciali
     preparazioni = [p for p in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at)
                     if del_tipo(p.veicolo)]
+    # 16/11/2026: filtro per attività da fare (stato di avanzamento), come i tipi di lavorazione in Lavorazioni
+    conta_attivita = Counter(p.prossima_fase for p in preparazioni if p.prossima_fase)
+    attivita_tutte = [(f, conta_attivita[f]) for f in Preparazione.FASI if conta_attivita.get(f)]
+    attivita = request.args.get("attivita", "") if request.args.get("attivita") in Preparazione.FASI else ""
+    if attivita:
+        preparazioni = [p for p in preparazioni if p.prossima_fase == attivita]
     in_ritardo = [p for p in preparazioni if p.pronta_entro_at and p.pronta_entro_at < adesso()]
     in_tempo = [p for p in preparazioni if p not in in_ritardo]
     # i numeri in cima filtrano: in tempo / in ritardo (toccandoli di nuovo si torna a tutte)
@@ -776,7 +783,7 @@ def preparazione():
                            calendario=calendario, tipi_evento=TIPI_EVENTO, tipologia=tipologia,
                            sedi_consegnate=sorted({(str(v.sede_id), v.sede.nome) for v in tutte_consegnate if v.sede},
                                                   key=lambda x: x[1]),
-                           fasi=Preparazione.FASI)
+                           fasi=Preparazione.FASI, attivita=attivita, attivita_tutte=attivita_tutte)
 
 
 def _filtra_consegnate(veicoli, fc):
@@ -1892,7 +1899,21 @@ def riposiziona(veicolo_id):
 
 # "In corso" = tutti tranne gli arrivati (che hanno la loro scheda) e i cancellati
 FILTRI_STATO = {"tutti": "In corso", "predisposto": "Da ritirare", "aperto": "In viaggio",
+                "a_lavorazione": "Arrivati a destinazione", "in_sede": "Arrivati in sede",
                 "chiuso": "Arrivati", "annullati": "Cancellati"}
+# 16/11/2026: i DDT arrivati in tre schede. A destinazione = arrivati da un partner per una lavorazione; in sede =
+# rientrati da un partner in una sede della concessionaria; Arrivati = tutti gli altri (es. auto acquistate che
+# arrivano dall'esterno, trasferimenti tra sedi)
+ARRIVI = ("a_lavorazione", "in_sede", "chiuso")
+
+
+def _tipo_arrivo(m):
+    """Scheda dei DDT arrivati in cui cade il movimento chiuso m."""
+    if m.a_sede and m.a_sede.tipo in Sede.FORNITORI:
+        return "a_lavorazione"
+    if m.da_sede and m.da_sede.tipo in Sede.FORNITORI and m.a_sede and m.a_sede.tipo == "propria":
+        return "in_sede"
+    return "chiuso"
 
 
 def _data(campo):
@@ -1925,6 +1946,16 @@ def archivio_ddt():
         query = query.filter(Ddt.annullato_at.is_(None))
         if stato == "tutti":
             query = query.filter(Movimento.stato != "chiuso")
+        elif stato in ARRIVI:
+            da, a = aliased(Sede), aliased(Sede)
+            query = query.filter(Movimento.stato == "chiuso").outerjoin(da, Movimento.da_sede_id == da.id) \
+                .outerjoin(a, Movimento.a_sede_id == a.id)
+            tipo_a, tipo_da = func.coalesce(a.tipo, ""), func.coalesce(da.tipo, "")
+            a_fornitore = tipo_a.in_(Sede.FORNITORI)
+            rientro = and_(tipo_da.in_(Sede.FORNITORI), tipo_a == "propria")
+            query = query.filter(a_fornitore if stato == "a_lavorazione" else
+                                 and_(not_(a_fornitore), rientro) if stato == "in_sede" else
+                                 and_(not_(a_fornitore), not_(rientro)))
         else:
             query = query.filter(Movimento.stato == stato)
     if f["q"]:
@@ -1963,7 +1994,8 @@ def archivio_ddt():
     attivi = [d for d in tutti if not d.annullato_at]
     conteggi = {"tutti": sum(1 for d in attivi if d.movimento.stato != "chiuso"), "annullati": len(tutti) - len(attivi)}
     for d in attivi:
-        conteggi[d.movimento.stato] = conteggi.get(d.movimento.stato, 0) + 1
+        k = _tipo_arrivo(d.movimento) if d.movimento.stato == "chiuso" else d.movimento.stato
+        conteggi[k] = conteggi.get(k, 0) + 1
     return render_template(
         "ddt_archivio.html", elenco=elenco, f=f, stato=stato, filtri_stato=FILTRI_STATO,
         f_attivi={k: v for k, v in f.items() if v}, avanzati=avanzati, conteggi=conteggi,

@@ -20,8 +20,8 @@
 <div class="stock-cerca">
   <div class="ricerca">{{ i('cerca') }}<input id="cerca-righe" autocomplete="off" placeholder="Cerca: auto, telaio, fornitore, lavorazione…" aria-label="Cerca tra le lavorazioni"></div>
   {% if tipi %}
-  <details class="ripiega filtri-stock">
-    <summary>{{ i('gestione', 's') }} Filtri{% if tipo %}<span class="filtri-n" title="Filtri attivi: 1">1</span>{% endif %}</summary>
+  <details class="ripiega filtri-stock {{ 'con-filtro' if tipo }}">
+    <summary>{{ i('gestione', 's') }} Filtri</summary>
     <div class="filtri-elenco">
     <p class="filtri-titolo" id="filtri-tipo-lavorazione">Tipo di lavorazione</p>
     <nav class="pillole-tipi" aria-labelledby="filtri-tipo-lavorazione">

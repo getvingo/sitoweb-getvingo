@@ -45,6 +45,8 @@ def marchi_auto():
                 flash(f"{marca}: logo ufficiale caricato.", "ok")
             except ValueError as e:
                 flash(str(e), "errore")
+        if request.form.get("torna") == "catalogo":
+            return redirect(url_for("admin.catalogo") + "#loghi")
         return redirect(url_for("admin.marchi_auto"))
     elenco = []
     for marca in sorted({v.marca.strip() for v in Veicolo.query if v.marca and v.marca.strip()}, key=str.lower):
@@ -639,7 +641,56 @@ def catalogo():
         if v.versione:
             albero[v.marca][v.modello].append(v.versione)
     n_correzioni = sum(1 for _, campo, *_ in uniforma.proposte() if campo != "colore") if voci else 0
-    return render_template("admin/catalogo.html", albero=albero, n_voci=len(voci), n_correzioni=n_correzioni)
+    from . import marchi
+    loghi = {}
+    marche_loghi = list(albero) or sorted({v.marca.strip() for v in Veicolo.query.with_entities(Veicolo.marca)
+                                           if v.marca and v.marca.strip()}, key=str.lower)
+    for marca in marche_loghi:
+        fonte, indirizzo = marchi.trova(marca)
+        loghi[marca] = {"url": indirizzo, "fonte": fonte, "ufficiale": fonte in ("caricato", "sito"),
+                        "nome_fonte": marchi.NOMI_FONTE.get(fonte, "Nessun logo · si vedono le iniziali")}
+    return render_template("admin/catalogo.html", albero=albero, n_voci=len(voci), n_correzioni=n_correzioni,
+                           loghi=loghi)
+
+
+@bp.route("/catalogo/loghi", methods=["POST"])
+@ruolo_richiesto("admin")
+def catalogo_loghi():
+    """Loghi aggiornati di più marche insieme: ogni file va alla marca del suo nome (volkswagen.svg → Volkswagen),
+    cercata tra le marche del catalogo e quelle in stock, senza badare a maiuscole, spazi e trattini."""
+    import os
+    from . import marchi
+    marche = {uniforma.chiave(m): m for m in uniforma.catalogo()["marche"].values()}
+    for v in Veicolo.query.with_entities(Veicolo.marca).distinct():
+        if v.marca and v.marca.strip():
+            marche.setdefault(uniforma.chiave(v.marca), v.marca.strip())
+    caricati, senza_marca, errori = [], [], []
+    for file in request.files.getlist("loghi"):
+        if not file or not file.filename:
+            continue
+        nome = os.path.splitext(os.path.basename(file.filename))[0]
+        k = uniforma.chiave(re.sub(r"(?i)[-_ ]*(logo|marchio|brand)[-_ ]*", " ", nome))
+        marca = marche.get(k) or marche.get(uniforma.chiave(nome)) or uniforma.da_catalogo("marca", nome)
+        if not marca and uniforma.MARCHE.get(nome.lower().replace("_", " ").replace("-", " ")):
+            marca = uniforma.MARCHE[nome.lower().replace("_", " ").replace("-", " ")]
+        if not marca:
+            senza_marca.append(file.filename)
+            continue
+        try:
+            marchi.salva_ufficiale(marca, file.read(), file.filename)
+            caricati.append(marca)
+        except ValueError as e:
+            errori.append(f"{file.filename}: {e}")
+    if caricati:
+        flash(f"Loghi caricati: {', '.join(caricati)}.", "ok")
+    if senza_marca:
+        flash("Non ho capito la marca di: " + ", ".join(senza_marca) + ". Chiama il file col nome della marca "
+              "(es. volkswagen.svg) o caricalo dal pulsante accanto alla marca.", "errore")
+    for e in errori:
+        flash(e, "errore")
+    if not (caricati or senza_marca or errori):
+        flash("Scegli uno o più file di logo.", "errore")
+    return redirect(url_for("admin.catalogo") + "#loghi")
 
 
 @bp.route("/import", methods=["GET", "POST"])
