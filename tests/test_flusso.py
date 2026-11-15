@@ -489,7 +489,7 @@ class TestSpostamentoColTocco(Base):
         d = self.ddt()
         pagina = self.c.get(f"/ddt/{d}/anteprima").get_data(as_text=True)
         self.assertIn("Scarica PDF", pagina)
-        self.assertIn("data-in-viaggio", pagina)  # in viaggio: contatore del tempo
+        self.assertIn('data-pdf="/ddt/', pagina)  # 16/11/2026: l'anteprima mostra il PDF vero
         self.c.post("/t/ABCD2345", data=POS)  # tocco durante il viaggio
         self.arrivo(d)
         with self.app.app_context():

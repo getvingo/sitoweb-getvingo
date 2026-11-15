@@ -3151,3 +3151,7 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .cella-auto small .badge { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; vertical-align: 0; }
 .cella-auto small .vin, .cella-auto small .targa-chip { flex: none; line-height: 18px; }
 details.filtri-stock.con-filtro > summary { border-color: var(--segnale); }  /* filtro attivo senza il numero verde (16/11/2026) */
+/* Anteprima del DDT = il PDF vero, pagina per pagina (16/11/2026) */
+.anteprima-pdf { max-width: 860px; margin: 0 auto; display: grid; gap: 14px; }
+.anteprima-pdf canvas { display: block; background: #fff; border-radius: var(--r-xs); box-shadow: 0 6px 20px rgba(17, 23, 29, .16); }
+.anteprima-pdf-attesa, .anteprima-pdf-errore { text-align: center; color: var(--testo-2); padding: 40px 16px; }
