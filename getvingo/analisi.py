@@ -1,5 +1,8 @@
 """Analisi dei tempi (11/11/2026): dalla vendita alla consegna, fase per fase, fornitori e tratte.
 
+15/11/2026: tutti i tempi in ore e giorni lavorativi (weekend, feste e giorni chiusi non contano; un giorno = 8 ore
+di lavoro), tranne i viaggi, che restano in tempo reale.
+
 Usa solo dati che il portale registra già: partenza e arrivo dei DDT, fine lavorazione, passi della
 preparazione, consegna, più i tre dati aggiunti per le analisi (data di vendita, prima stima della lavorazione,
 stima del viaggio fissata alla partenza). Niente analisi per singola persona: vedi CLAUDE.md.
@@ -7,6 +10,9 @@ stima del viaggio fissata alla partenza). Niente analisi per singola persona: ve
 from datetime import datetime, timedelta
 
 from .models import Movimento, Preparazione, Veicolo, adesso
+from .servizi import giorni_lavorativi_tra, ore_lavorate_concessionaria, ore_lavorate_fornitore
+
+ORE_GIORNO = 8  # un giorno lavorativo (fornitori 8–12 e 13–17, concessionaria 8:30–12:30 e 14:30–18:30)
 
 PERIODI = {"30": ("30 giorni", 30), "90": ("90 giorni", 90), "365": ("12 mesi", 365), "tutto": ("Tutto", None)}
 
@@ -19,16 +25,20 @@ def media(valori):
     return sum(valori) / len(valori) if valori else None
 
 
-def durata(ore):
-    """Testo leggibile: minuti, ore o giorni (con una cifra se serve)."""
+def durata(ore, lavorativa=True):
+    """Testo leggibile: minuti, ore o giorni (con una cifra se serve). Lavorativa: un giorno = 8 ore di lavoro;
+    altrimenti (viaggi) un giorno = 24 ore."""
     if ore is None:
         return "—"
+    giorno = ORE_GIORNO if lavorativa else 24
     if ore < 1:
         return f"{max(1, round(ore * 60))} min"
-    if ore < 24:
+    if ore < giorno:
         return f"{ore:.1f} h".replace(".0 h", " h").replace(".", ",")
-    giorni = ore / 24
-    return (f"{giorni:.1f} giorni" if giorni < 10 else f"{round(giorni)} giorni").replace(".", ",")
+    giorni = ore / giorno
+    if round(giorni, 1) == 1:
+        return "1 giorno"
+    return (f"{giorni:.1f} giorni" if giorni < 10 else f"{round(giorni)} giorni").replace(".0 giorni", " giorni").replace(".", ",")
 
 
 def _validi(movimenti):
@@ -51,27 +61,27 @@ def calcola(periodo="90"):
 
     def attesa_ritiro(m):
         dopo = [p for p in partenze.get((m.veicolo_id, m.a_sede_id), []) if p > m.lavorazione_completata_at]
-        return _ore(min(dopo) - m.lavorazione_completata_at) if dopo else None
+        return _ore(ore_lavorate_fornitore(m.lavorazione_completata_at, min(dopo))) if dopo else None
 
     # --- preparazione: avvio -> "Pronta"; poi pronta -> consegnata
     prep_ore, attesa_consegna = [], []
     for p in Preparazione.query.all():
         pronta = next((f.at for f in p.fasi if f.indice == len(Preparazione.FASI) - 1), None)
         if pronta and pronta >= dal and pronta > p.creata_at:
-            prep_ore.append(_ore(pronta - p.creata_at))
+            prep_ore.append(_ore(ore_lavorate_concessionaria(p.creata_at, pronta)))
         v = p.veicolo
         if pronta and v.consegnato_at and v.consegnato_at >= dal and v.consegnato_at > pronta:
-            attesa_consegna.append(_ore(v.consegnato_at - pronta))
+            attesa_consegna.append(_ore(ore_lavorate_concessionaria(pronta, v.consegnato_at)))
     # --- dalla vendita alla consegna
     vendute = [v for v in Veicolo.query.filter(Veicolo.stato == "consegnato", Veicolo.venduta_il.isnot(None)).all()
                if v.consegnato_at and v.consegnato_at >= dal]
-    vendita_consegna = [max(0, (v.consegnato_at.date() - v.venduta_il).days) * 24 for v in vendute]
+    vendita_consegna = [giorni_lavorativi_tra(v.venduta_il, v.consegnato_at) * ORE_GIORNO for v in vendute]
 
     attese = [a for a in (attesa_ritiro(m) for m in lavori) if a is not None]
     fasi = [
         {"nome": "Viaggio (DDT)", "ore": media([_ore(m.arrivo_at - m.partenza_at) for m in viaggi]), "n": len(viaggi),
          "cosa": "dalla partenza all'arrivo confermato"},
-        {"nome": "Lavorazione dal fornitore", "ore": media([_ore(m.lavorazione_completata_at - m.arrivo_at) for m in lavori]),
+        {"nome": "Lavorazione dal fornitore", "ore": media([_ore(ore_lavorate_fornitore(m.arrivo_at, m.lavorazione_completata_at)) for m in lavori]),
          "n": len(lavori), "cosa": "dall'arrivo alla fine segnata dal fornitore"},
         {"nome": "Attesa del ritiro", "ore": media(attese), "n": len(attese),
          "cosa": "da lavorazione finita alla partenza del rientro", "attesa": True},
@@ -82,7 +92,7 @@ def calcola(periodo="90"):
     massimo = max([f["ore"] for f in fasi if f["ore"]] or [1])
     for f in fasi:
         f["quota"] = round(100 * f["ore"] / massimo) if f["ore"] else 0
-        f["testo"] = durata(f["ore"])
+        f["testo"] = durata(f["ore"], lavorativa=not f["nome"].startswith("Viaggio"))
     con_dati = [f for f in fasi if f["ore"]]
     piu_lunga = max(con_dati, key=lambda f: f["ore"])["nome"] if con_dati else None
 
@@ -92,7 +102,7 @@ def calcola(periodo="90"):
         sede = m.sede_arrivo_effettiva
         r = fornitori.setdefault(sede.id, {"nome": sede.nome, "tipo": sede.TIPI.get(sede.tipo, ""), "giorni": [],
                                            "entro": 0, "ritardi": [], "attese": []})
-        giorni_veri = _ore(m.lavorazione_completata_at - m.arrivo_at) / 24
+        giorni_veri = _ore(ore_lavorate_fornitore(m.arrivo_at, m.lavorazione_completata_at)) / ORE_GIORNO  # lavorativi
         promessa = m.lavorazione_stima_iniziale or m.stima_giorni
         r["giorni"].append(giorni_veri)
         if giorni_veri <= promessa + 0.5:  # mezza giornata di tolleranza
@@ -128,8 +138,8 @@ def calcola(periodo="90"):
         scarto = None
         if t["coppie"]:
             scarto = round(100 * (sum(v for v, _ in t["coppie"]) / sum(s for _, s in t["coppie"]) - 1))
-        righe_t.append({"da": da, "a": a, "n": len(t["veri"]), "vero": durata(media(t["veri"]) / 60),
-                        "stima": durata(media(t["stime"]) / 60) if t["stime"] else None, "scarto": scarto})
+        righe_t.append({"da": da, "a": a, "n": len(t["veri"]), "vero": durata(media(t["veri"]) / 60, lavorativa=False),
+                        "stima": durata(media(t["stime"]) / 60, lavorativa=False) if t["stime"] else None, "scarto": scarto})
     righe_t.sort(key=lambda r: -r["n"])
 
     return {"periodo": periodo if periodo in PERIODI else "90", "fasi": fasi, "piu_lunga": piu_lunga,

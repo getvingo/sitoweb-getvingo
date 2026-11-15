@@ -16,10 +16,11 @@
     </div>
     <div class="carta-auto-stato">{% if con_stato %}{{ badge_veicolo(v) }}{% endif %}
       {% if modificabile %}<a class="btn piccolo modifica-auto" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}</div>
+    {# 15/11/2026: impronta del bene in alto a destra dell'intestazione (fondo scuro → nel riquadro chiaro) #}
+    {% if v.impronta is not none %}<div class="testa-impronta">{{ v.impronta|impronta(72, riquadro=True, titolo='Impronta di questa auto') }}</div>{% endif %}
   </div>
   <dl class="anagrafica-dati">
-    {# impronta del bene (marchio v1.0): unica per auto, sempre accanto al VIN #}
-    <div class="dato-telaio"><dt>Telaio</dt><dd class="con-impronta">{{ v.impronta|impronta(34, titolo='Impronta di questa auto') }}{{ v.vin|vin }}</dd></div>
+    <div class="dato-telaio"><dt>Telaio</dt><dd>{{ v.vin|vin }}</dd></div>
     <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="tenue">Senza targa</span>{% endif %}</dd></div>
     <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
     <div><dt>{{ 'Alimentazione · anno' if v.alimentazione else 'Anno' }}</dt><dd>{% if v.alimentazione %}{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}{% else %}{{ v.anno or '—' }}{% endif %}</dd></div>
@@ -117,13 +118,14 @@
 <{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#preparazione"{% endif %}>
   <span class="mini-anello" style="--p:{{ p.avanzamento }}"></span>{{ p.avanzamento }}% · attività {{ p.fasi|length + 1 }} di {{ p.FASI|length }}</{{ tag }}>
 {% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}
-<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}"{% endif %}>{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else ((adesso() - m.arrivo_at).days if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</{{ tag }}>
+<{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt.id) if m.ddt else url_for('main.veicolo', veicolo_id=v.id) }}"{% endif %}>{{ i('chiave', 's') }} {% if f == 'da_ritirare' %}finita, da ritirare{% else %}{# senza lavorazione indicata contano i giorni dall'arrivo #}{% set gl = m.giorni_lavorazione if m.giorni_lavorazione is not none else (giorni_lavorativi(m.arrivo_at) if m.arrivo_at else none) %}{% if gl is none %}dal fornitore{% elif gl == 0 %}arrivata oggi{% elif gl == 1 %}da 1 giorno{% else %}da {{ gl }} giorni{% endif %}{% endif %}</{{ tag }}>
 {% elif f == 'in_viaggio' and v.movimento_aperto %}
 <{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.arrivo_da_tap', ddt_id=v.movimento_aperto.ddt.id) }}"{% endif %}>{{ i('camion', 's') }} da {{ in_viaggio_da(v.movimento_aperto) }}</{{ tag }}>
 {% elif f == 'pronta' %}
 <{{ tag }} class="dettaglio-stato" {% if collegato %}href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna"{% endif %}>{{ i('bandiera', 's') }} {{ v.consegna_sede.nome if v.consegna_sede else 'consegna da fissare' }}</{{ tag }}>
 {% elif f == 'in_sede' %}{% set arrivo = v.ultimo_arrivo %}{% set dal = arrivo.arrivo_at if arrivo and arrivo.arrivo_at else v.creato_at %}
-{% set giorni_qui = (adesso() - dal).days %}<span class="dettaglio-stato">{{ i('orologio', 's') }} {% if giorni_qui == 0 %}arrivata oggi{% elif giorni_qui == 1 %}qui da ieri{% else %}qui da {{ giorni_qui }} giorni{% endif %}</span>
+{# giorni lavorativi (15/11/2026): arrivata venerdì, lunedì → "qui da 1 giorno" #}
+{% set giorni_qui = giorni_lavorativi(dal) %}<span class="dettaglio-stato">{{ i('orologio', 's') }} {% if dal.date() == adesso().date() %}arrivata oggi{% elif giorni_qui <= 1 %}qui da 1 giorno{% else %}qui da {{ giorni_qui }} giorni{% endif %}</span>
 {% endif %}
 {% endmacro %}
 
@@ -132,7 +134,7 @@
 {% macro avanzamento_lavoro(m, anello=False) %}
 {% set finita = m.lavorazione_completata_at %}{% set ritardo = m.giorni_ritardo %}
 {% set stato = 'finita' if finita else ('ritardo' if ritardo else 'corso') %}
-{% set giorno = (adesso() - m.arrivo_at).days + 1 if m.arrivo_at else 0 %}
+{% set giorno = m.giorno_lavorazione %}
 {% if anello %}
 <div class="prep-vista lavoro-{{ stato }}">
   <div class="anello anello-lavoro" data-anello data-da="0" data-a="{{ m.avanzamento_lavorazione }}">
@@ -231,7 +233,7 @@
 {# Lavorazione in breve: tipo e dettagli, barra sul tempo stimato e a che punto è #}
 {% macro lavoro_breve(m, titolo=none) %}
 {% set finita = m.lavorazione_completata_at %}{% set rit = m.giorni_ritardo %}
-{% set giorno = (adesso() - m.arrivo_at).days + 1 if m.arrivo_at else 0 %}
+{% set giorno = m.giorno_lavorazione %}
 <div class="lavoro-breve {{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
   <small>{{ titolo or ('Lavori finiti ' ~ (finita|da_quanto) if finita else 'Lavorazione · ' ~ m.sede_arrivo_effettiva.nome) }}</small>
   <div><b>{{ m.lavorazione }}</b>{% if m.lavorazione_note %} · {{ m.lavorazione_note }}{% endif %}</div>

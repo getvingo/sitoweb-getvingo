@@ -557,15 +557,27 @@ class Movimento(PerOrganizzazione, db.Model):
             return 100
         if not self.arrivo_at:
             return 0
-        totale = (self.lavorazione_prevista_at - self.arrivo_at).total_seconds()
-        return max(0, min(100, round(100 * (adesso() - self.arrivo_at).total_seconds() / totale)))
+        from .servizi import ORE_GIORNO_FORNITORE, ore_lavorate_fornitore
+        totale = self.stima_giorni * ORE_GIORNO_FORNITORE * 3600  # ore lavorative stimate (15/11/2026)
+        return max(0, min(100, round(100 * ore_lavorate_fornitore(self.arrivo_at, adesso()).total_seconds() / totale)))
+
+    @property
+    def giorno_lavorazione(self):
+        """A che giorno lavorativo di lavorazione si è (1 = primo): ogni 8 ore lavorate dal fornitore un giorno.
+        Arrivata venerdì alle 16, lunedì alle 10 → giorno 2 (prima contava i giorni di calendario: "giorno 4")."""
+        if not self.arrivo_at:
+            return 0
+        from .servizi import ORE_GIORNO_FORNITORE, ore_lavorate_fornitore
+        fine = self.lavorazione_completata_at or adesso()
+        return int(ore_lavorate_fornitore(self.arrivo_at, fine).total_seconds() // (ORE_GIORNO_FORNITORE * 3600)) + 1
 
     @property
     def giorni_ritardo(self):
-        """Giorni oltre la stima senza che il fornitore abbia segnato la fine (0 = in tempo)."""
+        """Giorni lavorativi oltre la fine prevista senza che il fornitore abbia segnato la fine (0 = in tempo)."""
         if self.lavorazione_completata_at or not self.arrivo_at or adesso() <= self.lavorazione_prevista_at:
             return 0
-        return max(1, (adesso() - self.lavorazione_prevista_at).days)
+        from .servizi import giorni_lavorativi_tra
+        return max(1, giorni_lavorativi_tra(self.lavorazione_prevista_at, adesso()))
 
     @property
     def sollecito_aperto(self):
@@ -577,11 +589,11 @@ class Movimento(PerOrganizzazione, db.Model):
 
     @property
     def giorni_lavorazione(self):
-        """Giorni dall'arrivo dal fornitore alla fine lavorazione (o a oggi)."""
+        """Giorni lavorativi dall'arrivo dal fornitore alla fine lavorazione (o a oggi)."""
         if self.stato != "chiuso" or not self.con_lavorazione or not self.sede_arrivo_effettiva.esterna:
             return None
-        fine = self.lavorazione_completata_at or adesso()
-        return (fine.date() - self.arrivo_at.date()).days
+        from .servizi import giorni_lavorativi_tra
+        return giorni_lavorativi_tra(self.arrivo_at, self.lavorazione_completata_at or adesso())
 
 
 class Ddt(PerOrganizzazione, db.Model):
@@ -742,11 +754,13 @@ class Preparazione(PerOrganizzazione, db.Model):
         """Rientro e ogni passo fatto, con la data e i giorni passati da allora."""
         oggi = adesso().date()
         righe = [("Rientro", self.creata_at)] + [(f.nome, f.at) for f in self.fasi_fatte]
-        return [{"nome": n, "data": d, "giorni_fa": (oggi - d.date()).days} for n, d in righe]
+        from .servizi import giorni_lavorativi_tra
+        return [{"nome": n, "data": d, "giorni_fa": giorni_lavorativi_tra(d, oggi)} for n, d in righe]
 
     @property
     def riepilogo(self):
-        """Versione semplice dei tempi: giorni di lavorazione esterna e interna, data di fine."""
+        """Versione semplice dei tempi: giorni lavorativi di lavorazione esterna e interna, data di fine."""
+        from .servizi import giorni_lavorativi_tra
         esterni = fornitore = None
         rientro = self.movimento
         if rientro is not None:
@@ -756,9 +770,9 @@ class Preparazione(PerOrganizzazione, db.Model):
                 Movimento.id != rientro.id).order_by(Movimento.arrivo_at.desc()).first())
             if andata is not None and andata.sede_arrivo_effettiva.esterna:
                 fine = andata.lavorazione_completata_at or rientro.partenza_at
-                esterni = (fine.date() - andata.arrivo_at.date()).days
+                esterni = giorni_lavorativi_tra(andata.arrivo_at, fine)
                 fornitore = andata.sede_arrivo_effettiva.nome
-        interni = ((self.completata_at or adesso()).date() - self.creata_at.date()).days
+        interni = giorni_lavorativi_tra(self.creata_at, self.completata_at or adesso())
         return {"esterni": esterni, "fornitore": fornitore, "interni": interni,
                 "completata_at": self.completata_at}
 

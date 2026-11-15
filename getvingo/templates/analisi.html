@@ -34,7 +34,8 @@
   </div>
   {% endfor %}
 </div>
-<p class="tenue piccolo">Le attese sono il tempo in cui l'auto è ferma senza che nessuno ci lavori: di solito è lì che si recupera di più.</p>
+<p class="tenue piccolo">Le attese sono il tempo in cui l'auto è ferma senza che nessuno ci lavori: di solito è lì che si recupera di più.
+  Tempi in giorni lavorativi da 8 ore (weekend, feste e giorni chiusi non contano); i viaggi in tempo reale.</p>
 
 <h2>{{ i('chiave') }} Partner lavorazioni</h2>
 {% if a.fornitori %}
@@ -46,9 +47,9 @@
   {% for r in a.fornitori %}
   <tr><th scope="row"><b>{{ r.nome }}</b><small>{{ r.tipo }}</small></th>
     <td class="num-col">{{ r.n }}</td>
-    <td><div class="cella-barra"><span class="analisi-barra"><span style="width:{{ r.quota }}%"></span></span><b>{{ durata(r.giorni * 24) }}</b></div></td>
+    <td><div class="cella-barra"><span class="analisi-barra"><span style="width:{{ r.quota }}%"></span></span><b>{{ durata(r.giorni * 8) }}</b></div></td>
     <td class="num-col"><b>{{ r.entro_pct }}%</b></td>
-    <td class="num-col">{{ durata(r.ritardo * 24) if r.ritardo else '—' }}</td>
+    <td class="num-col">{{ durata(r.ritardo * 8) if r.ritardo else '—' }}</td>
     <td class="num-col">{{ durata(r.attesa) }}</td></tr>
   {% endfor %}
   </tbody>

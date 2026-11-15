@@ -33,7 +33,7 @@
 {# ---- Presso un fornitore (13/11/2026 notte: un solo riquadro compatto, lo stato detto una volta) ---- #}
 {% if v.stato == 'in_sede' and v.sede and v.sede.esterna and ultimo %}
 {% set finita = ultimo.lavorazione_completata_at %}{% set rit = ultimo.giorni_ritardo %}
-{% set giorno = (adesso() - ultimo.arrivo_at).days + 1 if ultimo.arrivo_at else 0 %}
+{% set giorno = ultimo.giorno_lavorazione %}
 <section class="blocco-fase blocco-lavoro lavoro-{{ 'finita' if finita else ('ritardo' if rit else 'corso') }}">
   {# 14/11/2026 sera: grafica dedicata alla lavorazione. Dove si trova l'auto lo dice già la striscia sopra:
      qui solo cosa si fa, la linea del tempo (arrivo · fine prevista · oggi/finita) e le azioni #}
@@ -62,11 +62,13 @@
   </div>
   <div class="lavoro-numeri">
     <div><small>Tempo stimato</small><b>{{ ultimo.stima_giorni }} {{ 'giorno' if ultimo.stima_giorni == 1 else 'giorni' }}</b></div>
-    <div><small>{{ 'Ci è rimasta' if finita else 'Dal fornitore da' }}</small><b>{{ giorno }} {{ 'giorno' if giorno == 1 else 'giorni' }}</b></div>
-    {% if finita %}{% set oltre = ((finita - prev).total_seconds() / 86400)|round(0, 'ceil')|int %}
+    {# giorni lavorativi (15/11/2026): weekend, feste e giorni chiusi non contano #}
+    {% set gg = giorni_lavorativi(a, finita or adesso()) %}
+    <div><small>{{ 'Ci è rimasta' if finita else 'Dal fornitore da' }}</small><b>{% if gg == 0 %}{{ 'meno di 1 giorno' if finita else 'oggi' }}{% else %}{{ gg }} {{ 'giorno' if gg == 1 else 'giorni' }}{% endif %}</b></div>
+    {% if finita %}{% set oltre = ([1, giorni_lavorativi(prev, finita)]|max) if finita > prev else 0 %}
     <div class="esito {{ 'ritardo' if oltre > 0 else 'ok' }}"><small>{{ 'Finita in ritardo' if oltre > 0 else 'Finita nei tempi' }}</small><b>{% if oltre > 0 %}di {{ oltre }} {{ 'giorno' if oltre == 1 else 'giorni' }}{% else %}{{ finita|da_quanto }}{% endif %}</b>{% if ultimo.lavorazione_note_fine %}<span>{{ ultimo.lavorazione_note_fine }}</span>{% endif %}</div>
     {% elif rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }} {{ 'giorno' if rit == 1 else 'giorni' }}</b></div>
-    {% else %}<div class="esito"><small>Tempo che resta</small><b>{{ durata(prev - adesso()) }}</b></div>{% endif %}
+    {% else %}<div class="esito"><small>Tempo che resta</small><b>{{ prev|resta(fornitore=True) }}</b></div>{% endif %}
   </div>
   <div class="blocco-azioni">
     {{ sollecito_lavoro(ultimo, url_for('main.veicolo', veicolo_id=v.id)) }}
@@ -126,7 +128,7 @@
     <div><small>Avanzamento</small><b>{{ p.avanzamento }}% · {{ fatti }} di {{ p.FASI|length }} attività</b></div>
     {# la data di "pronta entro" è già sulla linea del tempo: qui quanto manca o di quanto è in ritardo #}
     {% if rit %}<div class="esito ritardo"><small>Ritardo</small><b>{{ rit }}</b></div>
-    {% elif p.pronta_entro_at %}<div class="esito"><small>Tempo che resta</small><b>{{ durata(p.pronta_entro_at - adesso()) }}</b></div>
+    {% elif p.pronta_entro_at %}<div class="esito"><small>Tempo che resta</small><b>{{ p.pronta_entro_at|resta }}</b></div>
     {% else %}<div class="esito"><small>Pronta entro</small><b>da fissare</b></div>{% endif %}
   </div>
   {% if p.fasi %}<div class="blocco-azioni">{{ annulla(annullabile(v.id, 'preparazione_fase', prep_id=p.id), 'Annulla “' ~ p.fasi_fatte[-1].nome ~ '”', url_for('main.veicolo', veicolo_id=v.id)) }}</div>{% endif %}

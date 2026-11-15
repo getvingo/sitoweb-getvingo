@@ -56,7 +56,7 @@
     <tr class="riga-gruppo"><th colspan="6">{{ i('chiave', 's') }} {{ sede.nome }} <span class="tenue">· {{ sede.TIPI[sede.tipo] }}</span> <span class="conteggio">{{ voci|length }}</span></th></tr>
     {% for v, m in voci %}
     {% set stato_m = 'finita' if m.lavorazione_completata_at else ('ritardo' if m.giorni_ritardo else 'corso') %}
-    {% set giorno = (adesso() - m.arrivo_at).days + 1 if m.arrivo_at else 0 %}
+    {% set giorno = m.giorno_lavorazione %}
     {% set qui = url_for('main.lavorazioni', lavorazione=tp, tipologia=tl, stato=st) %}
     <tr class="riga-stock lavoro-{{ stato_m }}" data-url="{{ url_for('main.veicolo', veicolo_id=v.id) }}"
         data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.vin, v.targa, sede.nome, m.lavorazione, m.lavorazione_note]|select|join(' ')|lower }}">

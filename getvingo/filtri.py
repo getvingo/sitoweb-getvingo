@@ -37,31 +37,60 @@ def da_quanto(momento):
     return "ieri" if giorni == 1 else f"{giorni} giorni fa"
 
 
+def _giorni_lav(da, a):
+    from .servizi import giorni_lavorativi_tra
+    return giorni_lavorativi_tra(da, a)
+
+
 def da_tempo(momento):
-    """Da quanto dura uno stato: "da 2 giorni", "da 3 h", "da oggi" (per "in preparazione da …")."""
+    """Da quanto dura uno stato: "da 2 giorni", "da 3 h", "da pochi minuti". I giorni sono lavorativi
+    (15/11/2026): entrata venerdì, lunedì → "da 1 giorno"; sotto un giorno lavorativo si contano le ore."""
     if not momento:
         return ""
     minuti = int((adesso() - momento).total_seconds() // 60)
     if minuti < 60:
         return "da pochi minuti" if minuti < 5 else f"da {minuti} min"
-    ore = minuti // 60
-    if ore < 24:
-        return f"da {ore} h"
-    giorni = ore // 24
+    giorni = _giorni_lav(momento, adesso()) if minuti >= 24 * 60 else 0
+    if not giorni:
+        return f"da {minuti // 60} h"
     return "da 1 giorno" if giorni == 1 else f"da {giorni} giorni"
 
 
 def ritardo(momento):
-    """Quanto si è oltre l'orario fissato: "3 giorni", "5 h", "20 min" (vuoto se non è in ritardo)."""
+    """Quanto si è oltre l'orario fissato: "3 giorni" (lavorativi), "5 h", "20 min" (vuoto se non è in ritardo)."""
     if not momento or momento >= adesso():
         return ""
     minuti = int((adesso() - momento).total_seconds() // 60)
     if minuti < 60:
         return f"{max(minuti, 1)} min"
-    ore = minuti // 60
-    if ore < 24:
-        return f"{ore} h"
-    giorni = ore // 24
+    giorni = _giorni_lav(momento, adesso()) if minuti >= 24 * 60 else 0
+    if not giorni:
+        return f"{minuti // 60} h"
+    return "1 giorno" if giorni == 1 else f"{giorni} giorni"
+
+
+def resta(momento, fornitore=False):
+    """Quanto manca a una scadenza, in tempo lavorativo. fornitore=True: ore di lavoro del fornitore
+    (8–12, 13–17; un giorno = 8 ore) → "1 giorno e 3 h"; altrimenti giorni lavorativi o, lo stesso giorno, ore."""
+    if not momento:
+        return ""
+    ora = adesso()
+    if momento <= ora:
+        return "scaduto"
+    if fornitore:
+        from .servizi import ORE_GIORNO_FORNITORE, ore_lavorate_fornitore
+        ore = ore_lavorate_fornitore(ora, momento).total_seconds() / 3600
+        giorni, h = int(ore // ORE_GIORNO_FORNITORE), int(round(ore % ORE_GIORNO_FORNITORE))
+        if h == ORE_GIORNO_FORNITORE:
+            giorni, h = giorni + 1, 0
+        if not giorni:
+            return f"{h} h" if h else "meno di 1 h"
+        testo = "1 giorno" if giorni == 1 else f"{giorni} giorni"
+        return testo + (f" e {h} h" if h else "")
+    giorni = _giorni_lav(ora, momento)
+    if not giorni:
+        minuti = int((momento - ora).total_seconds() // 60)
+        return f"{minuti // 60} h {minuti % 60} min" if minuti >= 60 else f"{max(minuti, 1)} min"
     return "1 giorno" if giorni == 1 else f"{giorni} giorni"
 
 
@@ -89,7 +118,7 @@ def init_app(app):
     from .anagrafica import separa_via
     from .impronte import svg as impronta
     app.jinja_env.filters.update(vin=vin, da_quanto=da_quanto, iniziali=iniziali, data=data, marchio=marchio,
-                                 slot=slot, da_tempo=da_tempo, ritardo=ritardo, separa_via=separa_via,
+                                 slot=slot, da_tempo=da_tempo, ritardo=ritardo, resta=resta, separa_via=separa_via,
                                  impronta=impronta)  # {{ v.impronta|impronta(32) }}: sempre accanto al VIN
     # g come globale: serve anche dentro le macro importate (che non vedono il contesto)
     app.jinja_env.globals["g"] = g
@@ -142,6 +171,11 @@ def init_app(app):
         return int((adesso() - momento).total_seconds()) if momento else 0
     app.jinja_env.globals["secondi_da"] = secondi_da
     app.jinja_env.globals["adesso"] = adesso
+
+    def giorni_lavorativi(da, a=None):
+        """Giorni lavorativi da `da` ad `a` (di base adesso): weekend, feste e giorni chiusi non contano."""
+        return _giorni_lav(da, a or adesso())
+    app.jinja_env.globals["giorni_lavorativi"] = giorni_lavorativi
     from .models import Veicolo
     app.jinja_env.globals["ALIMENTAZIONI"] = Veicolo.ALIMENTAZIONI
     app.jinja_env.globals["timedelta"] = timedelta

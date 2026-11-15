@@ -1788,12 +1788,12 @@ def _lavoro_fatto(v):
     rientro = min((r for r in validi if r.da_sede_id == sede.id and r.partenza_at and r.partenza_at >= m.arrivo_at),
                   key=lambda r: r.partenza_at, default=None)
     fine = m.lavorazione_completata_at or (rientro.partenza_at if rientro else None)
-    oltre = None
+    oltre = None  # giorni lavorativi oltre la fine prevista (negativo/0 = nei tempi)
     if fine and m.lavorazione_prevista_at:
-        oltre = -(-(fine - m.lavorazione_prevista_at).total_seconds() // 86400)
+        oltre = (max(1, servizi.giorni_lavorativi_tra(m.lavorazione_prevista_at, fine))
+                 if fine > m.lavorazione_prevista_at else 0)
     return {"m": m, "fornitore": sede.nome, "fine": fine, "rientro": rientro,
-            "giorni": (fine.date() - m.arrivo_at.date()).days if fine else None,
-            "oltre": int(oltre) if oltre is not None else None}
+            "giorni": servizi.giorni_lavorativi_tra(m.arrivo_at, fine) if fine else None, "oltre": oltre}
 
 
 @bp.route("/veicolo/<int:veicolo_id>")

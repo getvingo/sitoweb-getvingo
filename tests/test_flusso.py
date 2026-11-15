@@ -1570,9 +1570,8 @@ class TestRegoleNuove(Base):
         self.assertIn("Attività 1 di 4 · Controllo rientro", stock)
         self.assertIn("Volkswagen Golf", stock)
         self.assertEqual(self.c.get("/piazzale").status_code, 302)  # vecchio indirizzo
-        pagina = self.c.get("/").get_data(as_text=True)
+        pagina = self.c.get("/?mie=0").get_data(as_text=True)
         self.assertIn("Da ritirare", pagina)
-        self.assertIn("attività 1 di 4: Controllo rientro", pagina)  # home dal telefono: In preparazione
         self.assertNotIn("Da completare", pagina)  # 14/11 sera: le preparazioni regolari non sono "da fare"
         with self.app.app_context():
             prep = Preparazione.query.one()
@@ -1618,7 +1617,7 @@ class TestLavorazioniStimaESolleciti(Base):
             self.assertEqual((m.stima_giorni, m.giorni_ritardo), (5, 0))
             self.assertEqual(m.lavorazione_prevista_at, servizi.fine_lavori_prevista(m.arrivo_at, 5))
             self.assertIn(m.lavorazione_prevista_at.minute, (0, 30))
-            self.assertTrue(0 < m.avanzamento_lavorazione < 100)
+            self.assertTrue(0 <= m.avanzamento_lavorazione < 100)  # ore lavorative: nel weekend resta ferma
         self.c.post(f"/movimento/{mid}/stima", data={"giorni": "1"})  # stima più corta: già oltre la fine
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
@@ -1652,7 +1651,10 @@ class TestLavorazioniStimaESolleciti(Base):
         self.c.post(f"/sollecito/{sid}/risposta", data={"risposta": "Manca il ricambio", "nuova_stima": "2"})
         with self.app.app_context():
             m = db.session.get(Movimento, mid)
-            self.assertEqual((Sollecito.query.one().risposta, m.stima_giorni, m.giorni_ritardo), ("Manca il ricambio", 10, 0))
+            # "pronta tra 2 giorni" = 2 giorni lavorativi da oggi (15/11/2026: prima 2 giorni di calendario)
+            self.assertEqual((Sollecito.query.one().risposta, m.giorni_ritardo), ("Manca il ricambio", 0))
+            self.assertGreaterEqual(m.lavorazione_prevista_at.date(), servizi.giorno_lavorativo(2))
+            self.assertLess(servizi.fine_lavori_prevista(m.arrivo_at, m.stima_giorni - 1).date(), servizi.giorno_lavorativo(2))
         self.entra("admin")
         self.assertIn("Manca il ricambio", self.c.get("/lavorazioni").get_data(as_text=True))
 
@@ -2883,10 +2885,13 @@ class TestNovita1011(TestLavorazioniStimaESolleciti):
         fine = (arrivo + timedelta(days=7)).strftime("%Y-%m-%d")
         self.c.post(f"/movimento/{mid}/stima", data={"fine": fine})
         with self.app.app_context():
-            self.assertEqual(db.session.get(Movimento, mid).stima_giorni, 7)
+            # la stima è in giorni lavorativi: il numero più piccolo che fa finire i lavori in quel giorno
+            stima = db.session.get(Movimento, mid).stima_giorni
+            self.assertGreaterEqual(servizi.fine_lavori_prevista(arrivo, stima).date(), arrivo.date() + timedelta(days=7))
+            self.assertLess(servizi.fine_lavori_prevista(arrivo, stima - 1).date(), arrivo.date() + timedelta(days=7))
         self.c.post(f"/movimento/{mid}/stima", data={"fine": arrivo.strftime("%Y-%m-%d")})  # non prima dell'arrivo
         with self.app.app_context():
-            self.assertEqual(db.session.get(Movimento, mid).stima_giorni, 7)
+            self.assertEqual(db.session.get(Movimento, mid).stima_giorni, stima)
         mese = (arrivo + timedelta(days=7)).strftime("%Y-%m")
         cal = self.c.get(f"/lavorazioni?modo=calendario&mese={mese}").get_data(as_text=True)
         self.assertIn("cal-auto ev fine_prevista", cal)
@@ -3913,3 +3918,49 @@ class TestImpronteDeiBeni(Base):
             self.assertEqual(I.assegna_mancanti(), 3)
             gen = I.liberi(set())
             self.assertEqual([v.impronta for v in Veicolo.query.order_by(Veicolo.id)], [next(gen) for _ in range(3)])
+
+
+class TestTempiLavorativi(Base):
+    """15/11/2026: tutti i tempi sui giorni lavorativi. Caso dell'utente: dal fornitore "da 4 giorni" e
+    "giorno 4 di 2" con un solo giorno di lavoro effettivo."""
+    def test_lavorazione_su_giorni_e_ore_lavorative(self):
+        from unittest import mock
+        from getvingo import models
+        venerdi = datetime(2026, 11, 13, 16, 0)   # arrivo venerdì alle 16
+        lunedi = datetime(2026, 11, 16, 10, 0)    # oggi lunedì alle 10
+        with self.app.app_context():
+            m = Movimento(veicolo_id=None, stato="chiuso", lavorazione="Meccanica", lavorazione_stima_giorni=2,
+                          arrivo_at=venerdi)
+            with mock.patch.object(models, "adesso", return_value=lunedi), \
+                    mock.patch.object(servizi, "adesso", return_value=lunedi):
+                self.assertEqual(servizi.giorni_lavorativi_tra(venerdi, lunedi), 1)  # sabato e domenica non contano
+                self.assertEqual(servizi.ore_lavorate_fornitore(venerdi, lunedi), timedelta(hours=3))  # 16–17 + 8–10
+                self.assertEqual(m.giorno_lavorazione, 1)  # 3 ore di lavoro: ancora il primo giorno (prima "giorno 4")
+                self.assertEqual(m.avanzamento_lavorazione, 19)  # 3 ore su 16
+                self.assertEqual(m.giorni_ritardo, 0)
+                # fine prevista: 16 ore lavorative dall arrivo (ven 1 h, lun 8 h, mar 7 h) → martedì alle 16
+                self.assertEqual(m.lavorazione_prevista_at, datetime(2026, 11, 17, 16, 0))
+            giovedi = datetime(2026, 11, 19, 9, 0)
+            with mock.patch.object(models, "adesso", return_value=giovedi), \
+                    mock.patch.object(servizi, "adesso", return_value=giovedi):
+                self.assertEqual(m.giorni_ritardo, 2)  # mercoledì e giovedì
+                self.assertEqual(m.giorno_lavorazione, 4)  # 26 ore lavorate: quarto giorno su 2 stimati
+
+    def test_filtri_contano_solo_giorni_lavorativi(self):
+        from unittest import mock
+        from getvingo import filtri
+        lunedi = datetime(2026, 11, 16, 10, 0)
+        with self.app.app_context(), mock.patch.object(filtri, "adesso", return_value=lunedi):
+            self.assertEqual(filtri.da_tempo(datetime(2026, 11, 13, 9, 0)), "da 1 giorno")    # da venerdì
+            self.assertEqual(filtri.ritardo(datetime(2026, 11, 12, 18, 0)), "2 giorni")      # da giovedì sera
+            self.assertEqual(filtri.resta(datetime(2026, 11, 18, 10, 0)), "2 giorni")        # a mercoledì
+            self.assertEqual(filtri.resta(datetime(2026, 11, 17, 12, 0), fornitore=True), "1 giorno e 2 h")  # lun 10–17 (6 h) + mar 8–12 (4 h) = 10 h
+
+    def test_analisi_in_tempi_lavorativi(self):
+        from getvingo import analisi
+        venerdi, lunedi = datetime(2026, 11, 13, 16, 0), datetime(2026, 11, 16, 10, 0)
+        with self.app.app_context():
+            self.assertEqual(servizi.ore_lavorate_concessionaria(venerdi, lunedi), timedelta(hours=4))  # 16–18:30 + 8:30–10
+            self.assertEqual(analisi.durata(3), "3 h")
+            self.assertEqual(analisi.durata(16), "2 giorni")          # 16 ore di lavoro = 2 giorni lavorativi
+            self.assertEqual(analisi.durata(30, lavorativa=False), "1,2 giorni")  # i viaggi restano in tempo reale

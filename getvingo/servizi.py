@@ -1322,6 +1322,71 @@ def fine_lavori_prevista(arrivo, giorni):
     return t
 
 
+# --- Tempi in giorni lavorativi (15/11/2026, richiesta dell'utente: "tutti i tempi sui giorni lavorativi") ---
+# Weekend, feste nazionali e giorni chiusi di Gestione non contano mai: "da N giorni", "giorno n di N",
+# avanzamento delle lavorazioni e ritardi si leggono tutti sul calendario lavorativo.
+
+def _chiusi_memo():
+    """Giorni chiusi di Gestione, letti una volta per richiesta (le pagine con molte righe li usano spesso)."""
+    try:
+        memo = g.get("_giorni_chiusi")
+        if memo is None:
+            memo = {gc.data: gc.motivo or "Chiuso" for gc in GiornoChiuso.query}
+            g._giorni_chiusi = memo
+        return memo
+    except RuntimeError:  # fuori da una richiesta / app (comandi): si legge ogni volta
+        return {gc.data: gc.motivo or "Chiuso" for gc in GiornoChiuso.query}
+
+
+def e_lavorativo(giorno, chiusi=None):
+    return motivo_chiusura(giorno, _chiusi_memo() if chiusi is None else chiusi) is None
+
+
+def giorni_lavorativi_tra(da, a):
+    """Giorni lavorativi dopo il giorno di `da` fino al giorno di `a` compreso (stesso giorno = 0):
+    arrivata venerdì, oggi lunedì → 1."""
+    if not da or not a:
+        return None
+    d0 = da.date() if isinstance(da, datetime) else da
+    d1 = a.date() if isinstance(a, datetime) else a
+    if d1 <= d0:
+        return 0
+    chiusi = _chiusi_memo()
+    n, giorno = 0, d0
+    while giorno < d1:
+        giorno += timedelta(days=1)
+        if e_lavorativo(giorno, chiusi):
+            n += 1
+    return n
+
+
+def ore_lavorate_fornitore(da, a):
+    """Tempo lavorativo del fornitore tra due momenti (8–12 e 13–17 nei giorni lavorativi), come timedelta."""
+    return ore_lavorative(da, a, FASCE_FORNITORI)
+
+
+def ore_lavorate_concessionaria(da, a):
+    """Tempo lavorativo della concessionaria (8:30–12:30 e 14:30–18:30, gli orari delle preparazioni)."""
+    return ore_lavorative(da, a, FASCE_PREPARAZIONE)
+
+
+def ore_lavorative(da, a, fasce):
+    """Tempo che cade dentro le fasce orarie dei giorni lavorativi tra due momenti (8 ore = un giorno)."""
+    if not da or not a or a <= da:
+        return timedelta(0)
+    chiusi = _chiusi_memo()
+    tot, giorno = timedelta(0), da.date()
+    while giorno <= a.date():
+        if e_lavorativo(giorno, chiusi):
+            for inizio, fine in fasce:
+                x = max(da, datetime.combine(giorno, inizio))
+                y = min(a, datetime.combine(giorno, fine))
+                if y > x:
+                    tot += y - x
+        giorno += timedelta(days=1)
+    return tot
+
+
 def giorni_fino_a(mov, testo_data):
     """Fine prevista scelta come data (AAAA-MM-GG) → giorni lavorativi di lavorazione dall'arrivo: il numero
     più piccolo con cui la fine calcolata cade in quel giorno (o subito dopo, se quel giorno il fornitore è chiuso)."""
@@ -1378,8 +1443,9 @@ def rispondi_sollecito(sollecito, utente, risposta, nuova_stima=None):
     if not risposta:
         raise Vietato("Scrivi il motivo del ritardo.")
     if nuova_stima:
-        giorni_da_arrivo = (adesso().date() - mov.arrivo_at.date()).days + nuova_stima
-        imposta_stima(mov, utente, giorni_da_arrivo)
+        # "pronta tra N giorni" = N giorni lavorativi da oggi: la stima diventa il numero di giorni lavorativi
+        # dall'arrivo che fa cadere la fine in quel giorno
+        imposta_stima(mov, utente, giorni_fino_a(mov, giorno_lavorativo(nuova_stima).isoformat()))
         sollecito.nuova_stima_giorni = nuova_stima
     sollecito.risposta, sollecito.risposta_at, sollecito.risposta_utente_id = risposta, adesso(), utente.id
 

@@ -3116,5 +3116,11 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
 .con-impronta { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
 .impronta { flex: none; display: block; }
 @media (prefers-color-scheme: dark) {
-  .impronta { background: var(--riquadro); border-radius: 22%; padding: 3px; box-sizing: content-box; }
+  .con-impronta .impronta { background: var(--riquadro); border-radius: 22%; padding: 3px; box-sizing: content-box; }
 }
+/* in alto a destra nell'intestazione dell'auto (scura): versione nel riquadro chiaro, già arrotondata */
+.testa-impronta { flex: none; align-self: flex-start; line-height: 0; }
+.carta-auto-testa .testa-impronta { margin-left: 4px; }
+.dati-testa .testa-impronta { margin-left: auto; }
+@media (max-width: 480px) { .carta-auto-testa .testa-impronta { position: absolute; top: 14px; right: 14px; } }
+.dati-testa:has(.testa-impronta) { grid-template-columns: 56px 1fr auto; }
