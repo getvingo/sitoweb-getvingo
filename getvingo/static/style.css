@@ -2231,14 +2231,15 @@ dialog.foglio form { padding: 14px 16px calc(20px + env(safe-area-inset-bottom))
 .home-telefono h1 { font-size: var(--fs-24); margin: 0 0 12px; }
 .home-telefono.solo-tocco { margin: 0 0 16px; }
 .tocca-adesivo { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; padding: 26px 18px 22px;
-  border: 0; border-radius: var(--r-l); background: linear-gradient(160deg, var(--asfalto-2), var(--marchio-asfalto)); color: #fff;
+  border: 2px solid var(--marchio-via); border-radius: var(--r-l); background: linear-gradient(160deg, var(--asfalto-2), var(--marchio-asfalto)); color: #fff;
   font: inherit; text-align: center; cursor: pointer; box-shadow: 0 10px 24px rgba(17, 23, 29, .25); }
 .tocca-adesivo b { font-size: var(--fs-20); }
 .tocca-adesivo small { font-size: var(--fs-14); opacity: .85; }
-.tocca-adesivo .onde-nfc { width: 64px; height: 64px; background: rgba(255,255,255,.14); }
-.tocca-adesivo .onde-nfc i { border-color: rgba(255,255,255,.6); }
+/* 16/11/2026: contorno e cerchio con le onde nel verde via del marchio */
+.tocca-adesivo .onde-nfc { width: 64px; height: 64px; background: color-mix(in srgb, var(--marchio-via) 18%, transparent); color: var(--marchio-via); }
+.tocca-adesivo .onde-nfc i { border-color: var(--marchio-via); }
 .tocca-adesivo .onde-nfc .icona { width: 30px; height: 30px; }
-.tocca-adesivo.in-ascolto { box-shadow: 0 0 0 4px var(--marchio-via); }
+.tocca-adesivo.in-ascolto { box-shadow: 0 0 0 4px color-mix(in srgb, var(--marchio-via) 45%, transparent); }
 .titolo-sezione-piccolo { font-size: var(--fs-13); text-transform: uppercase; letter-spacing: .05em; color: var(--testo-2); margin: 20px 0 8px; }
 .per-te { display: grid; gap: 8px; }
 .per-te-voce { display: grid; grid-template-columns: 6px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; min-height: 64px;
