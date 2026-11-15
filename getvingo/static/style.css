@@ -3119,8 +3119,13 @@ details.filtri-stock:has(.filtri-n) > summary { border-color: var(--segnale); }
   .con-impronta .impronta { background: var(--riquadro); border-radius: 22%; padding: 3px; box-sizing: content-box; }
 }
 /* in alto a destra nell'intestazione dell'auto (scura): versione nel riquadro chiaro, già arrotondata */
-.testa-impronta { flex: none; align-self: flex-start; line-height: 0; }
+/* 15/11/2026: stessa misura e stessa altezza del logo della marca a sinistra (72 px da computer, 56 dal telefono),
+   centrata in verticale come il logo, con lo stesso arrotondamento e la stessa ombra */
+.testa-impronta { flex: none; align-self: center; line-height: 0; }
+.testa-impronta .impronta { display: block; }
 .carta-auto-testa .testa-impronta { margin-left: 4px; }
+.anagrafica .testa-impronta .impronta { width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
 .dati-testa .testa-impronta { margin-left: auto; }
-@media (max-width: 480px) { .carta-auto-testa .testa-impronta { position: absolute; top: 14px; right: 14px; } }
+.dati-testa .testa-impronta .impronta { width: 56px; height: 56px; border-radius: var(--r-s); }
+@media (max-width: 480px) { .anagrafica .carta-auto-testa .testa-impronta { position: absolute; top: 22px; right: 24px; } }
 .dati-testa:has(.testa-impronta) { grid-template-columns: 56px 1fr auto; }

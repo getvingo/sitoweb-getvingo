@@ -10,7 +10,7 @@
     <div><small>{{ v.marca }}{% if v.anno %} · {{ v.anno }}{% endif %}</small><h1>{{ v.modello or v.descrizione }}</h1>
       {% if v.versione %}<div class="tenue">{{ v.versione }}</div>{% endif %}
       <div class="dati-stato"><span class="pillola-stato"><i aria-hidden="true"></i>{{ stato }}</span></div></div>
-    {% if v.impronta is not none %}<div class="testa-impronta">{{ v.impronta|impronta(52, riquadro=True, titolo='Impronta di questa auto') }}</div>{% endif %}
+    {% if v.impronta is not none %}<div class="testa-impronta">{{ v.impronta|impronta(56, riquadro=True, titolo='Impronta di questa auto') }}</div>{% endif %}
   </div>
 
   <h2 class="sezione-t">Il veicolo</h2>
