@@ -32,12 +32,12 @@
   </details>
 </form>
 
-{% set icone = {'tutti': 'doc', 'predisposto': 'orologio', 'aperto': 'camion', 'a_lavorazione': 'chiave', 'in_sede': 'sede', 'chiuso': 'check', 'annullati': 'archivio'} %}
+{% set icone = {'tutti': 'doc', 'predisposto': 'orologio', 'aperto': 'camion', 'a_lavorazione': 'chiave', 'in_sede': 'sede', 'chiuso': 'check', 'archiviati': 'archivio', 'annullati': 'archivio'} %}
 {% set voci = [] %}
 {% for k, nome in filtri_stato.items() if k != 'annullati' or g.utente.ruolo == 'admin' %}
   {% set _ = voci.append((k, nome, url_for('main.archivio_ddt', stato=k, **f_attivi), conteggi.get(k, 0), icone[k])) %}
 {% endfor %}
-{{ pillole(voci, stato, a_destra=('a_lavorazione', 'in_sede', 'chiuso', 'annullati'), etichetta='Filtra i DDT per stato') }}
+{{ pillole(voci, stato, a_destra=('a_lavorazione', 'in_sede', 'chiuso', 'archiviati', 'annullati'), etichetta='Filtra i DDT per stato') }}
 
 {# Elenco a righe (13/11/2026 notte): colore dello stato sul bordo e sulla pillola (da ritirare magenta, in viaggio
    viola, arrivato verde, ritiro scaduto arancio, cancellato grigio) #}

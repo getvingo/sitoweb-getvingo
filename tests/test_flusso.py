@@ -1983,6 +1983,7 @@ class TestCampiDdtEFiltri(Base):
         self.assertIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=a_lavorazione").get_data(as_text=True))
         self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=chiuso").get_data(as_text=True))
         self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=in_sede").get_data(as_text=True))
+        self.assertNotIn(f"/ddt/{d}\"", self.c.get("/ddt?stato=archiviati").get_data(as_text=True))
         self.assertNotIn("Volkswagen Golf", self.c.get("/lavorazioni").get_data(as_text=True))       # solo trasferimento
 
     def test_filtro_vetture_commerciali_in_preparazione(self):

@@ -1900,11 +1900,11 @@ def riposiziona(veicolo_id):
 # "In corso" = tutti tranne gli arrivati (che hanno la loro scheda) e i cancellati
 FILTRI_STATO = {"tutti": "In corso", "predisposto": "Da ritirare", "aperto": "In viaggio",
                 "a_lavorazione": "Arrivati a destinazione", "in_sede": "Arrivati in sede",
-                "chiuso": "Arrivati", "annullati": "Cancellati"}
+                "chiuso": "Arrivati", "archiviati": "Archiviati", "annullati": "Cancellati"}
 # 16/11/2026: i DDT arrivati in tre schede. A destinazione = arrivati da un partner per una lavorazione; in sede =
 # rientrati da un partner in una sede della concessionaria; Arrivati = tutti gli altri (es. auto acquistate che
 # arrivano dall'esterno, trasferimenti tra sedi)
-ARRIVI = ("a_lavorazione", "in_sede", "chiuso")
+ARRIVI = ("a_lavorazione", "in_sede", "chiuso", "archiviati")  # Archiviati = in sede + Arrivati insieme
 
 
 def _tipo_arrivo(m):
@@ -1955,6 +1955,7 @@ def archivio_ddt():
             rientro = and_(tipo_da.in_(Sede.FORNITORI), tipo_a == "propria")
             query = query.filter(a_fornitore if stato == "a_lavorazione" else
                                  and_(not_(a_fornitore), rientro) if stato == "in_sede" else
+                                 not_(a_fornitore) if stato == "archiviati" else
                                  and_(not_(a_fornitore), not_(rientro)))
         else:
             query = query.filter(Movimento.stato == stato)
@@ -1996,6 +1997,8 @@ def archivio_ddt():
     for d in attivi:
         k = _tipo_arrivo(d.movimento) if d.movimento.stato == "chiuso" else d.movimento.stato
         conteggi[k] = conteggi.get(k, 0) + 1
+        if k in ("in_sede", "chiuso"):
+            conteggi["archiviati"] = conteggi.get("archiviati", 0) + 1
     return render_template(
         "ddt_archivio.html", elenco=elenco, f=f, stato=stato, filtri_stato=FILTRI_STATO,
         f_attivi={k: v for k, v in f.items() if v}, avanzati=avanzati, conteggi=conteggi,
