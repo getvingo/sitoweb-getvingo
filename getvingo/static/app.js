@@ -341,11 +341,18 @@
         var lettore = new NDEFReader();
         lettore.scan(ferma ? { signal: ferma.signal } : {}).then(function () {
           lettore.onreading = function (e) {
+            var vai = null;
             e.message.records.forEach(function (r) {
-              if (r.recordType !== 'url' && r.recordType !== 'absolute-url') return;
-              var m = new TextDecoder().decode(r.data).match(/\/t\/([A-Za-z0-9-]+)/);
-              if (m) { if (navigator.vibrate) navigator.vibrate(60); titolo.textContent = 'Adesivo letto'; location.href = '/t/' + m[1]; }
+              if (vai || (r.recordType !== 'url' && r.recordType !== 'absolute-url')) return;
+              var link = new TextDecoder().decode(r.data), m = link.match(/\/t\/([A-Za-z0-9-]+)/);
+              if (m) vai = '/t/' + m[1];
+              // link unico (20/11/2026): numero di serie scritto dall'adesivo o, se manca, letto dal telefono
+              else if (/\/t\/?(\?|$)/.test(link)) {
+                var u = (link.match(/[?&]uid=([0-9A-Fa-f]{8,20})/) || [])[1] || (e.serialNumber || '').replace(/:/g, '');
+                if (u) vai = '/t?uid=' + encodeURIComponent(u);
+              }
             });
+            if (vai) { if (navigator.vibrate) navigator.vibrate(60); titolo.textContent = 'Adesivo letto'; location.href = vai; }
           };
         }).catch(function (err) {
           if (err && err.name === 'AbortError') return;

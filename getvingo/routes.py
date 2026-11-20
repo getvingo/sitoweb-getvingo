@@ -10,6 +10,7 @@ from itertools import groupby
 from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect,
                    render_template, request, send_from_directory, session, url_for)
 from sqlalchemy import and_, func, not_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from . import copie
@@ -1064,6 +1065,42 @@ def cerca():
     return render_template("cerca.html", f=f, risultati=_filtra_veicoli(tutti, f), auto_mappa=auto_mappa,
                            luoghi_mappa=luoghi_mappa,
                            opzioni=_filtri_veicoli(tutti, f), filtri_attivi=[k for k in CHIAVI_FILTRO if f[k]])
+
+
+def pulisci_uid(testo):
+    """Numero di serie dell'adesivo dal link unico (UID mirror NTAG21x: 14 cifre esadecimali in coda al link,
+    a volte seguite da "x" e dal contatore) o dal Web NFC ("04:a2:3b:…"). Vuoto se non è un numero di serie."""
+    pulito = re.sub(r"[^0-9A-F]", "", (testo or "").upper().split("X")[0])
+    return pulito if 8 <= len(pulito) <= 20 else ""
+
+
+@bp.route("/t", methods=["GET"])
+@bp.route("/t/", methods=["GET"])
+@login_richiesto
+def tap_unico():
+    """Link unico per tutti gli adesivi (20/11/2026): https://<portale>/t?uid=<numero di serie>.
+    L'adesivo aggiunge da solo il suo numero di serie (UID mirror); un numero mai visto, toccato dal personale
+    della concessionaria, diventa un adesivo nuovo col codice progressivo (SIGLA-0001…) e apre "Nuova auto".
+    Da lì si prosegue come con i link /t/<codice> (posizione, abbinamento, scheda dell'auto)."""
+    uid = pulisci_uid(request.args.get("uid"))
+    if not uid:
+        abort(404, "Adesivo senza numero di serie: va scritto con il link unico e l'opzione “UID mirror” "
+                   "(app NXP TagWriter), vedi Gestione → Adesivi NFC.")
+    tag = Tag.query.filter_by(uid=uid).execution_options(tutte_le_organizzazioni=True).first()
+    if tag is not None and tag.org_id != g.org_id:
+        abort(403, "Questo adesivo è registrato da un'altra concessionaria.")
+    if tag is None:
+        if not g.utente.interno:
+            abort(403, "Adesivo nuovo: lo registra la concessionaria al primo tocco.")
+        codice = servizi.nuovi_codici_adesivi(1)[0]
+        tag = Tag.query.filter_by(codice=codice).first()
+        tag.uid = uid
+        try:
+            db.session.commit()
+        except IntegrityError:  # doppio tocco nello stesso istante: l'adesivo è già stato registrato
+            db.session.rollback()
+            tag = Tag.query.filter_by(uid=uid).first_or_404()
+    return redirect(url_for("main.tap", codice=tag.codice))
 
 
 @bp.route("/t/<codice>", methods=["GET", "POST"])

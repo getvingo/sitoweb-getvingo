@@ -12,7 +12,18 @@
 Apri questa pagina dall'indirizzo pubblico (es. quello del tunnel https://…trycloudflare.com) e copia i link da lì.</span></div>
 {% endif %}
 <div class="scheda" style="margin-bottom:16px">
-  <h3>Come si prepara un adesivo</h3>
+  <h3>Link unico per tutti gli adesivi</h3>
+  <p style="margin:8px 0"><code style="font-size:var(--fs-16)">{{ base }}/t?uid=</code></p>
+  <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">
+    <li>Adesivi <b>NTAG213, NTAG215 o NTAG216</b> (gli altri non aggiungono il numero di serie).</li>
+    <li>Con l'app gratuita “NXP TagWriter”: Write tags → New dataset → Link, incolla il link qui sopra e attiva <b>“Add UID mirror”</b> (il numero di serie va in fondo al link). Scrivi lo stesso link su tutti gli adesivi.</li>
+    <li>Al primo tocco di una persona della concessionaria l'adesivo si registra da solo col prossimo codice ({{ (sigla or 'SIGLA') ~ '-0001' }}…) e si apre “Nuova auto”; dal tocco dopo si apre l'auto.</li>
+    <li>Si possono anche ordinare già scritti così: chiedi al fornitore “URL con UID mirror” e dagli il link qui sopra.</li>
+  </ol>
+  <p class="tenue piccolo" style="margin:0">Gli adesivi già scritti con il loro link /t/{{ (sigla or 'SIGLA') ~ '-0001' }} continuano a funzionare.</p>
+</div>
+<div class="scheda" style="margin-bottom:16px">
+  <h3>Oppure: un link diverso per ogni adesivo</h3>
   <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">
     <li>Crea i codici qui sotto: sono progressivi e iniziano con la sigla della concessionaria (<b>{{ sigla or '—' }}</b>, si cambia in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>), es. {{ (sigla or 'SIGLA') ~ '-0001' }}.</li>
     <li>Con l'app gratuita “NFC Tools” scrivi su ogni adesivo il suo link (record di tipo URL).</li>

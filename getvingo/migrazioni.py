@@ -178,7 +178,9 @@ def aggiungi_colonne():
              ("veicolo", "anno", "INTEGER"),
              ("veicolo", "alimentazione", "VARCHAR(30) DEFAULT ''"),
              # 15/11/2026: impronta del bene (numero d'ordine, unico su tutto il portale)
-             ("veicolo", "impronta", "INTEGER")]
+             ("veicolo", "impronta", "INTEGER"),
+             # 20/11/2026: numero di serie dell'adesivo NFC (link unico per tutti gli adesivi, UID mirror)
+             ("tag", "uid", "VARCHAR(20)")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:
@@ -186,6 +188,7 @@ def aggiungi_colonne():
             aggiunte.append(f"{tabella}.{colonna}")
     with db.engine.begin() as conn:  # un'impronta = un'auto (più NULL ammessi, sia SQLite sia Postgres)
         conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_veicolo_impronta ON veicolo (impronta)")
+        conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_tag_uid ON tag (uid)")
     return aggiunte
 
 

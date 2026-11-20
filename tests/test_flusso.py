@@ -4063,3 +4063,47 @@ class TestTempiLavorativi(Base):
             self.assertEqual(analisi.durata(3), "3 h")
             self.assertEqual(analisi.durata(16), "2 giorni")          # 16 ore di lavoro = 2 giorni lavorativi
             self.assertEqual(analisi.durata(30, lavorativa=False), "1,2 giorni")  # i viaggi restano in tempo reale
+
+
+class TestLinkUnicoAdesivi(Base):
+    """20/11/2026: un solo link per tutti gli adesivi, /t?uid=<numero di serie> (UID mirror)."""
+    UID = "04A23B1C5D6E80"
+
+    def test_primo_tocco_registra_l_adesivo_e_apre_nuova_auto(self):
+        r = self.c.get(f"/t?uid={self.UID.lower()}")
+        self.assertEqual(r.status_code, 302)
+        with self.app.app_context():
+            tag = Tag.query.filter_by(uid=self.UID).one()
+            codice = tag.codice
+        self.assertTrue(r.headers["Location"].endswith(f"/t/{codice}"))
+        self.assertIn(f"/abbina/{codice}", self.c.post(f"/t/{codice}", data=POS).headers["Location"])
+        # secondo tocco: stesso adesivo, nessun codice nuovo
+        self.assertTrue(self.c.get(f"/t?uid={self.UID}").headers["Location"].endswith(f"/t/{codice}"))
+        with self.app.app_context():
+            self.assertEqual(Tag.query.filter_by(uid=self.UID).count(), 1)
+
+    def test_contatore_e_due_punti_ignorati(self):
+        self.c.get(f"/t?uid={self.UID}x000012")
+        self.c.get("/t?uid=04:a2:3b:1c:5d:6e:80")
+        with self.app.app_context():
+            self.assertEqual(Tag.query.filter_by(uid=self.UID).count(), 1)
+
+    def test_adesivo_abbinato_apre_l_auto(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            Tag.query.filter_by(codice="ABCD2345").one().uid = self.UID
+            db.session.commit()
+        self.assertTrue(self.c.get(f"/t?uid={self.UID}").headers["Location"].endswith("/t/ABCD2345"))
+        self.assertIn(f"/veicolo/{vid}/tocco", self.c.post("/t/ABCD2345", data=POS).headers["Location"])
+
+    def test_senza_numero_di_serie_spiega_cosa_fare(self):
+        r = self.c.get("/t?uid=")
+        self.assertEqual(r.status_code, 404)
+        self.assertIn("UID mirror", r.get_data(as_text=True))
+
+    def test_fornitore_non_registra_adesivi_nuovi(self):
+        self.entra("carr")
+        self.assertEqual(self.c.get(f"/t?uid={self.UID}").status_code, 403)
+
+    def test_link_unico_in_gestione(self):
+        self.assertIn("/t?uid=", self.c.get("/admin/tag").get_data(as_text=True))

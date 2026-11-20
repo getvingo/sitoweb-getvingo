@@ -418,9 +418,11 @@ class Veicolo(PerOrganizzazione, db.Model):
 
 
 class Tag(PerOrganizzazione, db.Model):
-    """Adesivo NFC: contiene l'URL /t/<codice>."""
+    """Adesivo NFC: contiene l'URL /t/<codice>, oppure il link unico /t?uid= con il numero di serie (UID mirror)."""
     id = db.Column(db.Integer, primary_key=True)
     codice = db.Column(db.String(16), unique=True, nullable=False, index=True)
+    # 20/11/2026: numero di serie dell'adesivo (14 cifre esadecimali), unico su tutto il portale (uq_tag_uid)
+    uid = db.Column(db.String(20))
     veicolo_id = db.Column(db.Integer, db.ForeignKey("veicolo.id"), unique=True)
     abbinato_at = db.Column(db.DateTime)
     creato_at = db.Column(db.DateTime, default=adesso)
