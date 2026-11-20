@@ -398,7 +398,7 @@
 {% macro detta(per) %}<button type="button" class="btn-mic-piccolo" data-detta="{{ per }}" aria-label="Detta">{{ i('mic', 's') }}</button>{% endmacro %}
 
 {# Grande "Tocca l'adesivo" della home sul telefono: su Android legge l'adesivo restando nell'app (Web NFC),
-   su iPhone basta avvicinare il telefono all'adesivo con lo schermo acceso (app.js, data-leggi-nfc) #}
+   su iPhone il foglio spiega come leggerlo (i siti non possono leggere l'NFC) (app.js, data-leggi-nfc) #}
 {% macro tocca_adesivo() %}
 <button type="button" class="tocca-adesivo" data-leggi-nfc>
   <span class="onde-nfc" aria-hidden="true"><i></i><i></i><i></i>{{ i('nfc') }}</span>

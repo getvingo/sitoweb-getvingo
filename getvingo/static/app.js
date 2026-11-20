@@ -313,22 +313,54 @@
 
   // Tocca l'adesivo dalla home: su Android (Chrome) il telefono legge l'adesivo restando nell'app;
   // su iPhone basta avvicinarlo all'adesivo con lo schermo acceso (si apre il link da solo)
+  // 20/11/2026: ogni tocco apre il foglio "Avvicina il telefono" a tutto schermo. Android/Chrome legge da qui;
+  // iPhone non permette ai siti di leggere l'NFC (solo app native, Core NFC): il foglio spiega la lettura
+  // dell'iPhone (notifica → Safari). App iPhone con lettura nativa: da fare (vedi CLAUDE.md)
+  var IPHONE = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function foglioNfc() {
+    var f = document.createElement('div');
+    f.className = 'foglio-nfc'; f.setAttribute('role', 'dialog'); f.setAttribute('aria-modal', 'true');
+    f.innerHTML = '<div class="foglio-nfc-carta">' +
+      '<span class="onde-nfc grande" aria-hidden="true"><i></i><i></i><i></i><svg class="icona"><use href="#i-nfc"/></svg></span>' +
+      '<b class="foglio-nfc-titolo"></b><p class="foglio-nfc-testo"></p><p class="foglio-nfc-nota tenue piccolo" hidden></p>' +
+      '<button type="button" class="btn secondario foglio-nfc-chiudi">Annulla</button></div>';
+    document.body.appendChild(f);
+    return f;
+  }
   document.querySelectorAll('[data-leggi-nfc]').forEach(function (b) {
-    var stato = b.querySelector('[data-nfc-stato]');
-    if (!('NDEFReader' in window)) return;
     b.addEventListener('click', function () {
-      var lettore = new NDEFReader();
-      lettore.scan().then(function () {
-        b.classList.add('in-ascolto');
-        if (stato) stato.textContent = 'Avvicina il telefono all’adesivo sul parabrezza…';
-        lettore.onreading = function (e) {
-          e.message.records.forEach(function (r) {
-            if (r.recordType !== 'url' && r.recordType !== 'absolute-url') return;
-            var m = new TextDecoder().decode(r.data).match(/\/t\/([A-Za-z0-9-]+)/);
-            if (m) { if (navigator.vibrate) navigator.vibrate(60); location.href = '/t/' + m[1]; }
-          });
-        };
-      }).catch(function () { if (stato) stato.textContent = 'Lettore NFC non disponibile: avvicina il telefono all’adesivo.'; });
+      var f = foglioNfc(), titolo = f.querySelector('.foglio-nfc-titolo'), testo = f.querySelector('.foglio-nfc-testo'),
+          nota = f.querySelector('.foglio-nfc-nota'), ferma = window.AbortController ? new AbortController() : null;
+      function chiudi() { if (ferma) ferma.abort(); f.remove(); document.removeEventListener('keydown', esc); }
+      function esc(e) { if (e.key === 'Escape') chiudi(); }
+      f.querySelector('.foglio-nfc-chiudi').addEventListener('click', chiudi);
+      document.addEventListener('keydown', esc);
+      titolo.textContent = 'Avvicina il telefono all’adesivo';
+      if ('NDEFReader' in window) {
+        testo.textContent = 'Appoggia il retro del telefono sull’adesivo sul parabrezza.';
+        var lettore = new NDEFReader();
+        lettore.scan(ferma ? { signal: ferma.signal } : {}).then(function () {
+          lettore.onreading = function (e) {
+            e.message.records.forEach(function (r) {
+              if (r.recordType !== 'url' && r.recordType !== 'absolute-url') return;
+              var m = new TextDecoder().decode(r.data).match(/\/t\/([A-Za-z0-9-]+)/);
+              if (m) { if (navigator.vibrate) navigator.vibrate(60); titolo.textContent = 'Adesivo letto'; location.href = '/t/' + m[1]; }
+            });
+          };
+        }).catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          titolo.textContent = 'NFC non attivo';
+          testo.textContent = err && err.name === 'NotAllowedError'
+            ? 'Consenti a Getvingo di usare l’NFC (lucchetto accanto all’indirizzo → Autorizzazioni) e riprova.'
+            : 'Attiva l’NFC nelle impostazioni del telefono (Connessioni → NFC) e riprova.';
+        });
+      } else if (IPHONE) {
+        testo.textContent = 'Sblocca l’iPhone e avvicina la parte alta all’adesivo sul parabrezza, poi tocca la notifica che compare in alto.';
+        if (navigator.standalone) { nota.hidden = false; nota.textContent = 'La pagina dell’auto si apre in Safari: la prima volta accedi anche lì.'; }
+      } else {
+        testo.textContent = 'Con l’NFC acceso, avvicina il telefono all’adesivo sul parabrezza e tocca la notifica.';
+        nota.hidden = false; nota.textContent = 'Per leggere l’adesivo da qui apri Getvingo con Chrome.';
+      }
     });
   });
 

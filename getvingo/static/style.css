@@ -3155,3 +3155,19 @@ details.filtri-stock.con-filtro > summary { border-color: var(--segnale); }  /* 
 .anteprima-pdf { max-width: 860px; margin: 0 auto; display: grid; gap: 14px; }
 .anteprima-pdf canvas { display: block; background: #fff; border-radius: var(--r-xs); box-shadow: 0 6px 20px rgba(17, 23, 29, .16); }
 .anteprima-pdf-attesa, .anteprima-pdf-errore { text-align: center; color: var(--testo-2); padding: 40px 16px; }
+
+/* Foglio "Avvicina il telefono all'adesivo" (20/11/2026, app.js data-leggi-nfc): si apre a ogni tocco del pulsante */
+.foglio-nfc { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(17, 23, 29, .6); animation: foglio-nfc-entra .2s ease-out; }
+.foglio-nfc-carta { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
+  padding: 32px 22px calc(22px + env(safe-area-inset-bottom)); border-radius: var(--r-l) var(--r-l) 0 0;
+  background: linear-gradient(160deg, var(--asfalto-2), var(--marchio-asfalto)); color: #fff; }
+.foglio-nfc .onde-nfc.grande { width: 112px; height: 112px; margin-bottom: 8px; color: var(--marchio-via);
+  background: color-mix(in srgb, var(--marchio-via) 18%, transparent); }
+.foglio-nfc .onde-nfc.grande i { border-color: var(--marchio-via); }
+.foglio-nfc .onde-nfc.grande .icona { width: 48px; height: 48px; }
+.foglio-nfc-titolo { font-size: var(--fs-20); }
+.foglio-nfc-testo { margin: 0; font-size: var(--fs-16); opacity: .9; }
+.foglio-nfc-nota { margin: 0; color: #fff; opacity: .7; }
+.foglio-nfc-chiudi { width: 100%; min-height: 48px; margin-top: 10px; color: #fff; border-color: rgba(255, 255, 255, .4); background: transparent; }
+@keyframes foglio-nfc-entra { from { opacity: 0; } to { opacity: 1; } }
