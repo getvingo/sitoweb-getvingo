@@ -1091,9 +1091,7 @@ def tap_unico():
     if tag is None:
         if not g.utente.interno:
             abort(403, "Adesivo nuovo: lo registra la concessionaria al primo tocco.")
-        codice = servizi.nuovi_codici_adesivi(1)[0]
-        tag = Tag.query.filter_by(codice=codice).first()
-        tag.uid = uid
+        tag = servizi.primo_adesivo_libero(uid)
         try:
             db.session.commit()
         except IntegrityError:  # doppio tocco nello stesso istante: l'adesivo è già stato registrato

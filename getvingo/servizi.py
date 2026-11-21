@@ -392,6 +392,21 @@ def nuovi_codici_adesivi(quanti):
     return codici
 
 
+def primo_adesivo_libero(uid):
+    """Adesivo per un numero di serie nuovo (21/11/2026): prima i codici già creati e ancora liberi (senza auto
+    né numero di serie), dal più basso; solo se sono finiti se ne crea uno nuovo dopo il più alto."""
+    org = db.session.get(Organizzazione, g.org_id)
+    prefisso = (org.sigla or "") + "-"
+    liberi = [t for t in Tag.query.filter(Tag.veicolo_id.is_(None), Tag.uid.is_(None))]
+    liberi.sort(key=lambda t: (not t.codice.startswith(prefisso), len(t.codice), t.codice))
+    if liberi:
+        t = liberi[0]
+    else:
+        t = Tag.query.filter_by(codice=nuovi_codici_adesivi(1)[0]).first()
+    t.uid = uid
+    return t
+
+
 def profilo_guida_mancante(utente):
     """Cosa manca al profilo di guida per partire col solo tocco (vuoto = pronto).
     Il vettore non manca mai: si prende quello dell'azienda per cui si lavora."""

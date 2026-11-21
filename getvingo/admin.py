@@ -589,9 +589,7 @@ def prenota_adesivo():
         return jsonify(errore="Questo adesivo è registrato da un'altra concessionaria."), 403
     nuovo = t is None
     if nuovo:
-        codice = servizi.nuovi_codici_adesivi(1)[0]
-        t = Tag.query.filter_by(codice=codice).first()
-        t.uid = uid
+        t = servizi.primo_adesivo_libero(uid)
         db.session.commit()
     base, _ = _base_adesivi()
     return jsonify(codice=t.codice, link=f"{base}/t/{t.codice}", nuovo=nuovo,

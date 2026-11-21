@@ -4141,3 +4141,13 @@ class TestPreparaAdesivi(Base):
 
     def test_senza_numero_di_serie_rifiutato(self):
         self.assertEqual(self.prenota("").status_code, 400)
+
+    def test_usa_prima_i_codici_gia_creati(self):
+        with self.app.app_context():
+            org = db.session.get(Organizzazione, 1)
+            org.sigla = "TEST"
+            db.session.add_all([Tag(codice="TEST-0002"), Tag(codice="TEST-0001"), Tag(codice="TEST-0010")])
+            db.session.commit()
+        codici = [self.prenota(f"04A23B1C5D6E8{n}").get_json()["codice"] for n in range(5)]
+        # prima i liberi con la sigla dal più basso, poi gli altri liberi, poi i nuovi dopo il più alto
+        self.assertEqual(codici, ["TEST-0001", "TEST-0002", "TEST-0010", "ABCD2345", "TEST-0011"])
