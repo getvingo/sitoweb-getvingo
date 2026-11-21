@@ -4110,3 +4110,34 @@ class TestLinkUnicoAdesivi(Base):
 
     def test_link_unico_in_gestione(self):
         self.assertIn("/t?uid=", self.c.get("/admin/tag").get_data(as_text=True))
+
+
+class TestPreparaAdesivi(Base):
+    """21/11/2026: l'amministratore prepara gli adesivi da Android (Web NFC): primo codice libero per ogni adesivo."""
+    def prenota(self, seriale):
+        return self.c.post("/admin/adesivi/prenota", json={"seriale": seriale})
+
+    def test_pagina_solo_admin_e_aperta_dal_telefono(self):
+        html = self.c.get("/admin/adesivi/prepara").get_data(as_text=True)
+        self.assertIn("Prepara adesivi", html)
+        self.assertNotIn("Questa pagina si usa dal computer", html)
+        self.assertIn("Prepara adesivi NFC", self.c.get("/profilo").get_data(as_text=True))
+        self.entra("ufficio")
+        self.assertEqual(self.c.get("/admin/adesivi/prepara").status_code, 403)
+        self.assertNotIn("Prepara adesivi NFC", self.c.get("/profilo").get_data(as_text=True))
+
+    def test_primo_codice_libero_e_stesso_codice_se_si_riprova(self):
+        d1 = self.prenota("04:a2:3b:1c:5d:6e:80").get_json()
+        d2 = self.prenota("04:a2:3b:1c:5d:6e:81").get_json()
+        self.assertTrue(d1["nuovo"])
+        self.assertNotEqual(d1["codice"], d2["codice"])
+        self.assertTrue(d1["link"].endswith("/t/" + d1["codice"]))
+        # scrittura fallita e adesivo riappoggiato: stesso codice, nessun numero bruciato
+        d3 = self.prenota("04A23B1C5D6E80").get_json()
+        self.assertEqual(d3["codice"], d1["codice"])
+        self.assertFalse(d3["nuovo"])
+        # l'adesivo preparato funziona anche col link unico (numero di serie salvato)
+        self.assertTrue(self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"].endswith("/t/" + d1["codice"]))
+
+    def test_senza_numero_di_serie_rifiutato(self):
+        self.assertEqual(self.prenota("").status_code, 400)

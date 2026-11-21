@@ -63,7 +63,7 @@
 {% set solo_pc = g.utente and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
                   'main.analisi', 'main.nuova_auto', 'main.modifica_auto', 'main.cerca_avanzata')
                   or (ep.startswith('admin.') and ep not in ('admin.utenti', 'admin.aziende', 'admin.gruppo_concessionaria',
-                                                            'admin.gruppo_fornitore', 'admin.utente'))
+                                                            'admin.gruppo_fornitore', 'admin.utente', 'admin.prepara_adesivi'))
                   or ep.startswith('piattaforma.')) %}
 {% if g.utente %}
 <header class="testata">

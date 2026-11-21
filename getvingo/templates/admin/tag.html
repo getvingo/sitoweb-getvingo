@@ -12,6 +12,11 @@
 Apri questa pagina dall'indirizzo pubblico (es. quello del tunnel https://…trycloudflare.com) e copia i link da lì.</span></div>
 {% endif %}
 <div class="scheda" style="margin-bottom:16px">
+  <h3>Prepara adesivi dal telefono Android</h3>
+  <p class="tenue piccolo" style="margin:8px 0 12px">Il modo più veloce: da un telefono Android con Chrome apri <b>Il mio profilo → Prepara adesivi NFC</b> e appoggia gli adesivi uno dopo l'altro. Su ognuno scrivo il link del primo codice libero; poi funzionano su tutti i telefoni, iPhone compresi.</p>
+  <a class="btn" href="{{ url_for('admin.prepara_adesivi') }}">{{ i('nfc', 's') }} Prepara adesivi</a>
+</div>
+<div class="scheda" style="margin-bottom:16px">
   <h3>Link unico per tutti gli adesivi</h3>
   <p style="margin:8px 0"><code style="font-size:var(--fs-16)">{{ base }}/t?uid=</code></p>
   <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">

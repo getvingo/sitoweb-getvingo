@@ -555,6 +555,49 @@ def vettore(vettore_id):
     return render_template("admin/vettore.html", vt=vt)
 
 
+def _base_adesivi():
+    """Indirizzo del portale da scrivere sugli adesivi (sempre HTTPS fuori dal computer locale)."""
+    base = (current_app.config["BASE_URL"] or request.url_root).rstrip("/")
+    host = request.host.split(":")[0]
+    locale = host in ("127.0.0.1", "localhost") or host.startswith(("192.168.", "10."))
+    if not current_app.config["BASE_URL"] and not locale and base.startswith("http://"):
+        base = "https://" + base[len("http://"):]
+    return base, locale
+
+
+@bp.route("/adesivi/prepara")
+@ruolo_richiesto("admin")
+def prepara_adesivi():
+    """Prepara adesivi (21/11/2026, solo amministratore, da Android con Chrome): si appoggia un adesivo e il
+    portale ci scrive il link del primo codice libero (Web NFC). Gli adesivi così preparati vanno su ogni telefono."""
+    base, _ = _base_adesivi()
+    return render_template("admin/prepara_adesivi.html", base=base, sigla=g.utente.organizzazione.sigla)
+
+
+@bp.route("/adesivi/prenota", methods=["POST"])
+@ruolo_richiesto("admin")
+def prenota_adesivo():
+    """Codice per l'adesivo appoggiato, dal suo numero di serie: lo stesso adesivo riceve sempre lo stesso codice
+    (se la scrittura fallisce si riprova senza bruciare numeri); un adesivo nuovo prende il primo codice libero."""
+    from flask import jsonify
+    from .routes import pulisci_uid
+    uid = pulisci_uid((request.get_json(silent=True) or {}).get("seriale"))
+    if not uid:
+        return jsonify(errore="Numero di serie dell'adesivo non letto: riappoggialo."), 400
+    t = Tag.query.filter_by(uid=uid).execution_options(tutte_le_organizzazioni=True).first()
+    if t is not None and t.org_id != g.org_id:
+        return jsonify(errore="Questo adesivo è registrato da un'altra concessionaria."), 403
+    nuovo = t is None
+    if nuovo:
+        codice = servizi.nuovi_codici_adesivi(1)[0]
+        t = Tag.query.filter_by(codice=codice).first()
+        t.uid = uid
+        db.session.commit()
+    base, _ = _base_adesivi()
+    return jsonify(codice=t.codice, link=f"{base}/t/{t.codice}", nuovo=nuovo,
+                   auto=t.veicolo.descrizione if t.veicolo else "")
+
+
 @bp.route("/tag", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def tag():
@@ -564,12 +607,7 @@ def tag():
         db.session.commit()
         flash(f"{quanti} codici creati, da {codici[0]} a {codici[-1]}: scrivi ciascun link su un adesivo NFC.", "ok")
         return redirect(url_for("admin.tag"))
-    base = (current_app.config["BASE_URL"] or request.url_root).rstrip("/")
-    host = request.host.split(":")[0]
-    locale = host in ("127.0.0.1", "localhost") or host.startswith(("192.168.", "10."))
-    # sugli adesivi serve sempre HTTPS (il GPS del browser funziona solo così)
-    if not current_app.config["BASE_URL"] and not locale and base.startswith("http://"):
-        base = "https://" + base[len("http://"):]
+    base, locale = _base_adesivi()  # sugli adesivi serve sempre HTTPS (il GPS del browser funziona solo così)
     return render_template("admin/tag.html", base=base, link_locale=locale and not current_app.config["BASE_URL"],
                            liberi=Tag.query.filter_by(veicolo_id=None).order_by(Tag.creato_at.desc()).all(),
                            abbinati=Tag.query.filter(Tag.veicolo_id.isnot(None)).count(),
