@@ -1091,7 +1091,7 @@ def tap_unico():
     if tag is None:
         if not g.utente.interno:
             abort(403, "Adesivo nuovo: lo registra la concessionaria al primo tocco.")
-        tag = servizi.primo_adesivo_libero(uid)
+        tag = servizi.primo_adesivo_libero(uid, "link_unico")
         try:
             db.session.commit()
         except IntegrityError:  # doppio tocco nello stesso istante: l'adesivo è già stato registrato
@@ -1106,8 +1106,13 @@ def tap(codice):
     """Punto di ingresso di ogni tocco NFC. Prima si rileva la posizione del telefono (obbligatoria:
     senza non si prosegue) e la si salva sull'auto; poi si va dove serve."""
     tag = Tag.query.filter_by(codice=codice.upper()).first()
-    if tag is None:
+    if tag is None:  # auto arrivata da un altro dealer: sull'adesivo c'è ancora il suo link (21/11/2026)
+        nuovo = Tag.query.filter_by(codice_precedente=codice.upper()).first()
+        if nuovo is not None:
+            return redirect(url_for("main.tap", codice=nuovo.codice), code=307)
         abort(404, "Adesivo non registrato nel sistema.")
+    if tag.trasferito_at:
+        abort(403, f"Questo adesivo è passato a {tag.trasferito_a} insieme all'auto.")
     lat, lon = _coord(usa_tocco=False)  # il tocco rileva sempre una posizione nuova
     if request.method == "POST" and lat is None and current_app.config["DEMO"]:
         lat, lon = _posizione_simulata(tag.veicolo)
@@ -1509,7 +1514,7 @@ def abbina(codice):
             veicolo.targa = _targa()
         veicolo.stato, veicolo.consegnato_at = "in_sede", None
         veicolo.sede_id = request.form.get("sede_id", type=int)
-        tag.veicolo, tag.abbinato_at = veicolo, adesso()
+        servizi.abbina_tag(tag, veicolo, g.utente)
         servizi.registra_evento(veicolo, "abbinamento", g.utente, *_coord())
         db.session.commit()
         marchi.assicura(veicolo.marca)  # marca nuova: il logo si scarica da solo
@@ -1606,7 +1611,7 @@ def nuova_auto():
                 db.session.rollback()
                 flash(_manca_dato_auto(v), "errore")
                 return render_template("abbina.html", tag=None, sedi=sedi, tag_liberi=liberi, form=request.form)
-            tag.veicolo, tag.abbinato_at = v, adesso()
+            servizi.abbina_tag(tag, v, g.utente)
             servizi.registra_evento(v, "inserimento", g.utente, *_coord())
             db.session.commit()
             marchi.assicura(v.marca)  # marca nuova: il logo si scarica da solo
@@ -2562,6 +2567,28 @@ def elimina_veicolo(veicolo_id):
             pass
     flash(f"{nome} eliminata.", "ok")
     return redirect(url_for("main.piazzale"))
+
+
+@bp.route("/veicolo/<int:veicolo_id>/trasferisci", methods=["POST"])
+@solo_interni
+def trasferisci_veicolo(veicolo_id):
+    """Auto venduta a un altro dealer Getvingo (21/11/2026, solo amministratore): prima si scrive la sigla e si
+    vede il nome del dealer, poi si conferma (servizi.trasferisci_veicolo)."""
+    v = db.get_or_404(Veicolo, veicolo_id)
+    try:
+        if g.utente.ruolo != "admin":
+            raise Vietato("Solo un amministratore può trasferire un'auto a un altro dealer.")
+        org = servizi.dealer_per_sigla(request.form.get("sigla"))
+        if request.form.get("conferma") != "1":
+            return render_template("trasferisci.html", v=v, org=org, tag=servizi.tag_dell_auto(v))
+        servizi.trasferisci_veicolo(v, org, g.utente)
+        db.session.commit()
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+        return redirect(url_for("main.veicolo", veicolo_id=veicolo_id) + "#trasferisci")
+    flash(f"{v.descrizione} trasferita a {org.nome}: la trovano nel loro stock, con l'adesivo già abbinato.", "ok")
+    return redirect(url_for("main.veicolo", veicolo_id=veicolo_id))
 
 
 # ---------------------------------------------------------------- correzioni dell'admin

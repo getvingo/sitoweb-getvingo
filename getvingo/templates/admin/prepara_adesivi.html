@@ -22,6 +22,13 @@
   </div>
   <h2 class="titolo-sezione-piccolo">Preparati adesso <span id="prep-conta">0</span></h2>
   <div id="prep-elenco" class="pila"><p class="tenue piccolo" id="prep-vuoto">Nessun adesivo ancora.</p></div>
+  {% if ultimi %}
+  <h2 class="titolo-sezione-piccolo">Ultimi preparati</h2>
+  <div class="pila">
+    {% for t in ultimi %}<div class="avviso"><b>{{ t.codice }}</b><span>{{ t.preparato_da.nome if t.preparato_da else '' }} · {{ t.preparato_at|data('%d/%m %H:%M') }}{% if t.veicolo %} · su {{ t.veicolo.descrizione }}{% endif %}</span></div>{% endfor %}
+  </div>
+  <p class="tenue piccolo">Tutti gli adesivi, con chi li ha preparati e abbinati, sono da computer in Gestione → Adesivi NFC.</p>
+  {% endif %}
 </div>
 {% endblock %}
 {% block script %}

@@ -377,9 +377,9 @@ def sigla_valida(sigla, org_id):
     return sigla
 
 
-def nuovi_codici_adesivi(quanti):
-    """Codici progressivi della concessionaria attiva: SIGLA-0001, SIGLA-0002… (si riparte dal più alto)."""
-    org = db.session.get(Organizzazione, g.org_id)
+def nuovi_codici_adesivi(quanti, org_id=None):
+    """Codici progressivi della concessionaria (quella attiva o org_id): SIGLA-0001, SIGLA-0002… (si riparte dal più alto)."""
+    org = db.session.get(Organizzazione, org_id or g.org_id)
     if not org.sigla:
         org.sigla = genera_sigla(org.nome)
     prefisso = org.sigla + "-"
@@ -388,23 +388,98 @@ def nuovi_codici_adesivi(quanti):
     primo = max(numeri, default=0) + 1
     codici = [f"{prefisso}{n:04d}" for n in range(primo, primo + quanti)]
     for c in codici:
-        db.session.add(Tag(codice=c))
+        db.session.add(Tag(codice=c, org_id=org.id))
     return codici
 
 
-def primo_adesivo_libero(uid):
-    """Adesivo per un numero di serie nuovo (21/11/2026): prima i codici già creati e ancora liberi (senza auto
-    né numero di serie), dal più basso; solo se sono finiti se ne crea uno nuovo dopo il più alto."""
+def primo_adesivo_libero(uid, origine, utente=None):
+    """Adesivo per un numero di serie nuovo (21/11/2026): prima i codici già creati e mai usati (senza auto,
+    numero di serie, abbinamenti passati né trasferimenti), dal più basso; finiti quelli, uno nuovo dopo il più alto.
+    Un codice già stato su un'auto non si riusa mai: quell'adesivo è ancora sull'auto consegnata."""
     org = db.session.get(Organizzazione, g.org_id)
     prefisso = (org.sigla or "") + "-"
-    liberi = [t for t in Tag.query.filter(Tag.veicolo_id.is_(None), Tag.uid.is_(None))]
+    liberi = [t for t in Tag.query.filter(Tag.veicolo_id.is_(None), Tag.uid.is_(None), Tag.primo_abbinamento_at.is_(None),
+                                          Tag.ultimo_veicolo_id.is_(None), Tag.trasferito_at.is_(None))]
     liberi.sort(key=lambda t: (not t.codice.startswith(prefisso), len(t.codice), t.codice))
     if liberi:
         t = liberi[0]
     else:
         t = Tag.query.filter_by(codice=nuovi_codici_adesivi(1)[0]).first()
-    t.uid = uid
+    t.uid, t.origine, t.preparato_at = uid, origine, adesso()
+    t.preparato_da = utente
     return t
+
+
+def abbina_tag(tag, v, utente):
+    """Adesivo sull'auto; il primo abbinamento resta nel registro degli adesivi (chi, quando, telaio)."""
+    tag.veicolo, tag.abbinato_at = v, adesso()
+    tag.ultimo_veicolo_id = v.id
+    if tag.primo_abbinamento_at is None:
+        tag.primo_abbinamento_at, tag.primo_abbinamento_da, tag.primo_vin = adesso(), utente, v.vin
+
+
+def tag_dell_auto(v):
+    """L'adesivo dell'auto: quello abbinato o, dopo la consegna, quello rimasto fisicamente sopra."""
+    if v.tag is not None:
+        return v.tag
+    return Tag.query.filter(Tag.ultimo_veicolo_id == v.id, Tag.veicolo_id.is_(None),
+                            Tag.trasferito_at.is_(None)).first()
+
+
+CAMPI_TRASFERIMENTO = ("vin", "marca", "modello", "versione", "alimentazione", "anno", "colore", "targa",
+                       "tipologia", "condizione")
+
+
+def dealer_per_sigla(sigla):
+    """Il dealer Getvingo a cui si trasferisce un'auto, dalla sua sigla degli adesivi (unica sul portale)."""
+    sigla = (sigla or "").strip().upper()
+    org = Organizzazione.query.filter_by(sigla=sigla).first() if sigla else None
+    if org is None or not org.attiva:
+        raise Vietato("Nessun dealer Getvingo con questa sigla: chiedila al dealer (Gestione → Dati aziendali).")
+    if org.id == g.org_id:
+        raise Vietato("È la sigla della tua concessionaria: scegli un altro dealer.")
+    return org
+
+
+def trasferisci_veicolo(v, org, utente):
+    """Auto venduta a un altro dealer Getvingo (21/11/2026). Il dealer riceve i dati dell'auto (non DDT né storico,
+    che restano qui) in stock nella sua sede legale; l'adesivo resta lo stesso ma prende un codice con la sua sigla
+    (il link vecchio scritto sopra continua a portare lì). Qui l'auto va in archivio come consegnata."""
+    if utente.ruolo != "admin":
+        raise Vietato("Solo un amministratore può trasferire un'auto a un altro dealer.")
+    if v.movimento_aperto or v.movimento_predisposto:
+        raise Vietato("L'auto ha un DDT in corso o da ritirare: prima va chiuso o annullato.")
+    if v.preparazione_attiva:
+        raise Vietato("L'auto è in preparazione: prima va finita o eliminata la preparazione.")
+    if v.trasferita_a:
+        raise Vietato(f"L'auto è già stata trasferita a {v.trasferita_a}.")
+    tutte = {"tutte_le_organizzazioni": True}
+    if Veicolo.query.filter_by(org_id=org.id, vin=v.vin).execution_options(**tutte).first():
+        raise Vietato(f"{org.nome} ha già un'auto con questo telaio.")
+    sede = (Sede.query.filter_by(org_id=org.id, tipo="propria", attiva=True).execution_options(**tutte)
+            .order_by(Sede.sede_legale.desc(), Sede.id).first())
+    nuova = Veicolo(org_id=org.id, sede=sede, stato="in_sede", note_interne=f"Arrivata da {organizzazione_attiva().nome}.",
+                    **{k: getattr(v, k) for k in CAMPI_TRASFERIMENTO})
+    db.session.add(nuova)
+    db.session.flush()
+    vecchio = tag_dell_auto(v)
+    if vecchio is not None:
+        codice = nuovi_codici_adesivi(1, org_id=org.id)[0]
+        db.session.flush()
+        t = Tag.query.filter_by(codice=codice).execution_options(**tutte).first()
+        uid, vecchio.uid = vecchio.uid, None
+        db.session.flush()  # il numero di serie è unico sul portale: prima si toglie dall'adesivo vecchio
+        t.uid, t.origine, t.preparato_at, t.codice_precedente = uid, "trasferito", adesso(), vecchio.codice
+        abbina_tag(t, nuova, None)
+        vecchio.veicolo, vecchio.abbinato_at = None, None
+        vecchio.trasferito_at, vecchio.trasferito_a = adesso(), org.nome
+    v.stato, v.consegnato_at, v.trasferita_a = "consegnato", adesso(), org.nome
+    registra_evento(v, "trasferimento", utente, None, None)
+    return nuova
+
+
+def organizzazione_attiva():
+    return db.session.get(Organizzazione, g.org_id)
 
 
 def profilo_guida_mancante(utente):
@@ -1098,6 +1173,7 @@ def elimina_veicolo(v, utente, demo=False):
                       "Se è stata consegnata o venduta, segnala la consegna.")
     if v.tag:
         v.tag.veicolo_id = None
+        v.tag.ultimo_veicolo_id = None  # l'auto non esiste più: l'adesivo si può riabbinare toccandolo
     foto = []
     for d in v.danni:
         foto += [f.file for f in d.foto]
@@ -1584,8 +1660,8 @@ def puo_ripristinare(azione, utente):
 
 def _riaggancia_tag(v, tag_id):
     tag = db.session.get(Tag, tag_id) if tag_id else None
-    if tag is not None and tag.veicolo_id is None:
-        tag.veicolo, tag.abbinato_at = v, adesso()
+    if tag is not None and tag.veicolo_id is None and tag.trasferito_at is None:
+        abbina_tag(tag, v, None)
 
 
 def _movimento_di(ddt, veicolo_id):

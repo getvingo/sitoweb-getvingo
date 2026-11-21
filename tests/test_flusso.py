@@ -963,7 +963,9 @@ class TestStockEDati(Base):
         self.c.post(f"/veicolo/{vid}/dati", data={"marca": "Volkswagen", "modello": "Golf GTI", "colore": "Rosso",
                                                   "targa": "AB123CD", "tipologia": "vettura"})
         self.c.post(f"/veicolo/{vid}/dati", data={"targa": "ZZ999ZZ"})  # la targa inserita non si cambia
-        self.c.post(f"/veicolo/{vid}/preparazione", data={"pronta_entro": "2026-11-20T16:00"})
+        with self.app.app_context():  # il prossimo giorno lavorativo alle 16 (una data fissa finisce nel passato)
+            giorno = servizi.giorno_lavorativo(2).isoformat()
+        self.c.post(f"/veicolo/{vid}/preparazione", data={"pronta_entro": f"{giorno}T16:00"})
         with self.app.app_context():
             v = db.session.get(Veicolo, vid)
             # i dati restano quelli dell'ingresso: si aggiunge solo la targa
@@ -2496,8 +2498,8 @@ class TestConfigurazioneConcessionaria(Base):
 
     def test_adesivi_progressivi_con_sigla(self):
         self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst", **INDIRIZZO, **FISCALI})
-        self.c.post("/admin/tag", data={"quanti": "3"})
-        self.c.post("/admin/tag", data={"quanti": "2"})
+        for _ in range(5):  # 21/11/2026: "Forza: crea un codice a mano" ne crea uno alla volta
+            self.c.post("/admin/tag")
         with self.app.app_context():
             codici = sorted(t.codice for t in Tag.query if t.codice.startswith("TST-"))
             self.assertEqual(codici, ["TST-0001", "TST-0002", "TST-0003", "TST-0004", "TST-0005"])
@@ -4151,3 +4153,93 @@ class TestPreparaAdesivi(Base):
         codici = [self.prenota(f"04A23B1C5D6E8{n}").get_json()["codice"] for n in range(5)]
         # prima i liberi con la sigla dal più basso, poi gli altri liberi, poi i nuovi dopo il più alto
         self.assertEqual(codici, ["TEST-0001", "TEST-0002", "TEST-0010", "ABCD2345", "TEST-0011"])
+
+
+class TestRegistroAdesivi(Base):
+    """21/11/2026: registro degli adesivi (chi li ha preparati e abbinati) e "Forza: crea un codice a mano"."""
+    def test_primo_abbinamento_registrato_e_codice_non_riusato(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            t = Tag.query.filter_by(codice="ABCD2345").one()
+            self.assertEqual((t.primo_vin, t.primo_abbinamento_da.nome, t.ultimo_veicolo_id), (VIN, "Admin", vid))
+            v = db.session.get(Veicolo, vid)
+            v.tag.veicolo = None  # come alla consegna: l'adesivo si stacca ma resta sull'auto
+            db.session.commit()
+        # un adesivo nuovo non prende mai il codice di uno rimasto su un'auto consegnata
+        d = self.c.post("/admin/adesivi/prenota", json={"seriale": "04A23B1C5D6E80"}).get_json()
+        self.assertNotEqual(d["codice"], "ABCD2345")
+        html = self.c.get("/admin/tag?vista=consegnate").get_data(as_text=True)
+        self.assertIn("ABCD2345", html)
+        self.assertIn(VIN, html)
+
+    def test_registro_mostra_chi_ha_preparato(self):
+        d = self.c.post("/admin/adesivi/prenota", json={"seriale": "04A23B1C5D6E80"}).get_json()
+        html = self.c.get("/admin/tag").get_data(as_text=True)
+        self.assertIn(d["codice"], html)
+        self.assertIn("Preparato dal telefono", html)
+        self.assertNotIn("Crea codici", html)
+
+    def test_forza_crea_un_solo_codice_col_link(self):
+        with self.app.app_context():
+            prima = Tag.query.count()
+        r = self.c.post("/admin/tag", follow_redirects=True)
+        html = r.get_data(as_text=True)
+        with self.app.app_context():
+            self.assertEqual(Tag.query.count(), prima + 1)
+            t = Tag.query.filter_by(origine="manuale").one()
+        self.assertIn(f"/t/{t.codice}", html)
+        self.entra("ufficio")
+        self.assertEqual(self.c.post("/admin/tag").status_code, 403)
+
+
+class TestTrasferimentoDealer(TestPiuClienti):
+    """21/11/2026: auto venduta a un altro dealer Getvingo, con i dati e l'adesivo (codice nuovo, link vecchio valido)."""
+    def setUp(self):
+        super().setUp()
+        with self.app.app_context():
+            db.session.get(Organizzazione, self.org2).sigla = "ALTRA"
+            db.session.get(Organizzazione, 1).sigla = "TEST"
+            db.session.commit()
+
+    def test_trasferimento_completo(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            Tag.query.filter_by(codice="ABCD2345").one().uid = "04A23B1C5D6E80"
+            db.session.commit()
+        # prima la conferma con il nome del dealer, poi il trasferimento
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "altra"})
+        self.assertIn("Trasferire a Altra Auto S.p.A.?", r.get_data(as_text=True))
+        self.assertEqual(self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}).status_code, 302)
+        with self.app.app_context():
+            v = db.session.get(Veicolo, vid)
+            self.assertEqual((v.stato, v.trasferita_a, v.tag), ("consegnato", "Altra Auto S.p.A.", None))
+            vecchio = Tag.query.filter_by(codice="ABCD2345").one()
+            self.assertEqual((vecchio.trasferito_a, vecchio.uid), ("Altra Auto S.p.A.", None))
+        # da noi l'adesivo dice dove è andato
+        self.assertIn("passato a Altra Auto", self.c.post("/t/ABCD2345", data=POS).get_data(as_text=True))
+        # l'altro dealer ha l'auto con i dati e l'adesivo con la sua sigla; il link vecchio e il numero di serie portano lì
+        self.c.post("/logout")
+        self.c.post("/login", data={"email": "admin@altra.it", "password": "password2"})
+        with self.app.app_context():
+            g.org_id = self.org2
+            nuova = Veicolo.query.filter_by(vin=VIN).one()
+            self.assertEqual((nuova.marca, nuova.modello, nuova.stato, nuova.tag.codice), ("Volkswagen", "Golf", "in_sede", "ALTRA-0001"))
+            self.assertEqual(nuova.tag.uid, "04A23B1C5D6E80")
+            self.assertEqual(Movimento.query.count(), 0)  # niente DDT né storico dell'altro dealer
+        r = self.c.post("/t/ABCD2345", data=POS, follow_redirects=True)
+        self.assertIn(f"/veicolo/{nuova.id}/tocco", r.request.path)
+        self.assertTrue(self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"].endswith("/t/ALTRA-0001"))
+
+    def test_rifiuti(self):
+        vid = self.abbina()
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "TEST"}, follow_redirects=True)
+        self.assertIn("È la sigla della tua concessionaria", r.get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "NONCE"}, follow_redirects=True)
+        self.assertIn("Nessun dealer Getvingo con questa sigla", r.get_data(as_text=True))
+        self.entra("ufficio")
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}, follow_redirects=True)
+        self.assertIn("Solo un amministratore", r.get_data(as_text=True))
+        self.entra("admin")
+        self.parti(vid, "Carrozzeria B")
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}, follow_redirects=True)
+        self.assertIn("DDT in corso", r.get_data(as_text=True))

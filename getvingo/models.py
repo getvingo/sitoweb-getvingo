@@ -292,6 +292,7 @@ class Veicolo(PerOrganizzazione, db.Model):
     cliente_nome = db.Column(db.String(200), default="")
     venditore_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
     note_interne = db.Column(db.Text, default="")
+    trasferita_a = db.Column(db.String(200), default="")  # 21/11/2026: passata a un altro dealer Getvingo
 
     sede = db.relationship("Sede", foreign_keys="Veicolo.sede_id")
     venditore = db.relationship("Utente", foreign_keys=[venditore_id])
@@ -423,6 +424,30 @@ class Tag(PerOrganizzazione, db.Model):
     codice = db.Column(db.String(16), unique=True, nullable=False, index=True)
     # 20/11/2026: numero di serie dell'adesivo (14 cifre esadecimali), unico su tutto il portale (uq_tag_uid)
     uid = db.Column(db.String(20))
+    # 21/11/2026, registro degli adesivi: come è nato (ORIGINI), chi e quando, primo abbinamento, ultima auto
+    origine = db.Column(db.String(20), default="")
+    preparato_da_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
+    preparato_at = db.Column(db.DateTime)
+    primo_abbinamento_at = db.Column(db.DateTime)
+    primo_abbinamento_da_id = db.Column(db.Integer, db.ForeignKey("utente.id"))
+    primo_vin = db.Column(db.String(17), default="")
+    ultimo_veicolo_id = db.Column(db.Integer)  # resta dopo la consegna: l'adesivo è ancora su quell'auto
+    # trasferimento a un altro dealer Getvingo: qui resta il ricordo, l'adesivo vive col codice nuovo dell'altro
+    trasferito_at = db.Column(db.DateTime)
+    trasferito_a = db.Column(db.String(200), default="")
+    codice_precedente = db.Column(db.String(16))  # sull'adesivo del nuovo dealer: il link vecchio ancora scritto
+
+    ORIGINI = {"prepara": "Preparato dal telefono", "link_unico": "Arrivato già pronto (link unico)",
+               "manuale": "Creato a mano da computer", "trasferito": "Arrivato con l'auto da un altro dealer"}
+
+    preparato_da = db.relationship("Utente", foreign_keys=[preparato_da_id])
+    primo_abbinamento_da = db.relationship("Utente", foreign_keys=[primo_abbinamento_da_id])
+
+    @property
+    def mai_usato(self):
+        """Mai finito su un'auto né trasferito: solo questi si danno a un adesivo nuovo."""
+        return (self.veicolo_id is None and self.primo_abbinamento_at is None and self.ultimo_veicolo_id is None
+                and self.trasferito_at is None)
     veicolo_id = db.Column(db.Integer, db.ForeignKey("veicolo.id"), unique=True)
     abbinato_at = db.Column(db.DateTime)
     creato_at = db.Column(db.DateTime, default=adesso)

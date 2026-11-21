@@ -1,54 +1,84 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, indietro %}
+{% from "_macro.html" import i, indietro, pillole, csrf_input %}
 {% block larghezza %}{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Adesivi NFC</h1></div></div>
-<div class="contatori" style="grid-template-columns:1fr 1fr;margin:0 0 16px">
-  <a><strong>{{ abbinati }}</strong><span>In uso sulle auto</span></a>
-  <a><strong>{{ liberi|length }}</strong><span>Liberi, pronti da scrivere</span></a>
-</div>
+{# Adesivi NFC (21/11/2026): registro di ogni adesivo della concessionaria al posto di "Crea codici".
+   I codici nascono da soli: Prepara adesivi (Android) o link unico; "Forza" ne crea uno a mano da computer #}
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Adesivi NFC</h1>
+  <p class="descrizione">Ogni adesivo della concessionaria ({{ sigla or 'SIGLA' }}-0001…): come è nato, chi l'ha preparato, il primo abbinamento e dove si trova.</p></div></div>
 {% if link_locale %}
-<div class="avviso errore">{{ i('attenzione') }}<span>Stai aprendo il portale da questo computer ({{ base }}): questi link funzionano solo qui, non dal telefono.
-Apri questa pagina dall'indirizzo pubblico (es. quello del tunnel https://…trycloudflare.com) e copia i link da lì.</span></div>
+<div class="avviso errore">{{ i('attenzione') }}<span>Stai aprendo il portale da questo computer ({{ base }}): i link creati qui funzionano solo qui, non dal telefono.</span></div>
 {% endif %}
-<div class="scheda" style="margin-bottom:16px">
-  <h3>Prepara adesivi dal telefono Android</h3>
-  <p class="tenue piccolo" style="margin:8px 0 12px">Il modo più veloce: da un telefono Android con Chrome apri <b>Il mio profilo → Prepara adesivi NFC</b> e appoggia gli adesivi uno dopo l'altro. Su ognuno scrivo il link del primo codice libero; poi funzionano su tutti i telefoni, iPhone compresi.</p>
-  <a class="btn" href="{{ url_for('admin.prepara_adesivi') }}">{{ i('nfc', 's') }} Prepara adesivi</a>
+
+<div class="griglia-2" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:16px">
+  <div class="scheda">
+    <h3>{{ i('nfc', 's') }} Prepara gli adesivi da Android</h3>
+    <p class="tenue piccolo" style="margin:8px 0 12px">Da un telefono Android con Chrome: Il mio profilo → <b>Prepara adesivi NFC</b>, poi appoggia gli adesivi uno dopo l'altro. Ognuno prende il primo codice libero e funziona su tutti i telefoni, iPhone compresi.</p>
+    <a class="btn" href="{{ url_for('admin.prepara_adesivi') }}">Prepara adesivi</a>
+  </div>
+  <details class="scheda">
+    <summary><b>Adesivi già pronti dal fornitore (link unico)</b></summary>
+    <p style="margin:10px 0 6px"><code>{{ base }}/t?uid=</code></p>
+    <p class="tenue piccolo" style="margin:0">Adesivi NTAG213/215/216 con questo link e l'opzione <b>UID mirror</b> attiva, tutti uguali. Al primo tocco di una persona della concessionaria l'adesivo prende il primo codice libero e si apre “Nuova auto”.</p>
+  </details>
 </div>
-<div class="scheda" style="margin-bottom:16px">
-  <h3>Link unico per tutti gli adesivi</h3>
-  <p style="margin:8px 0"><code style="font-size:var(--fs-16)">{{ base }}/t?uid=</code></p>
-  <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">
-    <li>Adesivi <b>NTAG213, NTAG215 o NTAG216</b> (gli altri non aggiungono il numero di serie).</li>
-    <li>Con l'app gratuita “NXP TagWriter”: Write tags → New dataset → Link, incolla il link qui sopra e attiva <b>“Add UID mirror”</b> (il numero di serie va in fondo al link). Scrivi lo stesso link su tutti gli adesivi.</li>
-    <li>Al primo tocco di una persona della concessionaria l'adesivo si registra da solo col prossimo codice ({{ (sigla or 'SIGLA') ~ '-0001' }}…) e si apre “Nuova auto”; dal tocco dopo si apre l'auto.</li>
-    <li>Si possono anche ordinare già scritti così: chiedi al fornitore “URL con UID mirror” e dagli il link qui sopra.</li>
-  </ol>
-  <p class="tenue piccolo" style="margin:0">Gli adesivi già scritti con il loro link /t/{{ (sigla or 'SIGLA') ~ '-0001' }} continuano a funzionare.</p>
-</div>
-<div class="scheda" style="margin-bottom:16px">
-  <h3>Oppure: un link diverso per ogni adesivo</h3>
-  <ol class="tenue piccolo" style="margin:8px 0 14px;padding-left:20px">
-    <li>Crea i codici qui sotto: sono progressivi e iniziano con la sigla della concessionaria (<b>{{ sigla or '—' }}</b>, si cambia in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>), es. {{ (sigla or 'SIGLA') ~ '-0001' }}.</li>
-    <li>Con l'app gratuita “NFC Tools” scrivi su ogni adesivo il suo link (record di tipo URL).</li>
-    <li>Attacca l'adesivo sul lato interno del parabrezza, in un angolo.</li>
-    <li>Al primo tocco il portale chiede di abbinarlo al VIN.</li>
-  </ol>
-  <form method="post" class="azioni" style="align-items:flex-end">
-    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <label class="campo" style="margin:0;flex:1;min-width:140px"><span>Quanti codici</span><input type="number" name="quanti" value="10" min="1" max="500"></label>
-    <button class="btn primario">Crea codici</button>
-  </form>
-</div>
-<div class="scorre"><table class="tabella">
-  <thead><tr><th>Codice</th><th>Link da scrivere sull'adesivo</th></tr></thead>
+
+{{ pillole([
+  ('tutti', 'Tutti', url_for('admin.tag'), totale, None),
+  ('liberi', 'Liberi', url_for('admin.tag', vista='liberi'), conta.liberi, None),
+  ('auto', 'Su un\'auto', url_for('admin.tag', vista='auto'), conta.auto, None),
+  ('consegnate', 'Su auto consegnate', url_for('admin.tag', vista='consegnate'), conta.consegnate, None),
+  ('trasferiti', 'Trasferiti', url_for('admin.tag', vista='trasferiti'), conta.trasferiti, None),
+], vista or 'tutti', etichetta='Adesivi') }}
+
+<label class="campo" style="margin:14px 0" aria-label="Cerca">
+  <input type="search" id="cerca-adesivi" placeholder="Cerca codice, telaio, auto o persona" style="font-size:16px"></label>
+
+<div class="scorre"><table class="tabella" id="registro-adesivi">
+  <thead><tr><th>Codice</th><th>Come è nato</th><th>Primo abbinamento</th><th>Dove si trova</th></tr></thead>
   <tbody>
-  {% for t in liberi %}
-    <tr><td class="num">{{ t.codice }}</td><td><code>{{ base }}/t/{{ t.codice }}</code></td></tr>
+  {% for t in righe %}{% set stato = vista_di(t) %}
+    <tr id="{{ t.codice }}">
+      <td class="num"><b>{{ t.codice }}</b>
+        {% if t.uid %}<br><small class="tenue">n. serie {{ t.uid }}</small>{% endif %}
+        {% if t.codice_precedente %}<br><small class="tenue">era {{ t.codice_precedente }}</small>{% endif %}</td>
+      <td>{{ t.ORIGINI.get(t.origine, 'Creato prima del registro') }}
+        <br><small class="tenue">{% if t.preparato_da %}{{ t.preparato_da.nome }} · {% endif %}{{ (t.preparato_at or t.creato_at)|data('%d/%m/%Y %H:%M') }}</small>
+        {% if stato == 'liberi' and t.origine == 'manuale' %}<br><small>Da scrivere: <code>{{ base }}/t/{{ t.codice }}</code></small>{% endif %}</td>
+      <td>{% if t.primo_abbinamento_at %}{{ t.primo_abbinamento_da.nome if t.primo_abbinamento_da else '—' }}
+        <br><small class="tenue">{{ t.primo_abbinamento_at|data('%d/%m/%Y %H:%M') }}{% if t.primo_vin %} · {{ t.primo_vin }}{% endif %}</small>
+        {% else %}<span class="tenue">mai abbinato</span>{% endif %}</td>
+      <td>{% if stato == 'auto' %}<a href="{{ url_for('main.veicolo', veicolo_id=t.veicolo.id) }}">{{ t.veicolo.descrizione }}</a><br><small class="tenue">{{ t.veicolo.vin }}</small>
+        {% elif stato == 'trasferiti' %}Passato a <b>{{ t.trasferito_a }}</b><br><small class="tenue">{{ t.trasferito_at|data('%d/%m/%Y') }}</small>
+        {% elif stato == 'consegnate' %}{% set u = ultime.get(t.id) %}{% if u %}<a href="{{ url_for('main.veicolo', veicolo_id=u.id) }}">{{ u.descrizione }}</a> · consegnata<br><small class="tenue">{{ u.vin }}</small>{% else %}Su un'auto consegnata{% endif %}
+        {% else %}<span class="tenue">Libero</span>{% endif %}</td>
+    </tr>
   {% else %}
-    <tr><td colspan="2" class="tenue">Nessun codice libero.</td></tr>
+    <tr><td colspan="4" class="tenue">Nessun adesivo{{ ' in questo gruppo' if vista }}.</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
+
+<details class="ripiega zona-pericolo" style="margin-top:24px">
+  <summary>Forza: crea un codice a mano</summary>
+  <form method="post" class="scheda pila" data-una-volta>
+    {{ csrf_input() }}
+    <p class="tenue piccolo" style="margin:0">Solo se non hai un Android per prepararlo: crea un codice nuovo dopo il più alto e ti mostra il link da scrivere sull'adesivo con un'app NFC (es. NFC Tools → Scrivi → URL). Scrivilo su <b>un solo</b> adesivo.</p>
+    <button class="btn">Crea un codice</button>
+  </form>
+</details>
+{% endblock %}
+{% block script %}
+<script>
+  (function () {
+    var campo = document.getElementById('cerca-adesivi'), righe = document.querySelectorAll('#registro-adesivi tbody tr');
+    campo.addEventListener('input', function () {
+      var parole = campo.value.toLowerCase().split(/\s+/).filter(Boolean);
+      righe.forEach(function (r) {
+        var t = r.textContent.toLowerCase();
+        r.hidden = !parole.every(function (p) { return t.indexOf(p) >= 0; });
+      });
+    });
+  })();
+</script>
 {% endblock %}

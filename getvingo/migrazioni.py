@@ -180,7 +180,14 @@ def aggiungi_colonne():
              # 15/11/2026: impronta del bene (numero d'ordine, unico su tutto il portale)
              ("veicolo", "impronta", "INTEGER"),
              # 20/11/2026: numero di serie dell'adesivo NFC (link unico per tutti gli adesivi, UID mirror)
-             ("tag", "uid", "VARCHAR(20)")]
+             ("tag", "uid", "VARCHAR(20)"),
+             # 21/11/2026: registro degli adesivi e trasferimento dell'auto a un altro dealer
+             ("tag", "origine", "VARCHAR(20) DEFAULT ''"), ("tag", "preparato_da_id", "INTEGER REFERENCES utente(id)"),
+             ("tag", "preparato_at", "TIMESTAMP"), ("tag", "primo_abbinamento_at", "TIMESTAMP"),
+             ("tag", "primo_abbinamento_da_id", "INTEGER REFERENCES utente(id)"), ("tag", "primo_vin", "VARCHAR(17) DEFAULT ''"),
+             ("tag", "ultimo_veicolo_id", "INTEGER"), ("tag", "trasferito_at", "TIMESTAMP"),
+             ("tag", "trasferito_a", "VARCHAR(200) DEFAULT ''"), ("tag", "codice_precedente", "VARCHAR(16)"),
+             ("veicolo", "trasferita_a", "VARCHAR(200) DEFAULT ''")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:
@@ -189,6 +196,10 @@ def aggiungi_colonne():
     with db.engine.begin() as conn:  # un'impronta = un'auto (più NULL ammessi, sia SQLite sia Postgres)
         conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_veicolo_impronta ON veicolo (impronta)")
         conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_tag_uid ON tag (uid)")
+        # 21/11/2026: gli adesivi già su un'auto entrano nel registro col loro abbinamento
+        conn.exec_driver_sql("UPDATE tag SET primo_abbinamento_at = abbinato_at, ultimo_veicolo_id = veicolo_id, "
+                             "primo_vin = (SELECT vin FROM veicolo WHERE veicolo.id = tag.veicolo_id) "
+                             "WHERE veicolo_id IS NOT NULL AND primo_abbinamento_at IS NULL")
     return aggiunte
 
 

@@ -1,3 +1,4 @@
+from collections import Counter
 import csv
 import io
 import re
@@ -571,7 +572,8 @@ def prepara_adesivi():
     """Prepara adesivi (21/11/2026, solo amministratore, da Android con Chrome): si appoggia un adesivo e il
     portale ci scrive il link del primo codice libero (Web NFC). Gli adesivi così preparati vanno su ogni telefono."""
     base, _ = _base_adesivi()
-    return render_template("admin/prepara_adesivi.html", base=base, sigla=g.utente.organizzazione.sigla)
+    ultimi = (Tag.query.filter_by(origine="prepara").order_by(Tag.preparato_at.desc()).limit(20).all())
+    return render_template("admin/prepara_adesivi.html", base=base, sigla=g.utente.organizzazione.sigla, ultimi=ultimi)
 
 
 @bp.route("/adesivi/prenota", methods=["POST"])
@@ -589,7 +591,7 @@ def prenota_adesivo():
         return jsonify(errore="Questo adesivo è registrato da un'altra concessionaria."), 403
     nuovo = t is None
     if nuovo:
-        t = servizi.primo_adesivo_libero(uid)
+        t = servizi.primo_adesivo_libero(uid, "prepara", g.utente)
         db.session.commit()
     base, _ = _base_adesivi()
     return jsonify(codice=t.codice, link=f"{base}/t/{t.codice}", nuovo=nuovo,
@@ -599,16 +601,32 @@ def prenota_adesivo():
 @bp.route("/tag", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def tag():
+    """Adesivi NFC (21/11/2026): registro di ogni adesivo della concessionaria (come è nato, chi l'ha preparato,
+    primo abbinamento, dove si trova). I codici nascono da soli (Prepara adesivi, link unico); "Forza" ne crea uno
+    a mano da computer, per scriverlo con un'app NFC."""
     if request.method == "POST":
-        quanti = max(1, min(request.form.get("quanti", 10, type=int), 500))
-        codici = servizi.nuovi_codici_adesivi(quanti)
+        codice = servizi.nuovi_codici_adesivi(1)[0]
+        db.session.flush()
+        t = Tag.query.filter_by(codice=codice).first()
+        t.origine, t.preparato_da, t.preparato_at = "manuale", g.utente, adesso()
         db.session.commit()
-        flash(f"{quanti} codici creati, da {codici[0]} a {codici[-1]}: scrivi ciascun link su un adesivo NFC.", "ok")
-        return redirect(url_for("admin.tag"))
+        flash(f"Codice {codice} creato: scrivi sull'adesivo il link che trovi nella sua riga.", "ok")
+        return redirect(url_for("admin.tag", vista="liberi") + "#" + codice)
     base, locale = _base_adesivi()  # sugli adesivi serve sempre HTTPS (il GPS del browser funziona solo così)
+    tutti = Tag.query.all()
+    tutti.sort(key=lambda t: (len(t.codice), t.codice), reverse=True)
+    def vista_di(t):
+        if t.trasferito_at:
+            return "trasferiti"
+        if t.veicolo_id:
+            return "auto"
+        return "consegnate" if t.ultimo_veicolo_id or t.primo_abbinamento_at else "liberi"
+    conta = Counter(vista_di(t) for t in tutti)
+    vista = request.args.get("vista", "")
+    righe = [t for t in tutti if not vista or vista_di(t) == vista]
+    ultime = {t.id: db.session.get(Veicolo, t.ultimo_veicolo_id) for t in righe if t.ultimo_veicolo_id and not t.veicolo_id}
     return render_template("admin/tag.html", base=base, link_locale=locale and not current_app.config["BASE_URL"],
-                           liberi=Tag.query.filter_by(veicolo_id=None).order_by(Tag.creato_at.desc()).all(),
-                           abbinati=Tag.query.filter(Tag.veicolo_id.isnot(None)).count(),
+                           righe=righe, conta=conta, totale=len(tutti), vista=vista, vista_di=vista_di, ultime=ultime,
                            sigla=g.utente.organizzazione.sigla)
 
 

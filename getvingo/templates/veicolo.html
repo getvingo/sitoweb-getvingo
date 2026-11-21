@@ -345,6 +345,20 @@
 </div>
 </div>
 
+{% if g.utente.ruolo == 'admin' and not v.trasferita_a %}
+{# 21/11/2026: auto venduta a un altro dealer Getvingo, con dati e adesivo (servizi.trasferisci_veicolo) #}
+<details class="ripiega" id="trasferisci" style="margin-top:24px">
+  <summary>Trasferisci a un altro dealer Getvingo</summary>
+  <form method="post" action="{{ url_for('main.trasferisci_veicolo', veicolo_id=v.id) }}" class="scheda pila">
+    {{ csrf_input() }}
+    <p class="tenue piccolo" style="margin-top:0">Per un'auto venduta a un dealer che usa Getvingo: riceve i dati dell'auto e l'adesivo resta lo stesso, con un codice nuovo della sua sigla. DDT e storico restano qui; da voi l'auto va tra le consegnate.</p>
+    <label class="campo"><span>Sigla del dealer</span><input name="sigla" maxlength="5" required autocapitalize="characters" placeholder="es. CDEMO" style="text-transform:uppercase"></label>
+    <p class="tenue piccolo" style="margin:0">La sigla la trova il dealer in Gestione → Dati aziendali. Prima di trasferire vedi il suo nome e confermi.</p>
+    <button class="btn">Continua</button>
+  </form>
+</details>
+{% endif %}
+{% if v.trasferita_a %}<div class="avviso" style="margin-top:24px">{{ i('auto') }}<span>Trasferita a <b>{{ v.trasferita_a }}</b> il {{ v.consegnato_at|data('%d/%m/%Y') }}.</span></div>{% endif %}
 {% if g.utente.ruolo == 'admin' %}{% set n_ddt = v.movimenti|selectattr('ddt')|list|length %}
 {% if not n_ddt or config.DEMO %}
 <details class="ripiega zona-pericolo" style="margin-top:24px">
