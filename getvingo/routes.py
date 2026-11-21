@@ -1083,9 +1083,8 @@ def tap_unico():
     della concessionaria, diventa un adesivo nuovo col codice progressivo (SIGLA-0001…) e apre "Nuova auto".
     Da lì si prosegue come con i link /t/<codice> (posizione, abbinamento, scheda dell'auto)."""
     uid = pulisci_uid(request.args.get("uid"))
-    if not uid:
-        abort(404, "Adesivo senza numero di serie: va scritto con il link unico e l'opzione “UID mirror” "
-                   "(app NXP TagWriter), vedi Gestione → Adesivi NFC.")
+    if not uid:  # adesivo scritto senza UID mirror: pagina che lo spiega (non la 404 generica, che confonde)
+        return render_template("adesivo_senza_uid.html"), 404
     tag = Tag.query.filter_by(uid=uid).execution_options(tutte_le_organizzazioni=True).first()
     if tag is not None and tag.org_id != g.org_id:
         abort(403, "Questo adesivo è registrato da un'altra concessionaria.")

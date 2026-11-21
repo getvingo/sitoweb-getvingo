@@ -4099,7 +4099,10 @@ class TestLinkUnicoAdesivi(Base):
     def test_senza_numero_di_serie_spiega_cosa_fare(self):
         r = self.c.get("/t?uid=")
         self.assertEqual(r.status_code, 404)
-        self.assertIn("UID mirror", r.get_data(as_text=True))
+        html = r.get_data(as_text=True)
+        self.assertIn("Adesivo da completare", html)
+        self.assertIn("UID mirror", html)
+        self.assertNotIn("eliminati", html)
 
     def test_fornitore_non_registra_adesivi_nuovi(self):
         self.entra("carr")

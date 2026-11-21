@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i %}
+{% block titolo %}Adesivo da completare · Getvingo{% endblock %}
+{% block contenuto %}
+{# Link unico /t?uid= arrivato senza numero di serie (21/11/2026): l'adesivo è scritto senza UID mirror #}
+<div class="arrivo-hero" style="margin-top:12px">
+  <span class="tondo in_viaggio">{{ i('nfc') }}</span>
+  <h1>Adesivo da completare</h1>
+  <p class="tenue">L'adesivo ha il link giusto ma non aggiunge il suo numero di serie, quindi Getvingo non sa quale adesivo è.</p>
+</div>
+<div class="scheda pila">
+  <p><b>Va riscritto con l'opzione “UID mirror”</b> (adesivi NTAG213, NTAG215 o NTAG216), oppure ordinato già scritto così dal fornitore.</p>
+  <p class="tenue piccolo">Le istruzioni sono da computer in Gestione → Adesivi NFC.
+    Intanto puoi usare un link diverso per ogni adesivo (…/t/{{ g.utente.organizzazione.sigla or 'SIGLA' }}-0001), sempre da Gestione → Adesivi NFC.</p>
+  <p><a class="btn primario" href="{{ url_for('main.home') }}">{{ i('home', 's') }} Torna alla Home</a></p>
+</div>
+{% endblock %}
