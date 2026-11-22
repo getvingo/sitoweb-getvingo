@@ -311,6 +311,12 @@
 {# Anno, alimentazione, versione e colore dell'auto (obbligatori dal 13/11/2026; static/datiauto.js): l'anno si compila dal VIN
    quando lo codifica, la versione si sceglie tra quelle del modello per quell'anno o se ne scrive una nuova #}
 {% macro campi_versione(form) %}
+{# 22/11/2026: la versione subito dopo marca e modello, poi anno, colore e alimentazione #}
+<label class="campo"><span>Versione</span>
+  <select data-versione-scelta hidden></select>
+  <input name="versione" value="{{ form.get('versione', '') }}" required maxlength="120" placeholder="Es. 1.5 eTSI 150 CV Life" autocomplete="off">
+  <small class="tenue" data-versione-aiuto></small>
+</label>
 <div class="griglia-2">
   <label class="campo"><span>Anno</span>
     <select name="anno" required>
@@ -326,11 +332,6 @@
     <option value="">Scegli l'alimentazione…</option>
     {% for a in ALIMENTAZIONI %}<option {{ 'selected' if form.get('alimentazione') == a }}>{{ a }}</option>{% endfor %}
   </select></label>
-<label class="campo"><span>Versione</span>
-  <select data-versione-scelta hidden></select>
-  <input name="versione" value="{{ form.get('versione', '') }}" required maxlength="120" placeholder="Es. 1.5 eTSI 150 CV Life" autocomplete="off">
-  <small class="tenue" data-versione-aiuto></small>
-</label>
 {% endmacro %}
 
 {# Indirizzo completo come sui DDT (via e civico, CAP, comune, provincia, stato) verificato sulla mappa:

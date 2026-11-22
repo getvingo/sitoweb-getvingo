@@ -2347,9 +2347,12 @@ dialog.foglio .riga-profilo a { white-space: nowrap; }
 .form-abbina.vin-letto .abbina-solo-leggi { display: none; }
 .form-abbina:not(.a-mano) .abbina-campi { display: none; }
 .form-abbina:not(.vin-letto):not(.a-mano) .abbina-salva { display: none; }
+/* 22/11/2026: con i campi aperti il riepilogo dei dati letti e "Correggi" spariscono (prima tutto due volte) */
+.form-abbina.a-mano .letti, .form-abbina.a-mano [data-correggi] { display: none; }
 .form-abbina [data-vin-testo] { font-size: var(--fs-14); margin-top: 2px; }
 .nuova-usata button { flex-direction: column; gap: 4px; min-height: 96px; }
 .nuova-usata button small { font-size: var(--fs-12); font-weight: 500; color: var(--testo-2); }
+.nuova-usata button .icona { width: 22px; height: 22px; }
 /* danno */
 .foto-danno { display: flex; flex-wrap: wrap; gap: 8px; }
 .foto-danno .anteprime { display: contents; }
