@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input, gps, campi_movimento, firma_pad, indietro %}
+{% from "_macro.html" import i, csrf_input, gps, campi_movimento, firma_pad, firma_dal_vivo, indietro %}
 {% block titolo %}DDT multiplo · Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('main.archivio_ddt')) }}
@@ -66,7 +66,7 @@
     {{ campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti,
                        etichetta_conducente="Responsabile dello spostamento") }}
     <p class="tenue piccolo" style="margin:-6px 0 12px">Chi si incarica del trasporto di tutte le auto e firma il DDT, anche se a guidarle sono più persone.</p>
-    {{ firma_pad("Firma del responsabile dello spostamento", obbligatoria=True) }}
+    {{ firma_dal_vivo('Firma del responsabile dello spostamento', '', timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   </div>
   <div class="barra-azione">
     <p class="riepilogo" data-riepilogo>scegli prima la destinazione</p>

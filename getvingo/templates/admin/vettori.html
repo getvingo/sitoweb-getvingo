@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, indietro, campi_indirizzo, campi_fiscali %}
+{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
 {% block titolo %}Vettori · Getvingo{% endblock %}
 {% block contenuto %}
 <div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione · Operatività</div><h1>Vettori</h1>
@@ -10,6 +10,7 @@
   <label class="campo"><span>Ragione sociale</span><input name="nome" value="{{ nuovo.nome if nuovo and nuovo.nome else '' }}" required></label>
   {{ campi_fiscali(nuovo) }}
   {{ campi_indirizzo(nuovo, 'Sede') }}
+  {{ firma_pad("Timbro e sigla del legale rappresentante", timbro=True) }}
   <button class="btn primario">{{ i('check', 's') }} Aggiungi</button>
 </form>
 </details>
@@ -21,6 +22,7 @@
       <div class="tratta">{{ vt.indirizzo_completo or 'Indirizzo mancante' }}</div>
       <div class="tenue piccolo">{% if vt.piva %}P. IVA {{ vt.piva }}{% endif %}{% if vt.codice_fiscale %} · C.F. {{ vt.codice_fiscale }}{% endif %}
         {% if not vt.piva or not vt.codice_fiscale or not vt.comune %}<span class="stato-accesso attesa">Dati da completare</span>{% endif %}
+        {% if not firma_vettore(vt) %}<span class="stato-accesso attesa">Manca timbro e sigla: il DDT non parte</span>{% endif %}
         {% if vt.proprio %} · si cambia dai Dati aziendali{% elif vt.sede_id %} · vettore di un fornitore{% endif %}</div></div>
     {{ i('chevron') }}
   </a>

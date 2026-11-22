@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, durata, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot, scelta_orario_prep %}
+{% from "_macro.html" import firma_dal_vivo, i, durata, badge_veicolo, csrf_input, gps, campi_movimento, firma_pad, giorni, riepilogo_lavorazione, tappe_preparazione, annulla, targa, posizione_info, indietro, scegli_slot, scelta_orario_prep %}
 {% from "_danno.html" import scheda_danno %}
 {% from "_auto.html" import carta_auto, info_auto, ddt_mini, in_viaggio_da, avanzamento_prep, avanzamento_lavoro, sollecito_lavoro, cambia_stima, rientro_lavoro %}
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
@@ -186,7 +186,7 @@
       <label class="campo"><span>Vettore</span><select name="vettore_id" required>{% for vt in vettori %}<option value="{{ vt.id }}" {{ 'selected' if valori.vettore_id == vt.id }}>{{ vt.nome }}</option>{% endfor %}</select></label>
     </div>
     <label class="campo"><span>Modalità di trasporto</span><select name="mezzo" required><option value="">Come viaggia l'auto…</option>{% for m in MEZZI_TRASPORTO %}<option>{{ m }}</option>{% endfor %}</select></label>
-    {{ firma_pad("Firma di chi sposta il mezzo", obbligatoria=True) }}
+    {{ firma_dal_vivo('Firma del conducente', '', timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
     <button type="submit" name="azione" value="parti" class="btn primario pieno">{{ i('doc') }} Emetti l'ultimo DDT e parti</button>
   </form>
   {% elif nella_sede and not v.targa %}

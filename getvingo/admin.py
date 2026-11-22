@@ -90,6 +90,9 @@ def azienda():
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 a.firma = firma
+            timbro = servizi.timbro_valido(request.form.get("timbro"))
+            if timbro:
+                a.timbro = timbro
             org.sigla = sigla
             db.session.add(a)
             servizi.allinea_vettore_proprio(a)
@@ -228,6 +231,9 @@ def sede(sede_id):
         firma = servizi.firma_valida(request.form.get("firma"))
         if firma and s.tipo != "propria":
             s.firma = firma
+        timbro = servizi.timbro_valido(request.form.get("timbro"))
+        if timbro and s.tipo != "propria":
+            s.timbro = timbro
         if s.tipo != "propria":
             try:
                 s.email_ddt = _email_ddt()
@@ -283,6 +289,7 @@ def vettori():
                 raise servizi.Vietato("Il nome del vettore è obbligatorio.")
             anagrafica.leggi_fiscali(nuovo)
             anagrafica.leggi_indirizzo(nuovo)
+            nuovo.firma = servizi.firma_valida(request.form.get("firma"))
         except servizi.Vietato as e:
             flash(str(e), "errore")
         else:
@@ -412,6 +419,9 @@ def gruppo_concessionaria():
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 a.firma = firma
+            timbro = servizi.timbro_valido(request.form.get("timbro"))
+            if timbro:
+                a.timbro = timbro
             db.session.add(a)
             db.session.commit()
             flash("Dati e firma della concessionaria salvati: valgono per tutti i suoi utenti.", "ok")
@@ -456,6 +466,9 @@ def gruppo_fornitore(sede_id):
             firma = servizi.firma_valida(request.form.get("firma"))
             if firma:
                 sede.firma = firma
+            timbro = servizi.timbro_valido(request.form.get("timbro"))
+            if timbro:
+                sede.timbro = timbro
             db.session.commit()
             flash(f"Dati e firma di {sede.nome} salvati: valgono per tutti i suoi utenti.", "ok")
         return redirect(url_for("admin.gruppo_fornitore", sede_id=sede.id))
@@ -545,6 +558,7 @@ def vettore(vettore_id):
             vt.nome = _testo("nome")
             anagrafica.leggi_fiscali(vt)
             anagrafica.leggi_indirizzo(vt)
+            vt.firma = servizi.firma_valida(request.form.get("firma")) or vt.firma
         except servizi.Vietato as e:
             db.session.rollback()
             flash(str(e), "errore")

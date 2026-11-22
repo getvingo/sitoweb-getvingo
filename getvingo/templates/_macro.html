@@ -103,6 +103,26 @@
 </div>
 {% endmacro %}
 
+{# Firma col dito a tutto schermo (22/11/2026): dentro un modulo di partenza o di arrivo. All'invio si apre la
+   pagina della firma (firma.js), sopra il timbro della società; senza firma il modulo non parte.
+   titolo: "Firma del conducente" / "Firma del destinatario"; chi: nome sotto la firma; timbro: data URL o None #}
+{% macro firma_dal_vivo(titolo, chi='', timbro=none, societa='') %}
+<input type="hidden" name="firma" data-firma-vivo data-titolo="{{ titolo }}" data-chi="{{ chi }}" data-societa="{{ societa }}"
+       {% if timbro %}data-timbro="{{ timbro }}"{% endif %}>
+{% endmacro %}
+
+{# Timbro della società da solo (22/11/2026): sotto le firme col dito. Immagine ridotta dal telefono (firma.js) #}
+{% macro campo_timbro(attuale=None, etichetta='Timbro della società') %}
+<div class="campo campo-timbro">
+  <span>{{ etichetta }}</span>
+  <div class="timbro-anteprima" data-timbro-anteprima>{% if attuale %}<img src="{{ attuale }}" alt="Timbro attuale">{% else %}<small class="tenue">Nessun timbro caricato</small>{% endif %}</div>
+  <label class="btn piccolo">{{ i('carica', 's') }} {{ 'Cambia il timbro' if attuale else 'Carica il timbro' }}
+    <input type="file" accept="image/png,image/jpeg,image/webp" data-carica-timbro hidden></label>
+  <input type="hidden" name="timbro">
+  <small class="tenue">Va sotto le firme fatte col dito sui DDT (chi guida e chi riceve per la società). Meglio su fondo bianco o trasparente.</small>
+</div>
+{% endmacro %}
+
 {% macro immagine_firma(dato, etichetta, nota='') %}
 <div class="firma-box">
   {% if dato %}<img src="{{ dato }}" alt="Firma {{ etichetta }}">{% else %}<span class="tenue piccolo">—</span>{% endif %}

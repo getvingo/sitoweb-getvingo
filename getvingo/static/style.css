@@ -3317,3 +3317,31 @@ details.filtri-stock.con-filtro > summary { border-color: var(--segnale); }  /* 
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .na-nu button:not(.usata) { background: var(--primario); border-color: var(--primario); color: var(--primario-testo); } }
 :root[data-theme="dark"] .na-nu button:not(.usata) { background: var(--primario); border-color: var(--primario); color: var(--primario-testo); }
 @media (prefers-reduced-motion: reduce) { .na-riga-scan, .na-tappe li.ora .p, .na-campo.lampeggia { animation: none; } }
+
+/* =====================================================================================================
+   Firme col dito a tutto schermo (22/11/2026, firma.js, _macro.firma_dal_vivo) e timbro della società
+   ===================================================================================================== */
+.foglio-firma { position: fixed; inset: 0; z-index: 200; background: var(--superficie); display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.foglio-firma[hidden] { display: none; }
+html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
+.foglio-firma-testa { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--inchiostro-fisso); color: #fff; }
+.foglio-firma-testa > div { flex: 1; min-width: 0; }
+.foglio-firma-testa b { display: block; font: 800 var(--fs-20)/1.2 var(--font-titoli); }
+.foglio-firma-testa small { color: #B8C1C9; font-size: var(--fs-13); }
+.foglio-firma-chiudi { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: #fff; font-size: 18px; cursor: pointer; }
+.foglio-firma-area { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 16px; gap: 10px; min-height: 0; }
+.foglio-firma-carta { position: relative; width: 100%; max-width: 900px; margin: 0 auto; aspect-ratio: 5 / 2; max-height: 70vh;
+  background: #fff; border: 2px dashed var(--bordo-forte); border-radius: var(--r-l); overflow: hidden; touch-action: none; }
+.foglio-firma-carta img { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; opacity: .9; pointer-events: none; }
+.foglio-firma-carta canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.foglio-firma-guida { position: absolute; left: 0; right: 0; bottom: 18%; text-align: center; color: #9AA3AB; font: 600 var(--fs-15) var(--font-testo); pointer-events: none; }
+.foglio-firma-carta::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: 26%; border-bottom: 1.5px solid #C9CEC8; pointer-events: none; }
+.foglio-firma-nota { text-align: center; color: var(--testo-2); font-size: var(--fs-13); margin: 0; }
+.foglio-firma-piede { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--carta); border-top: 1px solid var(--bordo); }
+.foglio-firma-piede .btn { margin: 0; min-height: 56px; }
+@media (orientation: portrait) and (max-width: 700px) { .foglio-firma-carta { aspect-ratio: 16 / 9; } }
+.campo-timbro .timbro-anteprima { display: grid; place-items: center; min-height: 96px; background: #fff; border: 1px dashed var(--bordo-forte); border-radius: var(--r-s); margin-bottom: 8px; padding: 8px; }
+.campo-timbro .timbro-anteprima img { max-height: 120px; max-width: 100%; object-fit: contain; }
+.timbro-vettore { display: grid; gap: 4px; margin-top: 10px; padding: 10px; border: 1px solid var(--bordo); border-radius: var(--r-s); background: #fff; }
+.timbro-vettore img { max-height: 70px; max-width: 100%; object-fit: contain; }

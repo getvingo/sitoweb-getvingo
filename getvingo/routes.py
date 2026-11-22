@@ -1381,7 +1381,8 @@ def sposta(veicolo_id):
                 sede = db.session.get(Sede, int(sid) if sid.isdigit() else 0)
             documento = servizi.parti_col_tocco(v, sede, g.utente, lat, lon, causale=causale, posizione=telefono,
                                                 lavorazione=request.form.get("lavorazione", ""),
-                                                lavorazione_note=request.form.get("lavorazione_note", ""))
+                                                lavorazione_note=request.form.get("lavorazione_note", ""),
+                                                firma=servizi.firma_valida(request.form.get("firma")))
         except Vietato as e:
             db.session.rollback()
             flash(str(e), "errore")
@@ -1419,8 +1420,6 @@ def profilo_guida():
             flash("Scegli il vettore.", "errore")
         elif mezzo not in Movimento.MEZZI:
             flash("Scegli come sposti di solito le auto.", "errore")
-        elif not firma:
-            flash("Disegna la tua firma nel riquadro.", "errore")
         else:
             g.utente.vettore, g.utente.mezzo, g.utente.firma = vettore, mezzo, firma
             db.session.commit()
@@ -2293,13 +2292,10 @@ def ddt_presa_in_carico(ddt_id):
         if lat is None and current_app.config["DEMO"]:  # demo senza GPS: come se fosse sul posto
             da = d.movimento.da_sede
             lat, lon = (da.lat, da.lon) if da is not None and da.lat is not None else _posizione_simulata(d.movimento.veicolo)
-        firma = servizi.firma_valida(request.form.get("firma"))
-        salvata = not firma and request.form.get("firma_salvata") == "1" and bool(g.utente.firma)
+        # 22/11/2026: sempre la firma col dito (niente più firma salvata del profilo di guida)
         servizi.prendi_in_carico(d.movimento, g.utente, request.form.get("conducente", "").strip()[:120],
-                                 g.utente.firma if salvata else firma, lat, lon,
+                                 servizi.firma_valida(request.form.get("firma")), lat, lon,
                                  mezzo=request.form.get("mezzo", "") or (g.utente.mezzo or ""))
-        if salvata:  # dalla schermata del tocco: firma del profilo di guida, come "Inizia spostamento"
-            d.movimento.firma_salvata = True
     risposta = _azione_ddt(ddt_id, presa, "Presa in carico confermata. Buon viaggio.")
     m = db.session.get(Ddt, ddt_id).movimento
     if m.stato == "aperto":
@@ -2330,7 +2326,8 @@ def ddt_arrivo(ddt_id):
             posizione = (dest.lat, dest.lon) if dest.lat is not None else _posizione_simulata(d.movimento.veicolo)
         for m in in_viaggio:
             servizi.registra_arrivo(m, g.utente, *posizione, altrove_id=request.form.get("arrivo_sede_id", type=int),
-                                    note=request.form.get("note", ""))
+                                    note=request.form.get("note", ""),
+                                    firma=servizi.firma_valida(request.form.get("firma")))
     documento = db.get_or_404(Ddt, ddt_id)
     risposta = _azione_ddt(ddt_id, arriva, "Arrivo confermato e DDT chiuso: posizione delle auto aggiornata."
                            if documento.multiplo else "Arrivo confermato e DDT chiuso: posizione dell'auto aggiornata.")
@@ -2429,10 +2426,12 @@ def mia_firma():
         abort(403)
     if request.method == "POST":
         firma = servizi.firma_valida(request.form.get("firma"))
-        if not firma:
+        timbro = servizi.timbro_valido(request.form.get("timbro"))
+        if not firma and not timbro and not sede.firma:
             flash("Firma non valida: disegnala nel riquadro.", "errore")
         else:
-            sede.firma = firma
+            sede.firma = firma or sede.firma
+            sede.timbro = timbro or sede.timbro
             db.session.commit()
             flash(f"Firma di {sede.nome} salvata: vale per tutti i suoi utenti.", "ok")
             return redirect(url_for("main.profilo"))
@@ -2446,8 +2445,7 @@ def profilo():
     fornitori, la firma della loro azienda. Tutto ciò che riguarda me in un posto solo."""
     u = g.utente
     guida = {"vettore": u.vettore.nome if u.vettore else None, "mezzo": u.mezzo or None, "firma": bool(u.firma)}
-    guida["mancano"] = [n for n, ok in (("vettore", guida["vettore"]), ("modalità di trasporto", guida["mezzo"]),
-                                         ("firma", guida["firma"])) if not ok]
+    guida["mancano"] = [n for n, ok in (("vettore", guida["vettore"]), ("modalità di trasporto", guida["mezzo"])) if not ok]
     return render_template("profilo.html", u=u, guida=guida)
 
 

@@ -187,7 +187,10 @@ def aggiungi_colonne():
              ("tag", "primo_abbinamento_da_id", "INTEGER REFERENCES utente(id)"), ("tag", "primo_vin", "VARCHAR(17) DEFAULT ''"),
              ("tag", "ultimo_veicolo_id", "INTEGER"), ("tag", "trasferito_at", "TIMESTAMP"),
              ("tag", "trasferito_a", "VARCHAR(200) DEFAULT ''"), ("tag", "codice_precedente", "VARCHAR(16)"),
-             ("veicolo", "trasferita_a", "VARCHAR(200) DEFAULT ''")]
+             ("veicolo", "trasferita_a", "VARCHAR(200) DEFAULT ''"),
+             # 22/11/2026: firme col dito sopra il timbro della società; timbro e sigla del vettore sul DDT
+             ("azienda", "timbro", "TEXT"), ("sede", "timbro", "TEXT"), ("vettore", "firma", "TEXT"),
+             ("movimento", "firma_vettore", "TEXT")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:

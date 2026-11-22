@@ -52,6 +52,61 @@ def firma_valida(dato):
     return dato if grezzo.startswith(b"\x89PNG") else None
 
 
+def timbro_valido(dato):
+    """Timbro della società caricato come immagine (PNG o JPEG in data URL, ridotto dal telefono): o None."""
+    for prefisso, firma in (("data:image/png;base64,", b"\x89PNG"), ("data:image/jpeg;base64,", b"\xff\xd8")):
+        if dato and dato.startswith(prefisso) and len(dato) <= 700_000:
+            try:
+                grezzo = base64.b64decode(dato[len(prefisso):], validate=True)
+            except (binascii.Error, ValueError):
+                return None
+            return dato if grezzo.startswith(firma) else None
+    return None
+
+
+# ---- firme del DDT (22/11/2026, richiesta dell'utente): tre firmatari, mittente · conducente · destinatario.
+# Mittente automatica (firma timbrata dell'azienda o del fornitore da cui parte l'auto). Conducente: col dito,
+# sempre dal vivo, alla partenza o alla presa in carico, sopra il timbro della sua società. Destinatario: col
+# dito alla conferma di arrivo, sopra il timbro di chi riceve. Vettore: timbro e sigla del legale
+# rappresentante caricati prima, copiati in automatico nel riquadro Vettore; senza, il DDT non parte.
+SERVE_FIRMA_CONDUCENTE = "Serve la firma del conducente: firma col dito per partire."
+SERVE_FIRMA_DESTINATARIO = "Serve la firma del destinatario: firma col dito per chiudere il DDT."
+
+
+def firma_vettore(vt):
+    """Timbro e sigla del legale rappresentante del vettore: quelli della sua scheda; il vettore della
+    concessionaria usa la firma timbrata dei Dati aziendali, quello di un fornitore la firma del fornitore."""
+    if vt is None:
+        return None
+    if vt.firma:
+        return vt.firma
+    if vt.proprio:
+        a = Azienda.query.first()
+        return a.firma if a else None
+    if vt.sede_id:
+        sede = db.session.get(Sede, vt.sede_id)
+        return sede.firma if sede else None
+    return None
+
+
+def timbro_di(utente):
+    """Timbro della società di chi firma come conducente: il fornitore per i suoi utenti, sennò la concessionaria."""
+    if utente is not None and utente.sede_id:
+        return utente.sede.timbro if utente.sede else None
+    a = Azienda.query.first()
+    return a.timbro if a else None
+
+
+def timbro_destinatario(sede):
+    """Timbro della società che riceve: la concessionaria nelle sue sedi, altrimenti quello del luogo."""
+    if sede is None:
+        return None
+    if sede.tipo == "propria":
+        a = Azienda.query.first()
+        return a.timbro if a else None
+    return sede.timbro
+
+
 def registra_azione(tipo, utente, veicolo, ddt=None, **dati):
     db.session.add(Azione(tipo=tipo, utente_id=utente.id, veicolo=veicolo, ddt=ddt, dati=dati))
 
@@ -226,6 +281,15 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
 
 
 def _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at=None):
+    if not firma_conducente:
+        raise Vietato(SERVE_FIRMA_CONDUCENTE)
+    with db.session.no_autoflush:  # il movimento non è ancora nella sessione
+        timbro_sigla = firma_vettore(mov.vettore or (db.session.get(Vettore, mov.vettore_id) if mov.vettore_id else None))
+    if not timbro_sigla:
+        nome = mov.vettore.nome if mov.vettore else "del vettore"
+        raise Vietato(f"Il vettore {nome} non ha timbro e sigla del legale rappresentante: caricali in "
+                      "Gestione → Vettori (per la concessionaria nei Dati aziendali) prima di emettere il DDT.")
+    mov.firma_vettore = timbro_sigla
     mov.stato = "aperto"
     mov.partenza_at = partenza_at or adesso()
     mov.partenza_utente_id = utente.id
@@ -543,9 +607,7 @@ def profilo_guida_mancante(utente):
         mancano.append("vettore")
     if utente.mezzo not in Movimento.MEZZI:
         mancano.append("modalità di trasporto")
-    if not utente.firma:
-        mancano.append("firma")
-    return mancano
+    return mancano  # 22/11/2026: la firma non si salva più, si fa col dito a ogni partenza
 
 
 def causale_per(da_sede, a_sede):
@@ -665,7 +727,7 @@ def destinazione_scritta(nome, tipo="altro"):
 
 
 def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, posizione=None,
-                    lavorazione="", lavorazione_note=""):
+                    lavorazione="", lavorazione_note="", firma=None):
     """"Inizia spostamento": si sceglie solo la destinazione, il resto viene dal profilo di guida.
     La lavorazione, se la destinazione è esterna, si può scegliere già qui (schermata del tocco, 12/11/2026)
     oppure dopo (entro la chiusura del DDT)."""
@@ -688,10 +750,9 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, p
         if not note:
             raise Vietato("Scrivi (o detta) i dettagli della lavorazione da fare.")
         dati.update(lavorazione=lavorazione, lavorazione_note=note)
-    ddt = crea_movimento(veicolo, dati, utente, firma_conducente=utente.firma, lat=lat, lon=lon,
-                         posizione=posizione)
-    ddt.movimento.firma_salvata = True
-    return ddt
+    if not firma:
+        raise Vietato(SERVE_FIRMA_CONDUCENTE)
+    return crea_movimento(veicolo, dati, utente, firma_conducente=firma, lat=lat, lon=lon, posizione=posizione)
 
 
 def assegnabili(veicolo):
@@ -735,7 +796,11 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
     if not conducente:
         raise Vietato("Indica chi sposta il mezzo.")
     if not firma_conducente:
-        raise Vietato("Serve la firma di chi sposta il mezzo.")
+        raise Vietato(SERVE_FIRMA_CONDUCENTE)
+    mov.firma_vettore = firma_vettore(mov.vettore)
+    if not mov.firma_vettore:
+        raise Vietato(f"Il vettore {mov.vettore.nome if mov.vettore else ''} non ha timbro e sigla del legale "
+                      "rappresentante: caricali in Gestione → Vettori prima di partire.")
     if not mov.mezzo:
         if mezzo not in Movimento.MEZZI:
             raise Vietato("Indica come viaggia l'auto (su strada, bisarca, carro attrezzi…).")
@@ -935,7 +1000,7 @@ def modifica_ddt(ddt, nuovi, utente):
     return rev
 
 
-def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
+def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note="", firma=None):
     if not puo_confermare_arrivo(mov, utente):
         if mov.stato == "aperto":
             raise Vietato(f"La ricezione a {mov.a_sede.nome} la conferma la concessionaria, "
@@ -943,6 +1008,8 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
         raise Vietato("Questo DDT non è in viaggio.")
     if not mov.lavorazione:
         raise Vietato("Prima di chiudere il DDT indica la lavorazione da fare.")
+    if not firma:
+        raise Vietato(SERVE_FIRMA_DESTINATARIO)
     if lat is None or lon is None:
         raise Vietato(SERVE_POSIZIONE)
     # l'auto arriva solo nella destinazione indicata nel DDT: per un altro luogo serve un nuovo DDT
@@ -960,10 +1027,7 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note=""):
     mov.stato = "chiuso"
     destinatario_interno = sede_finale.tipo == "propria"
     mov.arrivo_per_conto = per_conto
-    # firma predefinita del destinatario (per le sedi proprie, se manca, quella aziendale)
-    azienda = Azienda.query.first()
-    mov.firma_destinatario = sede_finale.firma or (
-        azienda.firma if destinatario_interno and azienda else None)
+    mov.firma_destinatario = firma  # col dito, sopra il timbro di chi riceve (22/11/2026)
 
     v = mov.veicolo
     tag_id = v.tag.id if v.tag else None

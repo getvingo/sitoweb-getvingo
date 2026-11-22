@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
+{% from "_macro.html" import i, firma_pad, campo_timbro, indietro, campi_indirizzo, campi_fiscali %}
 {% block titolo %}{{ s.nome }} · Getvingo{% endblock %}
 {% block contenuto %}
 <div class="titolo-pagina"><div>{{ indietro(url_for('admin.sedi', gruppo=gruppo)) }}<div class="sopratitolo">{{ 'Sedi e piazzali' if gruppo == 'proprie' else 'Destinazioni esterne' }}</div><h1>{{ s.nome }}</h1></div></div>
@@ -24,8 +24,9 @@
   <p class="tenue piccolo">Firma: per le sedi e i piazzali della concessionaria vale quella in <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>, non serve altro.</p>
   {% else %}
   <div class="scheda">
-    {{ firma_pad("Firma predefinita del destinatario", attuale=s.firma, timbro=True) }}
-    <small class="tenue">Di solito la imposta il fornitore dal suo account. Se manca, la ricezione resta senza firma.</small>
+    {{ firma_pad("Timbro e firma della società", attuale=s.firma, timbro=True) }}
+    <small class="tenue" style="display:block;margin-bottom:14px">Sui DDT come firma del mittente quando l'auto parte da qui e come timbro e sigla del vettore quando la riporta la società. Di solito la imposta il fornitore dal suo account.</small>
+    {{ campo_timbro(s.timbro) }}
   </div>
   {% endif %}
   <div class="barra-azione"><button class="btn primario pieno">{{ i('check') }} Salva</button></div>

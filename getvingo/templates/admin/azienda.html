@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, firma_pad, indietro, campi_indirizzo, campi_fiscali %}
+{% from "_macro.html" import i, firma_pad, campo_timbro, indietro, campi_indirizzo, campi_fiscali %}
 {% block titolo %}Dati aziendali · Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('admin.indice')) }}
@@ -25,7 +25,9 @@
     <small class="tenue">A ogni consegna arriva qui in automatico il PDF del DDT completo di firme. Se vuota, va agli amministratori.</small></label>
   {{ campi_indirizzo(a, 'Sede legale') }}
   <p class="tenue piccolo" style="margin-top:-6px">La sede legale diventa anche una destinazione tra le Sedi e piazzali, sempre aggiornata.</p>
-  {{ firma_pad("Firma del mittente (apposta in automatico sui DDT)", attuale=a.firma, timbro=True) }}
+  {{ firma_pad("Timbro e firma del legale rappresentante", attuale=a.firma, timbro=True) }}
+  <small class="tenue" style="display:block;margin:-6px 0 14px">Apposta in automatico sui DDT come firma del mittente e, quando trasportate voi, come timbro e sigla del vettore.</small>
+  {{ campo_timbro(a.timbro) }}
   <label class="campo"><span>Sigla degli adesivi NFC</span><input name="sigla" value="{{ sigla }}" maxlength="5" minlength="2" pattern="[A-Za-z]{2,5}" autocapitalize="characters" class="input-vin" required>
     <small>Da 2 a 5 lettere, unica tra tutte le concessionarie: i codici degli adesivi nuovi saranno {{ sigla }}-0001, {{ sigla }}-0002…{% if adesivi %} Gli adesivi già creati tengono il loro codice.{% endif %}</small></label>
   <button class="btn primario pieno">{{ i('check') }} Salva i dati aziendali</button>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, csrf_input, scorri, nota_voce %}
+{% from "_macro.html" import i, csrf_input, scorri, nota_voce, firma_dal_vivo %}
 {% from "_auto.html" import auto_breve, lavoro_breve, ddt_mini %}
 {% block titolo %}{{ v.descrizione }} · Getvingo{% endblock %}
 {% macro distanza_txt(m) %}{{ '%.0f m'|format(m) if m < 1000 else ('%.1f km'|format(m / 1000))|replace('.', ',') }}{% endmacro %}
@@ -41,12 +41,13 @@
 {% endif %}
 {% if ritiro.scaduto %}
 <p class="avviso errore">{{ i('orologio') }}<span>Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.</span></p>
-{% elif not g.utente.firma or not g.utente.mezzo %}
+{% elif not g.utente.mezzo %}
 <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
 {% else %}
 <form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=ritiro.ddt.id) }}" class="tocco-fondo" data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
-  <input type="hidden" name="firma_salvata" value="1"><input type="hidden" name="conducente" value="{{ g.utente.nome }}">
+  <input type="hidden" name="conducente" value="{{ g.utente.nome }}">
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   <p class="avviso errore" data-gps-errore hidden></p>
   {{ scorri('Scorri per prendere in carico e partire', 'magenta', 'Prendi in carico e parti') }}
 </form>
@@ -164,6 +165,7 @@
     <form method="post" action="{{ url_for('main.sposta', veicolo_id=v.id) }}" data-una-volta>
       {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
       <input type="hidden" name="a_sede_id"><input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
+      {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
       <span class="maniglia" aria-hidden="true"></span>
       <div class="foglio-testa"><h2 id="foglio-titolo">Spostamento</h2><button type="button" class="btn-link" data-chiudi-foglio>✕ Chiudi</button></div>
       {{ tratta(v.sede, none) }}
@@ -185,7 +187,7 @@
           <input name="lavorazione_note" id="dettagli-lavoro" required maxlength="300" placeholder="Dettagli della lavorazione">
         </div>
       </fieldset>
-      <p class="riga-profilo"><span>Tu · {{ g.utente.mezzo }} · {{ g.utente.vettore.nome if g.utente.vettore else '' }} · firma salvata</span>
+      <p class="riga-profilo"><span>Tu · {{ g.utente.mezzo }} · {{ g.utente.vettore.nome if g.utente.vettore else '' }} · firma col dito</span>
         <a href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">Cambia</a></p>
       {{ scorri('Scorri per emettere il DDT e partire', '', 'Emetti il DDT e parti') }}
     </form>

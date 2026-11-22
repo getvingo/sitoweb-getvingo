@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import campi_indirizzo, campi_fiscali, i, csrf_input, gps, indietro %}
+{% from "_macro.html" import campi_indirizzo, campi_fiscali, i, csrf_input, gps, indietro, firma_dal_vivo %}
 {% block titolo %}Inizia spostamento · Getvingo{% endblock %}
 {% macro destinazione(s) %}
 {% if s.tipo in ('concessionario', 'rivenditore') %}
@@ -19,7 +19,7 @@
 {% block contenuto %}
 {{ indietro(url_for('main.tocco_scelta', veicolo_id=v.id)) }}
 <div class="titolo-pagina"><div><div class="sopratitolo">{{ v.descrizione }} · …{{ v.vin[-8:] }}</div><h1>Dove la porti?</h1></div></div>
-<p class="tenue">Tocca la destinazione: il DDT viene emesso subito con il tuo nome, {{ g.utente.vettore.nome }}, “{{ g.utente.mezzo }}” e la tua firma salvata.
+<p class="tenue">Tocca la destinazione: il DDT viene emesso subito con il tuo nome, {{ g.utente.vettore.nome }}, “{{ g.utente.mezzo }}” e la tua firma col dito, che si fa subito dopo.
   <a href="{{ url_for('main.profilo_guida', poi=url_for('main.sposta', veicolo_id=v.id)) }}">Cambia</a></p>
 <section class="partenza-fissa">
   <span class="tondo-piccolo">{{ i('sede', 's') }}</span>
@@ -31,6 +31,7 @@
 </section>
 <form method="post" data-una-volta class="destinazioni">
   {{ csrf_input() }}{{ gps() }}
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   {% if preferite %}
   <h3>Le più usate</h3>
   {% for s in preferite %}{{ destinazione(s) }}{% endfor %}
@@ -45,6 +46,7 @@
 {% if v.fase != 'pronta' %}
 <form method="post" data-una-volta class="scheda destinazione-nuova">
   {{ csrf_input() }}
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   <h3>{{ i('matita', 's') }} Non è in elenco?</h3>
   <label class="campo"><span>Nome / ragione sociale</span>
     <input name="nuova_destinazione" required minlength="3" maxlength="200" placeholder="Es. Mario Bianchi, Carrozzeria Verdi S.r.l." autocomplete="off"></label>

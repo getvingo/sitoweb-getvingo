@@ -20,6 +20,26 @@ INDIRIZZO = {"indirizzo": "Via Roma 12", "cap": "31050", "comune": "Ponzano Vene
 FISCALI = {"piva": "01234567897", "codice_fiscale": "01234567897"}
 FIRMA = _png_firma(1)
 
+import re as _re
+from flask.testing import FlaskClient
+
+# 22/11/2026: partenza, presa in carico e arrivo vogliono la firma col dito. Il client dei test firma come farebbe
+# il telefono (campo "firma") se la prova non la scrive già; senza_firma=True per provarne il rifiuto.
+_SERVE_FIRMA = _re.compile(r"/(arrivo|presa-in-carico|sposta|partenza)$|^/ddt/multiplo$")
+
+
+class ClientConFirma(FlaskClient):
+    def open(self, *args, **kw):
+        senza = kw.pop("senza_firma", False)
+        url = args[0] if args and isinstance(args[0], str) else ""
+        if kw.get("method") == "POST" and not senza and _SERVE_FIRMA.search(url.split("?")[0]):
+            dati = kw.get("data")
+            if dati is None:
+                kw["data"] = {"firma": FIRMA}
+            elif isinstance(dati, dict) and "firma" not in dati:
+                kw["data"] = {**dati, "firma": FIRMA}
+        return super().open(*args, **kw)
+
 
 def usa_org_1(app):
     """Nei test i dati creati fuori da una richiesta appartengono all'organizzazione 1
@@ -34,6 +54,7 @@ class Base(unittest.TestCase):
         self.app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite://",
                                "CSRF_ATTIVO": False, "SECRET_KEY": "test", "FOTO_DIR": tempfile.mkdtemp(),
                                "ARCHIVIO_DIR": tempfile.mkdtemp()})
+        self.app.test_client_class = ClientConFirma
         usa_org_1(self.app)
         auth._falliti.clear()
         with self.app.app_context():
@@ -46,7 +67,7 @@ class Base(unittest.TestCase):
                 Tag(codice="ABCD2345"), Sede(nome="Sede A", tipo="propria", lat=45.0, lon=12.0), carr,
                 Sede(nome="Cliente C", tipo="cliente", lat=45.3, lon=12.3),
                 Sede(nome="Officina D", tipo="officina", lat=45.4, lon=12.4),
-                Vettore(nome="Vettore X"),
+                Vettore(nome="Vettore X", firma=FIRMA),  # timbro e sigla del legale rappresentante
             ])
             db.session.flush()
             for nome, ruolo, sede in [("admin", "admin", None), ("ufficio", "backoffice", None),
@@ -334,7 +355,7 @@ class TestSpostamentoColTocco(Base):
             m = self.mov(d)
             self.assertEqual((m.stato, m.causale, m.conducente, m.vettore.nome, m.mezzo),
                              ("aperto", "Invio lavorazione", "Autista", "Vettore X", "Bisarca"))
-            self.assertEqual((m.firma_conducente, m.firma_salvata, m.lavorazione), (FIRMA, True, ""))
+            self.assertEqual((m.firma_conducente, m.firma_salvata, m.lavorazione), (FIRMA, False, ""))  # 22/11/2026: firma col dito
             self.assertEqual((m.partenza_lat, m.partenza_lon), (45.66, 12.24))  # posizione del tocco
         self.assertTrue(self.c.get(f"/ddt/{d}.pdf").data.startswith(b"%PDF"))
         # senza lavorazione il DDT non si chiude, nemmeno sul posto
@@ -1205,7 +1226,7 @@ class TestPiuClienti(Base):
         with self.app.app_context():
             org2 = servizi.crea_organizzazione("Altra Auto S.p.A.", "admin@altra.it", "password2")
             db.session.add_all([Sede(nome="Sede Altra", tipo="propria"), Sede(nome="Carrozzeria Altra", tipo="carrozzeria"),
-                                Vettore(nome="Vettore Altra"), Tag(codice="ZZZZ9999")])
+                                Vettore(nome="Vettore Altra", firma=FIRMA), Tag(codice="ZZZZ9999")])
             db.session.commit()
             self.org2 = org2.id
 
@@ -3702,7 +3723,7 @@ class TestTelefonoSnello(Base):
         self.c.post(f"/ddt/{d}/presa-in-carico", data={"firma_salvata": "1", "conducente": "Autista"})
         with self.app.app_context():
             m = self.mov(d)
-            self.assertEqual((m.stato, m.firma_conducente, m.firma_salvata, m.mezzo), ("aperto", FIRMA, True, "Su strada (guidata)"))  # modalità: quella del DDT predisposto
+            self.assertEqual((m.stato, m.firma_conducente, m.firma_salvata, m.mezzo), ("aperto", FIRMA, False, "Su strada (guidata)"))  # 22/11/2026: firma col dito, mai quella salvata; modalità: quella del DDT predisposto
 
     def test_partner_lavori_finiti_dal_tocco(self):
         vid = self.abbina()
@@ -4341,3 +4362,52 @@ class TestSvuota(TestPiuClienti):
                               Tag.query.filter_by(org_id=1).execution_options(**tutte).count()), (0, 0, 0))
             self.assertEqual(Tag.query.filter_by(codice="ZZZZ9999").execution_options(**tutte).count(), 1)  # l'altra resta
             self.assertTrue(Sede.query.filter_by(nome="Sede A").count())
+
+
+class TestFirmeColDito(Base):
+    """22/11/2026: firma col dito obbligatoria del conducente alla partenza e del destinatario all'arrivo, sopra il
+    timbro della società; timbro e sigla del vettore copiati in automatico (senza, il DDT non parte)."""
+    def test_senza_firma_non_parte_e_non_si_chiude(self):
+        vid = self.abbina()
+        dati = self.dati("Carrozzeria B")
+        del dati["firma"]
+        r = self.c.post(f"/veicolo/{vid}/partenza", data=dati, senza_firma=True, follow_redirects=True)
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 0)
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        with self.app.app_context():
+            dest = db.session.get(Ddt, d).movimento.a_sede
+            pos = {"lat": str(dest.lat), "lon": str(dest.lon)}
+        r = self.c.post(f"/ddt/{d}/arrivo", data=pos, senza_firma=True, follow_redirects=True)
+        self.assertIn("Serve la firma del destinatario", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Ddt, d).movimento.stato, "aperto")
+        self.c.post(f"/ddt/{d}/arrivo", data={**pos, "firma": _png_firma(7)})
+        with self.app.app_context():
+            m = db.session.get(Ddt, d).movimento
+            self.assertEqual((m.stato, m.firma_destinatario, m.firma_vettore), ("chiuso", _png_firma(7), FIRMA))
+
+    def test_vettore_senza_timbro_e_sigla(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            Vettore.query.filter_by(nome="Vettore X").one().firma = None
+            db.session.commit()
+        r = self.parti(vid, "Carrozzeria B")
+        with self.app.app_context():
+            self.assertEqual(Ddt.query.count(), 0)
+        self.assertIn("Manca timbro e sigla", self.c.get("/admin/vettori").get_data(as_text=True))
+
+    def test_pagine_con_firma_dal_vivo_e_timbro(self):
+        with self.app.app_context():
+            Azienda.query.first().timbro = FIRMA
+            db.session.commit()
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        html = self.c.get(f"/ddt/{self.ddt()}").get_data(as_text=True)
+        self.assertIn("data-firma-vivo", html)
+        self.assertIn('data-titolo="Firma del destinatario"', html)
+        # timbro della società: si carica in Dati aziendali
+        self.assertIn("Timbro della società", self.c.get("/admin/azienda").get_data(as_text=True))
+        self.assertIsNone(servizi.timbro_valido("data:image/gif;base64,R0lGOD"))
+        self.assertEqual(servizi.timbro_valido(FIRMA), FIRMA)

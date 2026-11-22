@@ -104,8 +104,11 @@ class Azienda(PerOrganizzazione, ConIndirizzo, db.Model):
     stato = db.Column(db.String(60), default="Italia")
     lat = db.Column(db.Float)
     lon = db.Column(db.Float)
-    # Firma predefinita del mittente (PNG in data URL), apposta in automatico sui DDT
+    # Firma predefinita del mittente (PNG in data URL), apposta in automatico sui DDT; è anche timbro e sigla
+    # del legale rappresentante per il vettore della concessionaria (22/11/2026)
     firma = db.Column(db.Text)
+    # 22/11/2026: timbro della società da solo, sotto le firme col dito di chi conduce o riceve per la concessionaria
+    timbro = db.Column(db.Text)
 
 
 class Utente(PerOrganizzazione, db.Model):
@@ -195,8 +198,10 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     # Coordinate usate per aggiornare la posizione dell'auto all'arrivo
     lat = db.Column(db.Float)
     lon = db.Column(db.Float)
-    # Firma predefinita del destinatario, apposta in automatico alla conferma di arrivo
+    # Firma timbrata della società del luogo (mittente quando l'auto parte da lì; vettore del fornitore)
     firma = db.Column(db.Text)
+    # 22/11/2026: timbro della società da solo, sotto le firme col dito (conducente del fornitore, destinatario)
+    timbro = db.Column(db.Text)
 
     @property
     def esterna(self):
@@ -250,6 +255,8 @@ class Vettore(PerOrganizzazione, ConIndirizzo, db.Model):
     proprio = db.Column(db.Boolean, default=False)
     # vettore di un fornitore (es. la carrozzeria che riporta l'auto con un suo autista)
     sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
+    # 22/11/2026: timbro e sigla del legale rappresentante, copiati in automatico sul DDT (servizi.firma_vettore)
+    firma = db.Column(db.Text)
 
 
 class Veicolo(PerOrganizzazione, db.Model):
@@ -526,8 +533,10 @@ class Movimento(PerOrganizzazione, db.Model):
     # Valorizzata solo se l'auto è arrivata in un luogo diverso da quello del DDT
     arrivo_sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     note_arrivo = db.Column(db.String(300), default="")
-    # Copia della firma predefinita del destinatario al momento dell'arrivo
+    # Firma del destinatario: dal 22/11/2026 col dito alla conferma di arrivo, sopra il timbro di chi riceve
     firma_destinatario = db.Column(db.Text)
+    # 22/11/2026: copia di timbro e sigla del vettore alla partenza (il DDT non cambia se poi cambia il vettore)
+    firma_vettore = db.Column(db.Text)
     # True se un amministratore ha confermato al posto del destinatario
     arrivo_per_conto = db.Column(db.Boolean, default=False)
 

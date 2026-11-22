@@ -236,8 +236,17 @@ def pdf(ddt, invariante=False):
     trasporto_kv = [("Causale", m.causale), ("Modalità", m.mezzo or ("da indicare al ritiro" if da_ritirare else "-")),
                     ("A cura del", "vettore")]
     h = max(_altezza_kv(vettore_kv, meta), _altezza_kv(trasporto_kv, meta))
+    # 22/11/2026: timbro e sigla del legale rappresentante del vettore, copiati alla partenza
+    timbro_vettore = getattr(m, "firma_vettore", None)
+    if timbro_vettore:
+        h = max(h, _altezza_kv(vettore_kv, meta) + 17 * mm)
     _scheda_kv(c, sx, y, meta, "Vettore e conducente", vettore_kv, h)
     _scheda_kv(c, dx, y, meta, "Trasporto", trasporto_kv, h)
+    if timbro_vettore:
+        c.setFillColor(TENUE)
+        c.setFont("Helvetica", 7.8)
+        c.drawString(sx + 4 * mm, y - h + 9 * mm, "Timbro e sigla")
+        _firma(c, sx + 30 * mm, y - h + 2.5 * mm, meta - 34 * mm, 14 * mm, timbro_vettore)
     y -= h + spazio
 
     # Beni trasportati: tabella, una riga per auto (su più pagine se le auto sono tante)

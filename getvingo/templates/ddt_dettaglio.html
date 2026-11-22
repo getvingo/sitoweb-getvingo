@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, marchio, badge_condizione, badge_ddt, csrf_input, gps, firma_pad, immagine_firma, giorni, annulla, indietro, azioni_ddt %}
+{% from "_macro.html" import firma_dal_vivo, i, marchio, badge_condizione, badge_ddt, csrf_input, gps, firma_pad, immagine_firma, giorni, annulla, indietro, azioni_ddt %}
 {% from "_arrivo.html" import lavorazione_da_indicare, form_arrivo %}
 {% from "_auto.html" import in_viaggio_da, tocchi, stima %}
 {% block titolo %}DDT {{ d.sigla }} · Getvingo{% endblock %}
@@ -116,6 +116,7 @@
   {{ immagine_firma(m.firma_conducente, 'Responsabile' if d.multiplo else 'Conducente', (m.conducente ~ ' · ' ~ (m.partenza_at|data)) if m.partenza_at else 'al ritiro') }}
   {{ immagine_firma(m.firma_destinatario, 'Destinatario', (m.arrivo_at|data) if m.arrivo_at else "all'arrivo") }}
 </div>
+{% if m.firma_vettore %}<div class="timbro-vettore"><span class="tenue piccolo">Vettore · timbro e sigla</span><img src="{{ m.firma_vettore }}" alt="Timbro e sigla del vettore"></div>{% endif %}
 
 {# ---------------- Azioni principali, una alla volta ---------------- #}
 {% if puo_presa %}
@@ -127,7 +128,8 @@
     <p class="tenue piccolo" style="margin-top:0">Ritiro assegnato a <b>{{ m.assegnato_a.nome }}</b>: si prende in carico vicino all'auto (entro 200 m da {{ m.da_sede.nome if m.da_sede else 'la partenza' }}).</p>
     {% else %}<label class="campo"><span>Chi sposta il mezzo</span><input name="conducente" value="{{ nome_suggerito }}" required maxlength="120"></label>{% endif %}
     {% if not m.mezzo %}<label class="campo"><span>Modalità di trasporto</span><select name="mezzo" required><option value="">Come viaggia l'auto…</option>{% for m in MEZZI_TRASPORTO %}<option>{{ m }}</option>{% endfor %}</select></label>{% endif %}
-    {{ firma_pad("Firma del conducente", obbligatoria=True) }}
+    {{ firma_dal_vivo('Firma del conducente', (m.assegnato_a.nome if m.assegnato_a else g.utente.nome), timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+    <p class="tenue piccolo" style="margin:0">{{ i('firma', 's') }} Premendo il pulsante si apre la firma col dito: senza non si parte.</p>
   </div>
   <p class="avviso errore" data-gps-errore hidden></p>
   <div class="barra-azione">

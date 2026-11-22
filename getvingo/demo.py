@@ -61,7 +61,8 @@ def carica():
     proprio = Vettore(nome="Concessionaria Demo S.r.l.", proprio=True, piva="01234567897", codice_fiscale="01234567897",
                       indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", lat=45.6672, lon=12.2431)
     esterno = Vettore(nome="Trasporti Bianchi S.r.l.", piva="11223344556", codice_fiscale="11223344556",
-                      indirizzo="Via Industria 5", cap="31030", comune="Casier", provincia="TV")
+                      indirizzo="Via Industria 5", cap="31030", comune="Casier", provincia="TV",
+                      firma=_png_firma(4))  # 22/11/2026: timbro e sigla del legale rappresentante
     db.session.add_all([treviso, villorba, carrozzeria, officina, detailing, proprio, esterno])
     db.session.flush()
 
@@ -115,7 +116,7 @@ def carica():
                                       partenza_at=quando).movimento
 
     def arriva(m, chi, quando):
-        servizi.registra_arrivo(m, chi, m.a_sede.lat, m.a_sede.lon)  # sul posto, dentro l'area
+        servizi.registra_arrivo(m, chi, m.a_sede.lat, m.a_sede.lon, firma=_png_firma(5))  # sul posto, col dito
         m.arrivo_at = quando
 
     def in_lavorazione(v, fornitore, chi, lavorazione, note, giorni, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Consegne"):

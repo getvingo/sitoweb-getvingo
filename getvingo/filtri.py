@@ -183,6 +183,11 @@ def init_app(app):
         from .models import Ddt, db as _db
         return _db.session.get(Ddt, ddt_id)
     app.jinja_env.globals["ddt_per_id"] = ddt_per_id
+    # 22/11/2026: firme col dito sopra il timbro della società (servizi.timbro_di / timbro_destinatario)
+    from . import servizi as _servizi
+    app.jinja_env.globals["timbro_di"] = _servizi.timbro_di
+    app.jinja_env.globals["timbro_destinatario"] = _servizi.timbro_destinatario
+    app.jinja_env.globals["firma_vettore"] = _servizi.firma_vettore
     # versione di CSS e JS nell'indirizzo: dopo un aggiornamento i telefoni scaricano subito quelli nuovi
     import os
     cartella = os.path.join(app.root_path, "static")

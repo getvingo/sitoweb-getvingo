@@ -261,6 +261,8 @@
       var errore = form.querySelector('[data-gps-errore]');
       (function controlla() {
         if (errore && !errore.hidden) { fatto = false; box.classList.remove('fatto'); indietro(); return; }
+        // firma col dito annullata (firma.js): il pomello torna indietro e si può riprovare
+        if (form.dataset.firmaAnnullata) { delete form.dataset.firmaAnnullata; fatto = false; box.classList.remove('fatto'); indietro(); return; }
         if (fatto) setTimeout(controlla, 400);
       })();
     }

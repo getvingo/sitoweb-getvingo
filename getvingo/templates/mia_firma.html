@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% from "_macro.html" import csrf_input, firma_pad, indietro %}
+{% from "_macro.html" import csrf_input, firma_pad, campo_timbro, indietro %}
 {% block titolo %}Firma dell'azienda · Getvingo{% endblock %}
 {% block contenuto %}
 {{ indietro(url_for('main.profilo'), 'Il mio profilo') }}
 <div class="titolo-pagina"><div><div class="sopratitolo">Il mio profilo · La tua azienda</div><h1>Firma di {{ sede.nome }}</h1></div></div>
-<p class="tenue">È la firma dell'azienda, non la tua personale: viene apposta in automatico ogni volta che confermate la ricezione di un'auto e vale per tutti gli utenti di {{ sede.nome }}. La tua firma da conducente sta nel Profilo di guida.</p>
+<p class="tenue">Timbro e firma del legale rappresentante di {{ sede.nome }}: sui DDT come firma del mittente quando l'auto parte da voi e come timbro e sigla del vettore quando la riportate voi. Il timbro da solo va sotto le firme fatte col dito da chi guida o riceve per {{ sede.nome }}.</p>
 <form method="post" data-una-volta>
   {{ csrf_input() }}
-  <div class="scheda">{{ firma_pad("Firma del destinatario", obbligatoria=True, attuale=sede.firma, timbro=True) }}</div>
+  <div class="scheda">{{ firma_pad("Timbro e firma del legale rappresentante", obbligatoria=not sede.firma, attuale=sede.firma, timbro=True) }}
+    {{ campo_timbro(sede.timbro) }}</div>
   <div class="barra-azione"><button class="btn primario pieno">Salva firma</button></div>
 </form>
 {% endblock %}

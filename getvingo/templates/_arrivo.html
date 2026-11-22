@@ -27,9 +27,12 @@
 {# "Arrivato a destinazione": il telefono manda la posizione, il server chiude se è entro il raggio.
    Snellito il 12/11/2026: Tutto ok / C'è un danno, nota (anche dettata) e "scorri per confermare" #}
 {% macro form_arrivo(d, m, raggio, id='', dopo_tocco=False) %}
-{% from "_macro.html" import scorri, nota_voce %}
+{% from "_macro.html" import scorri, nota_voce, firma_dal_vivo %}
 <form method="post" action="{{ url_for('main.ddt_arrivo', ddt_id=d.id) }}" {% if id %}id="{{ id }}"{% endif %} data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }} class="form-arrivo">
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
+  {# 22/11/2026: chi riceve firma col dito sopra il timbro della società destinataria: senza, il DDT non si chiude #}
+  {{ firma_dal_vivo('Firma del destinatario', g.utente.nome, timbro_destinatario(m.a_sede),
+                    g.utente.organizzazione.nome if m.a_sede.tipo == 'propria' else m.a_sede.nome) }}
   {% if d.multiplo %}
   <p class="tenue piccolo">Chiudi il DDT per tutte le {{ d.movimenti|length }} auto.</p>
   {% else %}
