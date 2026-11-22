@@ -455,7 +455,8 @@ def home():
     sede_id = request.args.get("sede", type=int)
     attivi = dashboard.attive(sede_id)
     periodo = request.args.get("periodo") if request.args.get("periodo") in ("oggi", "domani", "7") else "oggi"
-    mie_arg = request.args.get("mie")
+    # agenda: "amie" (Solo le mie / Tutte); "mie" resta al Da fare per urgenza in cima, come nella Home di prima
+    mie_arg = request.args.get("amie")
     solo_mie = (mie_arg == "1") if mie_arg in ("0", "1") else g.utente.ruolo not in dashboard.RUOLI_TUTTO
     finestre = {"oggi": (oggi, oggi), "domani": (oggi + timedelta(days=1),) * 2, "7": (oggi, oggi + timedelta(days=6))}
     agende = {k: dashboard.agenda(*d, sede_id=sede_id, solo_mie=solo_mie) for k, d in finestre.items()}
@@ -467,8 +468,27 @@ def home():
     eventi = [e for e in _eventi_calendario(cal_giorni[0], cal_giorni[-1]) if e["stato"] != "anticipo"]
     calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
     marche, n_marche = dashboard.stock_per_marca(attivi)
+    # 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario come nella Home di prima (avviso danni,
+    # Pronte oggi, Da fare per urgenza con il pulsante), sotto i dati della dashboard B1
+    tutte = Veicolo.query.filter(Veicolo.stato != "consegnato").all()
+    gruppi = {k: [] for k in ("in_viaggio", "da_ritirare", "lavorazione", "preparazione", "pronta", "stock")}
+    for v in tutte:
+        fase = v.fase
+        if fase == "in_viaggio":
+            gruppi["in_viaggio"].append(v)
+        elif fase == "da_ritirare" or v.movimento_predisposto is not None:
+            gruppi["da_ritirare"].append(v)
+        elif fase in ("lavorazione", "preparazione", "pronta"):
+            gruppi[fase].append(v)
+        elif v.sede is not None and v.sede.tipo == "propria":
+            gruppi["stock"].append(v)
+    da_fare, totale_da_fare, mie_fare = _da_fare_home(gruppi, tutte)
+    danni = Danno.query.filter(Danno.risolto_at.is_(None), Danno.rimosso.is_(False)).order_by(Danno.segnalato_at.desc()).all()
+    pronte_oggi = [e for e in _eventi_calendario(oggi, oggi) if e["stato"] != "ritardo"]
     return render_template(
-        "home.html", ora=adesso(), data_lunga=dashboard.data_lunga(oggi), sede_id=sede_id,
+        "home.html", da_fare=da_fare, totale_da_fare=totale_da_fare, solo_mie_fare=mie_fare,
+        REPARTI_DA_FARE=REPARTI_DA_FARE, danni=danni, pronte_oggi=pronte_oggi,
+        ora=adesso(), data_lunga=dashboard.data_lunga(oggi), sede_id=sede_id,
         sedi=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
         giornata=dashboard.giornata(sede_id), marche=marche, n_marche=n_marche, n_attivi=len(attivi),
         periodo=periodo, agenda=agende[periodo], conta_agenda={k: len(v) for k, v in agende.items()}, solo_mie=solo_mie,

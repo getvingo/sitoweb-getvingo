@@ -3399,11 +3399,11 @@ class TestDaFareSoloLeMie(Base):
     def test_vista_iniziale_per_mansione(self):
         # 22/11/2026, Home B1: amministratore e resp. commerciale partono da "Tutte", le altre mansioni da "Solo le mie"
         home = self.c.get("/").get_data(as_text=True)  # admin
-        self.assertIn('mie=0" aria-pressed="true">Tutte', home)
+        self.assertIn('amie=0" aria-pressed="true">Tutte', home)
         self.assertLess(home.index(">Solo le mie<"), home.index(">Tutte<"))
         self.entra("autista")
-        self.assertIn('mie=1" aria-pressed="true">Solo le mie', self.c.get("/").get_data(as_text=True))
-        self.assertIn('mie=0" aria-pressed="true">Tutte', self.c.get("/?mie=0").get_data(as_text=True))
+        self.assertIn('amie=1" aria-pressed="true">Solo le mie', self.c.get("/").get_data(as_text=True))
+        self.assertIn('amie=0" aria-pressed="true">Tutte', self.c.get("/?amie=0").get_data(as_text=True))
 
 
 class TestControlliDellaSera(Base):
