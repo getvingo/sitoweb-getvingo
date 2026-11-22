@@ -2,17 +2,28 @@
 {% from "_macro.html" import i, csrf_input, indietro %}
 {% block titolo %}Trasferisci · Getvingo{% endblock %}
 {% block contenuto %}
-{# Conferma del trasferimento a un altro dealer Getvingo (21/11/2026, routes.trasferisci_veicolo) #}
+{# Dealer scelto dalla ricerca per nome (22/11/2026, routes.trasferisci_veicolo): con il DDT in uscita verso di lui
+   il pulsante "Togli dallo stock e trasferisci", senza DDT cosa manca #}
 <div class="titolo-pagina"><div>{{ indietro(url_for('main.veicolo', veicolo_id=v.id)) }}<div class="sopratitolo">{{ v.descrizione }} · {{ v.vin }}</div><h1>Trasferire a {{ org.nome }}?</h1></div></div>
 <div class="scheda pila" style="max-width:640px">
+  {% if uscita %}
+  <p style="margin:0">DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=uscita.ddt.id) }}">{{ uscita.ddt.sigla }}</a> in uscita verso {{ uscita.a_sede.nome }} · {{ 'in viaggio' if uscita.stato == 'aperto' else 'arrivato' }}.</p>
   <p style="margin:0"><b>{{ org.nome }}</b> riceve nel suo stock: telaio, marca, modello, versione, anno, alimentazione, colore, targa, tipo e condizione.</p>
-  {% if tag %}<p style="margin:0">L'adesivo <b>{{ tag.codice }}</b> resta sull'auto e passa a loro con un codice nuovo della sigla {{ org.sigla }}: il link già scritto sopra continua a funzionare.</p>
+  {% if tag %}<p style="margin:0">L'adesivo <b>{{ tag.codice }}</b> resta sull'auto e passa a loro con un codice nuovo{{ ' della sigla ' ~ org.sigla if org.sigla }}: il link già scritto sopra continua a funzionare.</p>
   {% else %}<p style="margin:0" class="tenue">L'auto non ha un adesivo: lo abbineranno loro.</p>{% endif %}
   <p class="tenue piccolo" style="margin:0">DDT, storico, note interne e danni restano solo a voi. Da voi l'auto va tra le consegnate come “Trasferita a {{ org.nome }}”. Non si può annullare.</p>
   <form method="post" action="{{ url_for('main.trasferisci_veicolo', veicolo_id=v.id) }}" class="azioni" data-una-volta>
-    {{ csrf_input() }}<input type="hidden" name="sigla" value="{{ org.sigla }}"><input type="hidden" name="conferma" value="1">
-    <button class="btn primario">Trasferisci a {{ org.nome }}</button>
+    {{ csrf_input() }}<input type="hidden" name="dealer_id" value="{{ org.id }}"><input type="hidden" name="conferma" value="1">
+    <button class="btn primario">{{ i('archivio', 's') }} Togli dallo stock e trasferisci</button>
     <a class="btn terziario" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Annulla</a>
   </form>
+  {% else %}
+  <p class="avviso info" style="margin:0">{{ i('doc') }}<span><b>Prima serve il DDT in uscita verso {{ org.nome }}.</b> Poi nella scheda dell'auto, sotto Segnala danno, compare “Togli dallo stock e trasferisci”.</span></p>
+  <ol class="tenue piccolo" style="margin:0;padding-left:18px">
+    <li>{{ org.nome }} deve essere tra le <a href="{{ url_for('admin.sedi_esterne') }}">Destinazioni esterne</a> come Concessionario o Rivenditore, con la sua P. IVA (o lo stesso nome).</li>
+    <li>Emetti il DDT verso di loro con causale Vendita: toccando l'adesivo, oppure con “Predisponi DDT da ritirare”.</li>
+  </ol>
+  <div class="azioni"><a class="btn" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Torna all'auto</a></div>
+  {% endif %}
 </div>
 {% endblock %}

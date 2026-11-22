@@ -340,24 +340,37 @@
 <a class="btn pieno btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}" style="margin-top:14px">{{ i('attenzione') }} Segnala danno</a>
 {% endif %}
 
-
-
+{# 22/11/2026: trasferimento a un altro dealer Getvingo sotto Segnala danno. Il dealer si cerca per nome (solo quelli
+   configurati in Getvingo); l'auto si toglie dallo stock solo dopo il DDT in uscita verso di lui (servizi.ddt_uscita_dealer) #}
+{% if g.utente.ruolo == 'admin' and not v.trasferita_a %}{% set m_usc, dealer_usc = uscita_dealer %}
+{% if dealer_usc %}
+<div class="scheda pila" id="trasferisci" style="margin-top:14px">
+  <p style="margin:0"><b>Trasferimento a {{ dealer_usc.nome }}</b></p>
+  <p class="tenue piccolo" style="margin:0">DDT <a href="{{ url_for('main.ddt_dettaglio', ddt_id=m_usc.ddt.id) }}">{{ m_usc.ddt.sigla }}</a> in uscita verso {{ m_usc.a_sede.nome }} · {{ 'in viaggio' if m_usc.stato == 'aperto' else 'arrivato' }}. {{ dealer_usc.nome }} riceve i dati dell'auto e l'adesivo; DDT e storico restano a voi.</p>
+  <form method="post" action="{{ url_for('main.trasferisci_veicolo', veicolo_id=v.id) }}" data-una-volta
+        onsubmit='return confirm({{ ("Togliere " ~ v.descrizione ~ " dallo stock e trasferirla a " ~ dealer_usc.nome ~ "? Non si può annullare.")|tojson }})'>
+    {{ csrf_input() }}<input type="hidden" name="dealer_id" value="{{ dealer_usc.id }}"><input type="hidden" name="conferma" value="1">
+    <button class="btn pieno">{{ i('archivio') }} Togli dallo stock e trasferisci</button>
+  </form>
 </div>
-</div>
-
-{% if g.utente.ruolo == 'admin' and not v.trasferita_a %}
-{# 21/11/2026: auto venduta a un altro dealer Getvingo, con dati e adesivo (servizi.trasferisci_veicolo) #}
-<details class="ripiega" id="trasferisci" style="margin-top:24px">
-  <summary>Trasferisci a un altro dealer Getvingo</summary>
-  <form method="post" action="{{ url_for('main.trasferisci_veicolo', veicolo_id=v.id) }}" class="scheda pila">
+{% elif v.stato != 'consegnato' %}
+<details class="ripiega" id="trasferisci" style="margin-top:14px">
+  <summary>{{ i('auto', 's') }} Trasferisci a un altro dealer Getvingo</summary>
+  <form method="post" action="{{ url_for('main.trasferisci_veicolo', veicolo_id=v.id) }}" class="scheda pila" id="trasf-modulo">
     {{ csrf_input() }}
-    <p class="tenue piccolo" style="margin-top:0">Per un'auto venduta a un dealer che usa Getvingo: riceve i dati dell'auto e l'adesivo resta lo stesso, con un codice nuovo della sua sigla. DDT e storico restano qui; da voi l'auto va tra le consegnate.</p>
-    <label class="campo"><span>Sigla del dealer</span><input name="sigla" maxlength="5" required autocapitalize="characters" placeholder="es. CDEMO" style="text-transform:uppercase"></label>
-    <p class="tenue piccolo" style="margin:0">La sigla la trova il dealer in Gestione → Dati aziendali. Prima di trasferire vedi il suo nome e confermi.</p>
-    <button class="btn">Continua</button>
+    <label class="campo" style="margin:0"><span>Nome della concessionaria</span>
+      <input type="search" id="trasf-cerca" autocomplete="off" placeholder="Scrivi almeno 3 lettere" data-url="{{ url_for('main.cerca_dealer') }}"></label>
+    <div id="trasf-risultati" class="pila" aria-live="polite"></div>
+    <p class="tenue piccolo" style="margin:0">Compaiono solo i dealer che usano Getvingo. Dopo il DDT in uscita verso il dealer qui compare il pulsante per togliere l'auto dallo stock.</p>
   </form>
 </details>
-{% endif %}
+{% endif %}{% endif %}
+
+
+
+</div>
+</div>
+
 {% if v.trasferita_a %}<div class="avviso" style="margin-top:24px">{{ i('auto') }}<span>Trasferita a <b>{{ v.trasferita_a }}</b> il {{ v.consegnato_at|data('%d/%m/%Y') }}.</span></div>{% endif %}
 {% if g.utente.ruolo == 'admin' %}{% set n_ddt = v.movimenti|selectattr('ddt')|list|length %}
 {% if not n_ddt or config.DEMO %}
@@ -376,6 +389,34 @@
 {% endblock %}
 {% block script %}
 <script>
+  // 22/11/2026: ricerca del dealer Getvingo per nome mentre si scrive (Trasferisci a un altro dealer)
+  (function () {
+    var campo = document.getElementById('trasf-cerca'); if (!campo) return;
+    var box = document.getElementById('trasf-risultati'), timer = null, ultima = '';
+    function scrivi(testo) { box.innerHTML = ''; if (testo) { var p = document.createElement('p'); p.className = 'tenue piccolo'; p.style.margin = '0'; p.textContent = testo; box.appendChild(p); } }
+    campo.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+    campo.addEventListener('input', function () {
+      clearTimeout(timer);
+      var q = campo.value.trim();
+      if (q.length < 3) { ultima = ''; scrivi(''); return; }
+      timer = setTimeout(function () {
+        ultima = q;
+        fetch(campo.dataset.url + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (elenco) {
+            if (q !== ultima) return;
+            if (!elenco.length) { scrivi('Nessun risultato trovato'); return; }
+            box.innerHTML = '';
+            elenco.forEach(function (d) {
+              var b = document.createElement('button');
+              b.className = 'btn pieno'; b.name = 'dealer_id'; b.value = d.id; b.textContent = d.nome;
+              box.appendChild(b);
+            });
+          })
+          .catch(function () { scrivi('Ricerca non riuscita: riprova.'); });
+      }, 250);
+    });
+  })();
   // arrivati da "Predisponi il DDT di rientro" (Lavorazioni): il modulo si apre da solo
   if (location.hash === '#predisponi') { var p = document.getElementById('predisponi'); if (p) { p.open = true; p.scrollIntoView({ block: 'start' }); } }
 </script>

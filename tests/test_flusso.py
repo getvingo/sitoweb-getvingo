@@ -4193,28 +4193,67 @@ class TestRegistroAdesivi(Base):
 
 
 class TestTrasferimentoDealer(TestPiuClienti):
-    """21/11/2026: auto venduta a un altro dealer Getvingo, con i dati e l'adesivo (codice nuovo, link vecchio valido)."""
+    """21/11/2026: auto venduta a un altro dealer Getvingo, con i dati e l'adesivo (codice nuovo, link vecchio valido).
+    22/11/2026: il dealer si cerca per nome; l'auto si toglie dallo stock solo dopo il DDT in uscita verso di lui."""
     def setUp(self):
         super().setUp()
         with self.app.app_context():
             db.session.get(Organizzazione, self.org2).sigla = "ALTRA"
             db.session.get(Organizzazione, 1).sigla = "TEST"
+            g.org_id = self.org2
+            Azienda.query.one().piva = "IT01234567890"
+            g.org_id = 1
+            # da noi il dealer è una destinazione esterna di tipo concessionario, con la sua P. IVA e un altro nome
+            db.session.add(Sede(nome="Altra Auto Treviso", tipo="concessionario", piva="01234567890", lat=45.2, lon=12.2,
+                                comune="Treviso", provincia="TV"))
             db.session.commit()
+
+    def uscita(self, vid, arriva=False):
+        self.parti(vid, "Altra Auto Treviso", causale="Vendita", lavorazione="Nessuna (solo trasferimento)")
+        if arriva:
+            self.arrivo(self.ddt())
+
+    def test_ricerca_per_nome(self):
+        self.assertEqual(self.c.get("/api/dealer?q=altra").get_json(), [{"id": self.org2, "nome": "Altra Auto S.p.A."}])
+        self.assertEqual(self.c.get("/api/dealer?q=nessuno").get_json(), [])     # non configurato: nessun risultato
+        self.assertEqual(self.c.get("/api/dealer?q=al").get_json(), [])          # servono 3 lettere
+        self.assertEqual(self.c.get("/api/dealer?q=%25%25%25").get_json(), [])   # % non vale come jolly
+        self.entra("ufficio")
+        self.assertEqual(self.c.get("/api/dealer?q=altra").status_code, 403)
+
+    def test_sotto_segnala_danno_e_pulsante_solo_dopo_il_ddt(self):
+        vid = self.abbina()
+        html = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertLess(html.index("Segnala danno</a>"), html.index("Trasferisci a un altro dealer Getvingo"))
+        self.assertIn("Nome della concessionaria", html)
+        self.assertNotIn("Togli dallo stock", html)
+        # scelto il dealer senza DDT: si spiega cosa manca, e il trasferimento è rifiutato
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2})
+        self.assertIn("Prima serve il DDT in uscita verso Altra Auto S.p.A.", r.get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2, "conferma": "1"}, follow_redirects=True)
+        self.assertIn("Prima serve il DDT in uscita", r.get_data(as_text=True))
+        # col DDT in uscita (in viaggio) la scheda mostra il pulsante
+        self.uscita(vid)
+        html = self.c.get(f"/veicolo/{vid}").get_data(as_text=True)
+        self.assertIn("Trasferimento a Altra Auto S.p.A.", html)
+        self.assertIn("Togli dallo stock e trasferisci", html)
 
     def test_trasferimento_completo(self):
         vid = self.abbina()
         with self.app.app_context():
             Tag.query.filter_by(codice="ABCD2345").one().uid = "04A23B1C5D6E80"
             db.session.commit()
-        # prima la conferma con il nome del dealer, poi il trasferimento
-        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "altra"})
+        self.uscita(vid, arriva=True)  # Vendita: all'arrivo l'auto è già consegnata, il pulsante resta
+        self.assertIn("Togli dallo stock e trasferisci", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2})
         self.assertIn("Trasferire a Altra Auto S.p.A.?", r.get_data(as_text=True))
-        self.assertEqual(self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}).status_code, 302)
+        self.assertEqual(self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2, "conferma": "1"}).status_code, 302)
         with self.app.app_context():
             v = db.session.get(Veicolo, vid)
             self.assertEqual((v.stato, v.trasferita_a, v.tag), ("consegnato", "Altra Auto S.p.A.", None))
             vecchio = Tag.query.filter_by(codice="ABCD2345").one()
             self.assertEqual((vecchio.trasferito_a, vecchio.uid), ("Altra Auto S.p.A.", None))
+        self.assertNotIn("Togli dallo stock", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
         # da noi l'adesivo dice dove è andato
         self.assertIn("passato a Altra Auto", self.c.post("/t/ABCD2345", data=POS).get_data(as_text=True))
         # l'altro dealer ha l'auto con i dati e l'adesivo con la sua sigla; il link vecchio e il numero di serie portano lì
@@ -4232,14 +4271,12 @@ class TestTrasferimentoDealer(TestPiuClienti):
 
     def test_rifiuti(self):
         vid = self.abbina()
-        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "TEST"}, follow_redirects=True)
-        self.assertIn("È la sigla della tua concessionaria", r.get_data(as_text=True))
-        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "NONCE"}, follow_redirects=True)
-        self.assertIn("Nessun dealer Getvingo con questa sigla", r.get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": "1"}, follow_redirects=True)
+        self.assertIn("È la tua concessionaria", r.get_data(as_text=True))
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": "999"}, follow_redirects=True)
+        self.assertIn("Nessun risultato trovato", r.get_data(as_text=True))
+        self.uscita(vid)
         self.entra("ufficio")
-        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}, follow_redirects=True)
+        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2, "conferma": "1"}, follow_redirects=True)
         self.assertIn("Solo un amministratore", r.get_data(as_text=True))
-        self.entra("admin")
-        self.parti(vid, "Carrozzeria B")
-        r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"sigla": "ALTRA", "conferma": "1"}, follow_redirects=True)
-        self.assertIn("DDT in corso", r.get_data(as_text=True))
+        self.assertNotIn("Togli dallo stock", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))

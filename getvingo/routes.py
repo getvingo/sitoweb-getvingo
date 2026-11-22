@@ -1871,8 +1871,11 @@ def veicolo(veicolo_id):
                        key=lambda u: (u.ruolo != "venditore", u.nome)) if g.utente.interno else []
     simili = Veicolo.query.filter(Veicolo.marca == v.marca, Veicolo.modello == v.modello,
                                   Veicolo.id != v.id, Veicolo.stato != "consegnato").count()
+    # 22/11/2026: DDT in uscita verso un dealer Getvingo -> nella scheda "Togli dallo stock e trasferisci"
+    uscita_dealer = (servizi.ddt_uscita_dealer(v) if g.utente.ruolo == "admin" and not v.trasferita_a
+                     else (None, None))
     return render_template(
-        "veicolo.html", v=v, mov=mov, lavoro_fatto=_lavoro_fatto(v), predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
+        "veicolo.html", v=v, mov=mov, lavoro_fatto=_lavoro_fatto(v), uscita_dealer=uscita_dealer, predisposto=v.movimento_predisposto, ultimo=ultimo, venditori=venditori,
         slot_prep=_scelta_prep(), slot_auto=servizi.slot_automatico(),
         preparazione=v.preparazione_attiva, ultima_prep=v.ultima_preparazione, simili=simili,
         puo_emettere=servizi.puo_emettere(v, g.utente),
@@ -2569,25 +2572,38 @@ def elimina_veicolo(veicolo_id):
     return redirect(url_for("main.piazzale"))
 
 
+@bp.route("/api/dealer")
+@solo_interni
+def cerca_dealer():
+    """Ricerca del dealer Getvingo per nome mentre si scrive (22/11/2026, solo amministratore)."""
+    if g.utente.ruolo != "admin":
+        abort(403)
+    return jsonify([{"id": o.id, "nome": o.nome} for o in servizi.cerca_dealer(request.args.get("q"))])
+
+
 @bp.route("/veicolo/<int:veicolo_id>/trasferisci", methods=["POST"])
 @solo_interni
 def trasferisci_veicolo(veicolo_id):
-    """Auto venduta a un altro dealer Getvingo (21/11/2026, solo amministratore): prima si scrive la sigla e si
-    vede il nome del dealer, poi si conferma (servizi.trasferisci_veicolo)."""
+    """Auto venduta a un altro dealer Getvingo (21/11/2026, solo amministratore; 22/11/2026: il dealer si cerca per
+    nome e l'auto si toglie dallo stock solo dopo il DDT in uscita verso di lui, servizi.trasferisci_veicolo).
+    Senza `conferma` mostra il dealer scelto: il DDT trovato e il pulsante, oppure cosa manca."""
     v = db.get_or_404(Veicolo, veicolo_id)
     try:
         if g.utente.ruolo != "admin":
             raise Vietato("Solo un amministratore può trasferire un'auto a un altro dealer.")
-        org = servizi.dealer_per_sigla(request.form.get("sigla"))
+        org = servizi.dealer_per_id(request.form.get("dealer_id"))
         if request.form.get("conferma") != "1":
-            return render_template("trasferisci.html", v=v, org=org, tag=servizi.tag_dell_auto(v))
+            m, dealer = servizi.ddt_uscita_dealer(v)
+            return render_template("trasferisci.html", v=v, org=org, tag=servizi.tag_dell_auto(v),
+                                   uscita=m if dealer and dealer.id == org.id else None)
         servizi.trasferisci_veicolo(v, org, g.utente)
         db.session.commit()
     except Vietato as e:
         db.session.rollback()
         flash(str(e), "errore")
         return redirect(url_for("main.veicolo", veicolo_id=veicolo_id) + "#trasferisci")
-    flash(f"{v.descrizione} trasferita a {org.nome}: la trovano nel loro stock, con l'adesivo già abbinato.", "ok")
+    flash(f"{v.descrizione} tolta dallo stock e trasferita a {org.nome}: la trovano nel loro stock, "
+          "con l'adesivo già abbinato.", "ok")
     return redirect(url_for("main.veicolo", veicolo_id=veicolo_id))
 
 

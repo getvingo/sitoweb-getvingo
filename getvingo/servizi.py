@@ -430,25 +430,77 @@ CAMPI_TRASFERIMENTO = ("vin", "marca", "modello", "versione", "alimentazione", "
                        "tipologia", "condizione")
 
 
-def dealer_per_sigla(sigla):
-    """Il dealer Getvingo a cui si trasferisce un'auto, dalla sua sigla degli adesivi (unica sul portale)."""
-    sigla = (sigla or "").strip().upper()
-    org = Organizzazione.query.filter_by(sigla=sigla).first() if sigla else None
+def _piva_pulita(piva):
+    piva = "".join(c for c in (piva or "").upper() if c.isalnum())
+    return piva[2:] if piva.startswith("IT") and len(piva) == 13 else piva
+
+
+def cerca_dealer(testo):
+    """Dealer Getvingo per nome (22/11/2026, al posto della sigla): almeno 3 lettere, solo concessionarie attive
+    e mai la propria. Lista vuota = "Nessun risultato trovato" (il dealer non usa Getvingo)."""
+    testo = " ".join((testo or "").split())
+    if len(testo) < 3:
+        return []
+    simili = "%" + testo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    return (Organizzazione.query.filter(Organizzazione.attiva.is_(True), Organizzazione.id != g.org_id,
+                                        Organizzazione.nome.ilike(simili, escape="\\"))
+            .order_by(Organizzazione.nome).limit(8).all())
+
+
+def dealer_per_id(org_id):
+    """Il dealer scelto dall'elenco della ricerca."""
+    try:
+        org = db.session.get(Organizzazione, int(org_id))
+    except (TypeError, ValueError):
+        org = None
     if org is None or not org.attiva:
-        raise Vietato("Nessun dealer Getvingo con questa sigla: chiedila al dealer (Gestione → Dati aziendali).")
+        raise Vietato("Nessun risultato trovato: il dealer non è configurato in Getvingo.")
     if org.id == g.org_id:
-        raise Vietato("È la sigla della tua concessionaria: scegli un altro dealer.")
+        raise Vietato("È la tua concessionaria: scegli un altro dealer.")
     return org
 
 
+def dealer_della_sede(sede):
+    """Il dealer Getvingo dietro una destinazione esterna di tipo concessionario o rivenditore: stessa P. IVA
+    dei suoi Dati aziendali o, se manca, stesso nome. None se quel luogo non usa Getvingo."""
+    if sede is None or sede.tipo not in Sede.COMMERCIO:
+        return None
+    tutte = {"tutte_le_organizzazioni": True}
+    piva, nome = _piva_pulita(sede.piva), (sede.nome or "").strip().casefold()
+    per_nome = None
+    for a in Azienda.query.filter(Azienda.org_id != g.org_id).execution_options(**tutte).all():
+        org = db.session.get(Organizzazione, a.org_id)
+        if org is None or not org.attiva:
+            continue
+        if piva and _piva_pulita(a.piva) == piva:
+            return org
+        if nome and nome in ((a.ragione_sociale or "").strip().casefold(), (org.nome or "").strip().casefold()):
+            per_nome = per_nome or org
+    return per_nome
+
+
+def ddt_uscita_dealer(v):
+    """(movimento, dealer) se l'ultimo DDT dell'auto, in viaggio o arrivato, va verso un dealer Getvingo;
+    altrimenti (None, None). È il DDT in uscita che sblocca "Togli dallo stock e trasferisci"."""
+    m = v.movimento_aperto or v.ultimo_arrivo
+    if m is None or m.ddt is None:
+        return None, None
+    dealer = dealer_della_sede(m.a_sede)
+    return (m, dealer) if dealer else (None, None)
+
+
 def trasferisci_veicolo(v, org, utente):
-    """Auto venduta a un altro dealer Getvingo (21/11/2026). Il dealer riceve i dati dell'auto (non DDT né storico,
+    """Auto venduta a un altro dealer Getvingo (21/11/2026; dal 22/11/2026 solo dopo il DDT in uscita verso di lui,
+    in viaggio o già arrivato, `ddt_uscita_dealer`). Il dealer riceve i dati dell'auto (non DDT né storico,
     che restano qui) in stock nella sua sede legale; l'adesivo resta lo stesso ma prende un codice con la sua sigla
     (il link vecchio scritto sopra continua a portare lì). Qui l'auto va in archivio come consegnata."""
     if utente.ruolo != "admin":
         raise Vietato("Solo un amministratore può trasferire un'auto a un altro dealer.")
-    if v.movimento_aperto or v.movimento_predisposto:
-        raise Vietato("L'auto ha un DDT in corso o da ritirare: prima va chiuso o annullato.")
+    m, dealer = ddt_uscita_dealer(v)
+    if dealer is None or dealer.id != org.id:
+        raise Vietato(f"Prima serve il DDT in uscita verso {org.nome}: poi l'auto si toglie dallo stock.")
+    if v.movimento_predisposto:
+        raise Vietato("L'auto ha un DDT da ritirare: prima va preso in carico o annullato.")
     if v.preparazione_attiva:
         raise Vietato("L'auto è in preparazione: prima va finita o eliminata la preparazione.")
     if v.trasferita_a:
