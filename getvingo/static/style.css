@@ -11,11 +11,11 @@
   --segnale-scuro: #00603D;
   --segnale-tenue: #E2F4EB;
   --primario: #11171D; --primario-hover: #232D36; --primario-testo: #FFFFFF;
-  --superficie: #F7F8F5;   /* fondo pagina (design B1; il bianco segnaletica #F3F4F0 resta nel marchio) */
+  --superficie: #F3F4F0;   /* bianco segnaletica */
   --carta: #FFFFFF;
   --testo: #11171D;
   --testo-2: #5A6672;      /* grigio asfalto */
-  --bordo: #E6E8E3;
+  --bordo: #E0E3DE;
   --bordo-forte: #C9CEC8;  /* filo */
   --ok: #007A4E;      --ok-tenue: #E2F4EB;
   --viaggio: #9A4A07; --viaggio-tenue: #FDF0DD;
@@ -35,12 +35,8 @@
   --marchio-asfalto: #11171D; --marchio-verde: #00A86B; --marchio-via: #00D68F; --riquadro: #EEF0EC;
   --notte: #0A0F14; --inchiostro-fisso: #11171D; --asfalto-2: #1C252D; --asfalto-3: #26323C;
   /* colori di stato dell'auto (fase) e varianti piene per gli sfondi con testo */
-  /* colori di stato (22/11/2026 sera: tornati quelli di prima del design B1, scelta dell'utente) */
   --st-viaggio: #7C3AED; --st-lavoro: #CA8A04; --st-ritiro: #DB2777; --st-prep: #0D9488; --st-pronta: #16A34A; --st-sede: #475569;
   --st-lavoro-pieno: #A16207; --st-ritiro-pieno: #BE185D; --st-prep-pieno: #0F766E; --st-pronta-pieno: #15803D;
-  --st-consegnata: #14532D;
-  /* design B1: fondo pagina, linea dei riquadri, testo secondario scuro, attenzione */
-  --fondo-pagina: #F7F8F5; --linea: #E6E8E3; --testo-3: #3A444E; --attenzione: #A8360C; --attenzione-tenue: #FBE9E2;
   /* scala del testo: 12 · 13 · 14 · 15 · 16 · 17 · 20 · 24 · 30 px (minimo 12 px) */
   --fs-12: .75rem; --fs-13: .8125rem; --fs-14: .875rem; --fs-15: .9375rem; --fs-16: 1rem; --fs-17: 1.0625rem;
   --fs-20: 1.25rem; --fs-24: 1.5rem; --fs-30: 1.875rem;
@@ -3351,15 +3347,18 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .timbro-vettore img { max-height: 70px; max-width: 100%; object-fit: contain; }
 
 /* =====================================================================================================
+   22/11/2026 notte: schema di colori della versione precedente (scelta dell'utente). Le parti nuove (barra
+   laterale, Home) usano gli stessi colori: qui solo i nomi che usano, collegati alla palette di prima.
+   ===================================================================================================== */
+:root { --fondo-pagina: var(--superficie); --linea: var(--bordo); --testo-3: var(--testo-2);
+        --attenzione: var(--in-ritardo-testo, #B42318); --attenzione-tenue: var(--in-ritardo-tenue, #FDE8E5);
+        --st-consegnata: var(--consegnata-verde, #14532D); }
+
+/* =====================================================================================================
    Design B1 "Getvingo Yard" (22/11/2026, getvingo-dashboard-B1-specifiche.md): barra laterale da computer,
    testata chiara dal telefono. Le pagine secondarie tengono il loro contenuto, con colori e caratteri del sistema.
    ===================================================================================================== */
 .barra-laterale { display: none; }
-.testata { background: var(--carta); color: var(--testo); border-bottom: 1px solid var(--linea); }
-.testata .marchio img { height: 24px; }
-.testata .avatar { background: var(--riquadro); color: var(--inchiostro-fisso); font-family: var(--font-titoli); font-weight: 800; }
-.testata .menu-utente[open] .avatar { box-shadow: 0 0 0 3px var(--linea); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .testata .avatar { background: var(--asfalto-3); color: #fff; } }
 @media (min-width: 1024px) {
   body.con-barra { padding-left: 260px; }
   body.con-barra .testata { display: none; }
@@ -3546,97 +3545,10 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .y-frecce a.y-link { width: auto; height: auto; border: 0; font-weight: 600; font-size: 13px; color: var(--segnale); margin-right: 8px; }
 
 /* =====================================================================================================
-   ARMONIZZAZIONE B1 (22/11/2026 sera, analisi in knowledge/analisi-ux-ui-portale-v2.txt). Un solo linguaggio
-   per tutte le pagine, quello della Home "Getvingo Yard". Regole:
-   1. Un colore = un significato. Stato della vettura: blu in viaggio · ocra dai fornitori · ruggine da ritirare
-      · viola in preparazione · verde pronta/consegnata. Tempo: NEUTRO se nei tempi (asfalto/grigio), ARANCIO
-      attenzione se in ritardo. Rosso pieno solo per i danni. Verde testi per link e "fatto".
-   2. Superfici piatte: carta bianca, filo 1px #E6E8E3, raggio 12 px, niente ombre né gradienti.
-   3. Gerarchia del testo: titolo pagina 28 px · titolo sezione 17 px · testo 14–15 px · etichette 11 px MAIUSCOLO.
-   4. Un solo pulsante pieno per area (asfalto); gli altri bianchi col filo; il colore sta nell'icona.
-   ===================================================================================================== */
-:root {
-  --ombra: none; --r: 12px; --r-l: 12px;
-}
-body { background: var(--fondo-pagina); }
-
-/* 3. gerarchia del testo */
-h1 { font-size: 28px; letter-spacing: -.01em; }
-h2 { font: 700 17px/1.3 var(--font-titoli); text-transform: none; letter-spacing: 0; color: var(--testo); margin: 0 0 10px; }
-h2 .icona { color: var(--testo-2); }
-.sezione-t { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
-.titolo-pagina { margin-bottom: 20px; align-items: flex-end; }
-.descrizione-pagina { font-size: 14px; color: var(--testo-2); margin-top: 4px; }
-.sopratitolo { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
-
-/* 4. pulsanti: piatti, raggio 8 */
-.btn { min-height: 44px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); box-shadow: none !important;
-  font: 600 14px var(--font-testo); color: var(--testo); padding: 0 16px; }
-.btn:hover { border-color: var(--testo-2); background: var(--carta); }
-.btn.primario, .titolo-pagina .btn.primario { background: var(--inchiostro-fisso); border-color: var(--inchiostro-fisso); color: #fff; }
-.btn.primario:hover { background: #232D36; border-color: #232D36; }
-.btn.pieno { min-height: 48px; }
-.btn.pericolo { background: var(--danno-scuro); border-color: var(--danno-scuro); color: #fff; }
-.btn-link { color: var(--segnale); font-weight: 600; }
-.scorri.come-pulsante { height: 48px; border-radius: 8px; }
-.indietro, a.btn.indietro { min-height: 36px; padding: 0 12px; }
-
-/* demo: un'etichetta discreta, non una fascia */
-.demo-barra { display: inline-flex; width: auto; min-height: 32px; padding: 0 12px; margin: 0 0 14px; border: 1px dashed var(--bordo-forte);
-  background: var(--carta); color: var(--testo-2); font-size: 12px; font-weight: 600; border-radius: 999px; }
-.demo-barra .icona { width: 14px; height: 14px; }
-
-/* 2. superfici piatte */
-.scheda, .voce, .carta-auto, .blocco-fase, .blocco-lavoro, .ddt-sezione, .note-interne, .y-box { box-shadow: none !important; }
-.scheda, .ddt-sezione { border: 1px solid var(--linea); border-radius: 12px; }
-
-/* tabelle degli elenchi (Vetture, Lavorazioni, Preparazioni, DDT, Danni): un riquadro, righe separate da un filo */
-.tabella-stock { border-collapse: separate; border-spacing: 0; background: var(--carta); border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
-.tabella-stock thead th { background: var(--fondo-pagina); padding: 10px 12px; font: 700 11px var(--font-titoli); letter-spacing: .06em; border-bottom: 1px solid var(--linea); }
-.tabella-stock .riga-gruppo th { background: var(--carta); padding: 14px 12px 6px; font: 700 13px var(--font-titoli); color: var(--testo-2); border-top: 1px solid var(--linea); }
-.riga-stock > td, .riga-stock > td:first-child, .riga-stock > td:last-child { border: 0; border-top: 1px solid var(--linea); border-radius: 0; background: var(--carta); padding: 12px; }
-.riga-stock:hover > td { background: var(--fondo-pagina); }
-.riga-stock.con-danno > td:first-child { box-shadow: inset 3px 0 0 var(--danno); }
-.tabella-stock .riga-dettagli > td, .riga-dettagli > td { border-left: 0 !important; border-radius: 0 !important; }
-
-/* filtri di stato: segmenti come l'agenda della Home */
-.stato-filtri, .filtri-stato { gap: 4px !important; background: var(--carta); border: 1px solid var(--linea); border-radius: 10px; padding: 3px; display: inline-flex; flex-wrap: wrap; }
-.stato-voce, .stato-voce:first-child { border: 0 !important; border-radius: 8px !important; min-height: 36px; padding: 0 12px 0 8px; background: transparent; box-shadow: none !important; }
-.stato-voce .stato-icona { width: 22px; height: 22px; }
-.stato-voce b { font-size: 14px; }
-.stato-voce .stato-nome { font-size: 13px; color: var(--testo-3); }
-.stato-voce.attivo { background: var(--c-tenue, var(--riquadro)) !important; }
-.stato-voce.attivo b, .stato-voce.attivo .stato-nome { color: var(--c-testo, var(--testo)) !important; }
-.stato-voce:hover { background: var(--fondo-pagina); }
-
-/* pillole di stato: fondo tenue + pallino del colore + testo (come l'agenda) */
-.pillola-stato, .badge.in_viaggio, .badge.aperto { font-weight: 600; }
-
-/* barra degli strumenti degli elenchi: ricerca, Filtri, tipo e vista alti uguali (44 px) e vicini */
-:root { --bordo-stato: 3px; }
-.stock-cerca { margin-bottom: 10px !important; gap: 8px !important; }
-.ricerca { min-height: 44px; border-radius: 8px !important; border: 1px solid var(--linea) !important; background: var(--carta); box-shadow: none !important; }
-.ricerca input { min-height: 42px; font-size: 14px; }
-details.filtri-stock > summary, .filtri-stock > summary { min-height: 44px !important; border-radius: 8px !important; border: 1px solid var(--linea) !important; box-shadow: none !important; font-size: 14px; }
-.barra-modo { margin: 0 0 12px !important; }
-.interruttore, .filtro-gruppo.interruttore { background: var(--carta) !important; border: 1px solid var(--linea); border-radius: 10px !important; padding: 3px !important; box-shadow: none !important; gap: 2px; }
-.interruttore a, .interruttore button { min-height: 34px !important; border-radius: 8px !important; font-size: 13px !important; color: var(--testo-3); box-shadow: none !important; }
-.interruttore a.attivo, .interruttore button.attivo { background: var(--spento-tenue) !important; color: var(--testo) !important; }
-.pillole-sedi a, .pillole a { box-shadow: none !important; }
-
-.y-num-n small { display: block; margin-top: 6px; font: 600 13px/1.3 var(--font-testo); color: var(--testo-2); }
-.y-sede select { height: 40px !important; min-height: 40px !important; font-size: 14px !important; padding: 0 32px 0 12px !important; }
-.y-cerca .btn-mic-piccolo { background: transparent !important; color: var(--testo-2); }
-
-/* =====================================================================================================
    22/11/2026 sera, scelte dell'utente: menu con testo bianco su asfalto (barra laterale da computer e testata
    dal telefono), colori di stato di prima del design B1, niente "Yard"
    ===================================================================================================== */
 :root { --attenzione: var(--in-ritardo-testo); --attenzione-tenue: var(--in-ritardo-tenue); }
-.testata { background: var(--inchiostro); color: #fff; border-bottom: 0; }
-.testata .marchio img { height: 26px; }
-.testata .avatar { background: var(--segnale); color: #fff; }
-.testata .menu-utente[open] .avatar { box-shadow: 0 0 0 3px rgba(255,255,255,.35); }
 @media (min-width: 1024px) {
   .barra-laterale { background: var(--inchiostro-fisso); border-right: 0; color: #fff; }
   .bl-marchio { color: #fff; }
@@ -3661,3 +3573,8 @@ details.filtri-stock > summary, .filtri-stock > summary { min-height: 44px !impo
 .y-ev.preparazione { background: color-mix(in srgb, var(--st-prep) 12%, var(--carta)); }
 .y-ev.lavorazione b { color: var(--st-lavoro-pieno); } .y-ev.preparazione b { color: var(--st-prep-pieno); }
 .y-stato.y-corso { background: var(--st-viaggio-tenue); color: var(--st-viaggio-testo); }
+
+.y-num-n small { display: block; margin-top: 6px; font: 600 13px/1.3 var(--font-testo); color: var(--testo-2); }
+.y-sede select { height: 40px !important; min-height: 40px !important; font-size: 14px !important; padding: 0 32px 0 12px !important; }
+.y-cerca .btn-mic-piccolo { background: transparent !important; color: var(--testo-2); }
+.y-box-testa h2 { text-transform: none; letter-spacing: 0; font-size: 17px; color: var(--testo); }
