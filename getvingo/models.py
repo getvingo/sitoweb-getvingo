@@ -32,6 +32,8 @@ class Organizzazione(db.Model):
     assistenza_cambiata_at = db.Column(db.DateTime)
     # sigla dei codici degli adesivi NFC (es. CDEMO → CDEMO-0001): unica su tutto il portale
     sigla = db.Column(db.String(5), unique=True)
+    # 22/11/2026: per i test (Gestione) le firme col dito e timbro e sigla del vettore non sono obbligatorie
+    firme_facoltative = db.Column(db.Boolean, default=False)
 
 
 def org_attiva():

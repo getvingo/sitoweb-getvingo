@@ -4456,3 +4456,31 @@ class TestVetturePova(Base):
             self.assertEqual(Sede.query.filter(Sede.nome.like("%(prova)")).count(), 0)
             self.assertEqual(Utente.query.filter(Utente.email.like("%prova.getvingo.invalid")).count(), 0)
             self.assertTrue(Sede.query.filter_by(nome="Sede A").count())  # i luoghi veri restano
+
+
+class TestFirmeFacoltative(Base):
+    """22/11/2026: Gestione → Firme facoltative per i test: si parte e si chiude senza firma né timbro del vettore."""
+    def test_senza_firma_con_interruttore(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            Vettore.query.filter_by(nome="Vettore X").one().firma = None
+            db.session.commit()
+        self.assertIn("Firme facoltative per i test", self.c.get("/admin/").get_data(as_text=True))
+        self.c.post("/admin/firme-facoltative", data={"attive": "1"})
+        dati = self.dati("Carrozzeria B")
+        del dati["firma"]
+        self.c.post(f"/veicolo/{vid}/partenza", data=dati, senza_firma=True)
+        d = self.ddt()
+        self.assertIn("data-facoltativa", self.c.get(f"/ddt/{d}").get_data(as_text=True))
+        with self.app.app_context():
+            dest = db.session.get(Ddt, d).movimento.a_sede
+            pos = {"lat": str(dest.lat), "lon": str(dest.lon)}
+        self.c.post(f"/ddt/{d}/arrivo", data=pos, senza_firma=True)
+        with self.app.app_context():
+            m = db.session.get(Ddt, d).movimento
+            self.assertEqual((m.stato, m.firma_conducente, m.firma_destinatario), ("chiuso", None, None))
+        # spente: di nuovo obbligatorie
+        self.c.post("/admin/firme-facoltative", data={"attive": "0"})
+        self.assertNotIn("Firme facoltative ACCESE", self.c.get("/admin/").get_data(as_text=True))
+        self.entra("ufficio")
+        self.assertEqual(self.c.post("/admin/firme-facoltative", data={"attive": "1"}).status_code, 403)

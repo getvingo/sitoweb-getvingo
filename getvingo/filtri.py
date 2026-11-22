@@ -188,6 +188,7 @@ def init_app(app):
     app.jinja_env.globals["timbro_di"] = _servizi.timbro_di
     app.jinja_env.globals["timbro_destinatario"] = _servizi.timbro_destinatario
     app.jinja_env.globals["firma_vettore"] = _servizi.firma_vettore
+    app.jinja_env.globals["firme_facoltative"] = _servizi.firme_facoltative
     # versione di CSS e JS nell'indirizzo: dopo un aggiornamento i telefoni scaricano subito quelli nuovi
     import os
     cartella = os.path.join(app.root_path, "static")

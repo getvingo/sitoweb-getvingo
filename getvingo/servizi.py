@@ -73,6 +73,13 @@ SERVE_FIRMA_CONDUCENTE = "Serve la firma del conducente: firma col dito per part
 SERVE_FIRMA_DESTINATARIO = "Serve la firma del destinatario: firma col dito per chiudere il DDT."
 
 
+def firme_facoltative():
+    """True se la concessionaria ha acceso "Firme facoltative per i test" (Gestione): si parte e si chiude anche
+    senza firma col dito e senza timbro e sigla del vettore."""
+    org = db.session.get(Organizzazione, g.org_id) if g.get("org_id") else None
+    return bool(org and org.firme_facoltative)
+
+
 def firma_vettore(vt):
     """Timbro e sigla del legale rappresentante del vettore: quelli della sua scheda; il vettore della
     concessionaria usa la firma timbrata dei Dati aziendali, quello di un fornitore la firma del fornitore."""
@@ -271,7 +278,7 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
         registra_azione("predisposizione", utente, veicolo, ddt)
         return ddt
 
-    if not firma_conducente:
+    if not firma_conducente and not firme_facoltative():
         raise Vietato("Serve la firma di chi sposta il mezzo.")
     _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at)
     # Il DDT nasce PRIMA della partenza (obbligo DPR 472/1996)
@@ -281,11 +288,11 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
 
 
 def _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at=None):
-    if not firma_conducente:
+    if not firma_conducente and not firme_facoltative():
         raise Vietato(SERVE_FIRMA_CONDUCENTE)
     with db.session.no_autoflush:  # il movimento non è ancora nella sessione
         timbro_sigla = firma_vettore(mov.vettore or (db.session.get(Vettore, mov.vettore_id) if mov.vettore_id else None))
-    if not timbro_sigla:
+    if not timbro_sigla and not firme_facoltative():
         nome = mov.vettore.nome if mov.vettore else "del vettore"
         raise Vietato(f"Il vettore {nome} non ha timbro e sigla del legale rappresentante: caricali in "
                       "Gestione → Vettori (per la concessionaria nei Dati aziendali) prima di emettere il DDT.")
@@ -328,7 +335,7 @@ def crea_ddt_multiplo(veicoli, dati, utente, firma_conducente=None, lat=None, lo
     if verso_il_cliente(dati["a_sede_id"], dati.get("causale")):
         for v in veicoli:
             controlla_targa_consegna(v)
-    if not firma_conducente:
+    if not firma_conducente and not firme_facoltative():
         raise Vietato("Serve la firma di chi sposta i mezzi.")
     ora = adesso()
     movimenti = [Movimento(veicolo=v, da_sede=origine, **dati) for v in veicoli]
@@ -750,7 +757,7 @@ def parti_col_tocco(veicolo, a_sede, utente, lat=None, lon=None, causale=None, p
         if not note:
             raise Vietato("Scrivi (o detta) i dettagli della lavorazione da fare.")
         dati.update(lavorazione=lavorazione, lavorazione_note=note)
-    if not firma:
+    if not firma and not firme_facoltative():
         raise Vietato(SERVE_FIRMA_CONDUCENTE)
     return crea_movimento(veicolo, dati, utente, firma_conducente=firma, lat=lat, lon=lon, posizione=posizione)
 
@@ -795,10 +802,10 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
         raise Vietato("Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.")
     if not conducente:
         raise Vietato("Indica chi sposta il mezzo.")
-    if not firma_conducente:
+    if not firma_conducente and not firme_facoltative():
         raise Vietato(SERVE_FIRMA_CONDUCENTE)
     mov.firma_vettore = firma_vettore(mov.vettore)
-    if not mov.firma_vettore:
+    if not mov.firma_vettore and not firme_facoltative():
         raise Vietato(f"Il vettore {mov.vettore.nome if mov.vettore else ''} non ha timbro e sigla del legale "
                       "rappresentante: caricali in Gestione → Vettori prima di partire.")
     if not mov.mezzo:
@@ -1008,7 +1015,7 @@ def registra_arrivo(mov, utente, lat=None, lon=None, altrove_id=None, note="", f
         raise Vietato("Questo DDT non è in viaggio.")
     if not mov.lavorazione:
         raise Vietato("Prima di chiudere il DDT indica la lavorazione da fare.")
-    if not firma:
+    if not firma and not firme_facoltative():
         raise Vietato(SERVE_FIRMA_DESTINATARIO)
     if lat is None or lon is None:
         raise Vietato(SERVE_POSIZIONE)

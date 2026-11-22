@@ -108,6 +108,7 @@
    titolo: "Firma del conducente" / "Firma del destinatario"; chi: nome sotto la firma; timbro: data URL o None #}
 {% macro firma_dal_vivo(titolo, chi='', timbro=none, societa='') %}
 <input type="hidden" name="firma" data-firma-vivo data-titolo="{{ titolo }}" data-chi="{{ chi }}" data-societa="{{ societa }}"
+       {% if firme_facoltative() %}data-facoltativa{% endif %}
        {% if timbro %}data-timbro="{{ timbro }}"{% endif %}>
 {% endmacro %}
 

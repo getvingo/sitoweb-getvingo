@@ -3707,3 +3707,5 @@ input, select, textarea, .campo input, .campo select, .campo textarea, .stato-vo
 .y-cal-scorre { overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
 .y-cal-scorre .y-cal { min-width: 0; width: 100%; grid-template-columns: repeat(7, calc((100% - 48px) / 5)); }
 .y-cal-scorre .y-cal-g { scroll-snap-align: start; }
+.foglio-firma-piede.con-salta { grid-template-columns: 1fr 2fr; }
+.foglio-firma-piede [data-f-salta] { grid-column: 1 / -1; order: -1; border-style: dashed !important; color: var(--testo-2); }

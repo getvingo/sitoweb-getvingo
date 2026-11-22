@@ -192,7 +192,9 @@ def aggiungi_colonne():
              ("azienda", "timbro", "TEXT"), ("sede", "timbro", "TEXT"), ("vettore", "firma", "TEXT"),
              ("movimento", "firma_vettore", "TEXT"),
              # 22/11/2026: posti auto di sedi e piazzali (Home B1)
-             ("sede", "posti", "INTEGER")]
+             ("sede", "posti", "INTEGER"),
+             # 22/11/2026: firme facoltative per i test
+             ("organizzazione", "firme_facoltative", "BOOLEAN DEFAULT FALSE")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:

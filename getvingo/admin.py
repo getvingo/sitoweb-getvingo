@@ -823,6 +823,19 @@ def importa():
     return render_template("admin/import.html")
 
 
+@bp.route("/firme-facoltative", methods=["POST"])
+@ruolo_richiesto("admin")
+def firme_facoltative():
+    """Interruttore per i test (22/11/2026): firme col dito e timbro e sigla del vettore non obbligatorie."""
+    from .models import Organizzazione
+    org = db.session.get(Organizzazione, g.org_id)
+    org.firme_facoltative = request.form.get("attive") == "1"
+    db.session.commit()
+    flash("Firme facoltative ACCESE: si parte e si chiude anche senza firmare. Ricordati di spegnerle dopo i test."
+          if org.firme_facoltative else "Firme di nuovo obbligatorie, come nell'uso reale.", "ok")
+    return redirect(url_for("admin.indice") + "#test")
+
+
 @bp.route("/prova", methods=["POST"])
 @ruolo_richiesto("admin")
 def carica_prova():

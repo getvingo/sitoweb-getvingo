@@ -117,6 +117,7 @@
     '<span class="foglio-firma-guida" data-f-guida>Firma qui col dito</span></div>' +
     '<p class="foglio-firma-nota" data-f-nota></p></div>' +
     '<div class="foglio-firma-piede"><button type="button" class="btn" data-f-cancella>Cancella</button>' +
+    '<button type="button" class="btn" data-f-salta hidden>Continua senza firma</button>' +
     '<button type="button" class="btn primario" data-f-ok disabled>Conferma la firma</button></div>';
   document.body.appendChild(foglio);
   var canvas = foglio.querySelector('canvas'), ctx = canvas.getContext('2d'), timbroImg = foglio.querySelector('[data-f-timbro]');
@@ -149,6 +150,9 @@
     timbroImg.hidden = !t; if (t) timbroImg.src = t;
     foglio.querySelector('[data-f-nota]').textContent = t ? 'Firma sopra il timbro della società.' :
       (campo.dataset.societa ? 'Timbro di ' + campo.dataset.societa + ' non ancora caricato: si firma senza.' : '');
+    // test (Gestione → Firme facoltative): si può proseguire senza firmare
+    foglio.querySelector('[data-f-salta]').hidden = campo.dataset.facoltativa === undefined;
+    foglio.querySelector('.foglio-firma-piede').classList.toggle('con-salta', campo.dataset.facoltativa !== undefined);
     foglio.hidden = false; document.documentElement.classList.add('con-foglio-firma');
     requestAnimationFrame(dimensiona);
   }
@@ -159,6 +163,14 @@
     if (form) { form.dataset.firmaAnnullata = '1'; if (invio) invio.classList.remove('in-corso'); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !foglio.hidden) foglio.querySelector('[data-f-annulla]').click(); });
+
+  foglio.querySelector('[data-f-salta]').addEventListener('click', function () {
+    if (!attuale) return;
+    attuale.value = ''; attuale.dataset.saltata = '1';
+    var form = attuale.form, bottone = invio;
+    chiudi();
+    if (form.requestSubmit) form.requestSubmit(bottone && bottone.form === form ? bottone : undefined); else form.submit();
+  });
 
   ok.addEventListener('click', function () {
     if (vuota || !attuale) return;
@@ -181,7 +193,7 @@
   campi.forEach(function (campo) {
     var form = campo.form; if (!form) return;
     form.addEventListener('submit', function (e) {
-      if (campo.value) return;
+      if (campo.value || campo.dataset.saltata) return;
       if (e.submitter && e.submitter.dataset.senzaFirma !== undefined) return;  // es. "Predisponi": nessuna partenza
       e.preventDefault(); e.stopImmediatePropagation();
       delete form.dataset.firmaAnnullata;

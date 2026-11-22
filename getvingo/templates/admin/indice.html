@@ -36,7 +36,15 @@
 {% endfor %}
 </div>
 {# 22/11/2026: in fondo, separato, lo svuotamento per ripartire con un test #}
-<div class="zona-pericolo-gestione" style="margin-top:32px;padding-top:16px;border-top:1px dashed var(--bordo-forte)">
+<div class="zona-pericolo-gestione" id="test" style="margin-top:32px;padding-top:16px;border-top:1px dashed var(--bordo-forte)">
+  <h2>Strumenti per i test</h2>
+  {% set facoltative = firme_facoltative() %}
+  <form method="post" action="{{ url_for('admin.firme_facoltative') }}" class="scheda" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="attive" value="{{ '0' if facoltative else '1' }}">
+    <span style="flex:1;min-width:240px"><b>Firme facoltative per i test</b>{% if facoltative %} <span class="badge" style="background:var(--arancio-tenue);color:var(--arancio-testo)">Accese</span>{% endif %}<br>
+      <span class="tenue piccolo">Accese: nella pagina della firma compare "Continua senza firma" e il DDT parte e si chiude anche senza firme né timbro e sigla del vettore. Spente: tutto obbligatorio, come nell'uso reale.</span></span>
+    <button class="btn">{{ 'Spegni: firme obbligatorie' if facoltative else 'Accendi per i test' }}</button>
+  </form>
   <div class="azioni" style="gap:10px">
     <form method="post" action="{{ url_for('admin.carica_prova') }}" data-una-volta
           onsubmit="return confirm('Aggiungere una trentina di vetture di prova in tutti gli stati? Si tolgono con Svuota per un nuovo test.')">
