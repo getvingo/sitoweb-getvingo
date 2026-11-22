@@ -4316,3 +4316,28 @@ class TestNuovaAutoAPassi(Base):
         # VIN sconosciuto: si torna alla nuova auto
         r = self.c.post("/abbina/NUOVO123/esistente", data={"vin": "ZFA31200000999999", "azione": "dati"})
         self.assertTrue(r.headers["Location"].endswith("/abbina/NUOVO123"))
+
+
+class TestSvuota(TestPiuClienti):
+    """22/11/2026: Gestione → Svuota per un nuovo test (solo admin, solo la propria concessionaria, scrivendo SVUOTA)."""
+    def test_svuota_solo_la_propria(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.assertIn("Svuota per un nuovo test", self.c.get("/admin/").get_data(as_text=True))
+        self.assertIn("<b>1</b> auto", self.c.get("/admin/svuota").get_data(as_text=True))
+        r = self.c.post("/admin/svuota", data={"conferma": "no"}, follow_redirects=True)
+        self.assertIn("Niente cancellato", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertEqual(Veicolo.query.count(), 1)
+        self.entra("ufficio")
+        self.assertEqual(self.c.post("/admin/svuota", data={"conferma": "SVUOTA"}).status_code, 403)
+        self.entra("admin")
+        r = self.c.post("/admin/svuota", data={"conferma": "svuota"}, follow_redirects=True)
+        self.assertIn("Portale svuotato: tolte 1 auto, 1 DDT", r.get_data(as_text=True))
+        tutte = {"tutte_le_organizzazioni": True}
+        with self.app.app_context():
+            self.assertEqual((Veicolo.query.filter_by(org_id=1).execution_options(**tutte).count(),
+                              Ddt.query.filter_by(org_id=1).execution_options(**tutte).count(),
+                              Tag.query.filter_by(org_id=1).execution_options(**tutte).count()), (0, 0, 0))
+            self.assertEqual(Tag.query.filter_by(codice="ZZZZ9999").execution_options(**tutte).count(), 1)  # l'altra resta
+            self.assertTrue(Sede.query.filter_by(nome="Sede A").count())

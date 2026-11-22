@@ -35,4 +35,8 @@
   </section>
 {% endfor %}
 </div>
+{# 22/11/2026: in fondo, separato, lo svuotamento per ripartire con un test #}
+<div class="zona-pericolo-gestione" style="margin-top:32px;padding-top:16px;border-top:1px dashed var(--bordo-forte)">
+  <a class="btn-link" style="color:var(--danno-scuro)" href="{{ url_for('admin.svuota') }}">{{ i('attenzione', 's') }} Svuota per un nuovo test: togli auto, DDT e adesivi</a>
+</div>
 {% endblock %}

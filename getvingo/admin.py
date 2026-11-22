@@ -804,3 +804,26 @@ def importa():
             flash(f"Righe con VIN non valido, saltate: {', '.join(map(str, scartati[:30]))}", "errore")
         return redirect(url_for("admin.importa"))
     return render_template("admin/import.html")
+
+
+@bp.route("/svuota", methods=["GET", "POST"])
+@ruolo_richiesto("admin")
+def svuota():
+    """Svuota la concessionaria per ripartire con un test (22/11/2026, richiesta dell'utente; stesso lavoro di
+    `flask svuota-stock`, getvingo/svuota.py): auto, DDT e adesivi via, copia di sicurezza in instance/.
+    Si conferma scrivendo SVUOTA."""
+    import os
+    from . import svuota as svuota_mod
+    if request.method == "POST":
+        if _testo("conferma").upper() != "SVUOTA":
+            flash("Niente cancellato: per confermare scrivi SVUOTA.", "errore")
+            return redirect(url_for("admin.svuota"))
+        cartella = os.path.join(current_app.instance_path, "svuotamenti")
+        os.makedirs(cartella, exist_ok=True)
+        svuota_mod.esporta(g.org_id, os.path.join(cartella, datetime.now().strftime(f"org{g.org_id}-%Y%m%d-%H%M%S.json")))
+        tolte = svuota_mod.svuota(g.org_id)
+        current_app.logger.warning("Svuotamento della concessionaria %s da %s: %s", g.org_id, g.utente.email, tolte)
+        flash(f"Portale svuotato: tolte {tolte['veicolo']} auto, {tolte['ddt']} DDT e {tolte['tag']} adesivi. "
+              "I DDT ripartono dal n. 1 e gli adesivi dal 0001.", "ok")
+        return redirect(url_for("admin.indice"))
+    return render_template("admin/svuota.html", n=svuota_mod.conta(g.org_id))

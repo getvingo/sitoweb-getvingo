@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, csrf_input, indietro %}
+{% block titolo %}Svuota per un nuovo test · Getvingo{% endblock %}
+{% block contenuto %}
+{# 22/11/2026: svuota la concessionaria per ripartire con un test (admin.svuota, getvingo/svuota.py) #}
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.indice')) }}<div class="sopratitolo">Gestione</div><h1>Svuota per un nuovo test</h1>
+  <p class="descrizione-pagina">Toglie auto, DDT e adesivi NFC della concessionaria. Restano utenti, sedi, partner, vettori, dati aziendali e catalogo.</p></div></div>
+<div class="scheda pila" style="max-width:640px">
+  <p style="margin:0"><b>Sparisce:</b></p>
+  <ul style="margin:0;padding-left:20px">
+    <li><b>{{ n.veicolo }}</b> auto, con storico, danni ({{ n.danno }}) e preparazioni ({{ n.preparazione }})</li>
+    <li><b>{{ n.ddt }}</b> DDT, con le loro modifiche</li>
+    <li><b>{{ n.tag }}</b> adesivi NFC</li>
+  </ul>
+  <p class="tenue piccolo" style="margin:0">Dopo, i DDT ripartono dal n. 1 e gli adesivi dal 0001: gli adesivi già scritti con un link /t/<i>codice</i> vanno buttati o riscritti (quelli col link unico rinascono da soli al primo tocco). Una copia di quello che si toglie resta sul server.</p>
+  <details class="ripiega zona-pericolo" open>
+    <summary>{{ i('attenzione', 's') }} Svuota il portale</summary>
+    <form method="post" class="pila" data-una-volta>
+      {{ csrf_input() }}
+      <label class="campo"><span>Per confermare scrivi <b>SVUOTA</b></span>
+        <input name="conferma" autocomplete="off" autocapitalize="characters" required placeholder="SVUOTA"></label>
+      <p class="tenue piccolo" style="margin:0">Non si può annullare.</p>
+      <button class="btn pericolo">{{ i('attenzione', 's') }} Svuota auto, DDT e adesivi</button>
+    </form>
+  </details>
+</div>
+{% endblock %}
