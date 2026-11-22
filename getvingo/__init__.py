@@ -184,6 +184,31 @@ def create_app(config=None):
         from . import backup
         click.echo("Backup salvato: " + backup.esegui(cartella or os.path.join(app.instance_path, "backup"), tieni))
 
+    @app.cli.command("svuota-stock")
+    @click.option("--org", "org_id", type=int, default=None, help="Numero della concessionaria (senza: elenco)")
+    @click.option("--copia", default=None, help="File JSON della copia di sicurezza (predefinito: instance/)")
+    @click.option("--conferma", is_flag=True, help="Cancella davvero (senza: mostra solo cosa sparirebbe)")
+    def svuota_cmd(org_id, copia, conferma):
+        """Toglie auto, DDT e adesivi di una concessionaria per ripartire con un test (vedi getvingo/svuota.py)."""
+        from . import svuota
+        from .models import Organizzazione
+        if org_id is None:
+            for o in Organizzazione.query.order_by(Organizzazione.id):
+                click.echo(f"{o.id}\t{o.sigla or '-'}\t{o.nome}")
+            return
+        org = db.session.get(Organizzazione, org_id)
+        if org is None:
+            raise click.ClickException(f"Nessuna organizzazione n. {org_id}")
+        click.echo(f"{org.nome} ({org.sigla}): " + ", ".join(f"{k} {n}" for k, n in svuota.conta(org_id).items()))
+        if not conferma:
+            click.echo("Niente cancellato: aggiungi --conferma per svuotare.")
+            return
+        from datetime import datetime as _dt
+        percorso = copia or os.path.join(app.instance_path, _dt.now().strftime(f"svuota-org{org_id}-%Y%m%d-%H%M%S.json"))
+        click.echo("Copia di sicurezza: " + svuota.esporta(org_id, percorso))
+        tolte = svuota.svuota(org_id)
+        click.echo("Tolte: " + ", ".join(f"{k} {n}" for k, n in tolte.items()))
+
     @app.cli.command("archivia-ddt")
     def archivia_ddt_cmd():
         """Archivia i PDF dei DDT non ancora in archivio (recupero dopo un invio non riuscito)."""
