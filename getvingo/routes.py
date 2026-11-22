@@ -1755,10 +1755,51 @@ def api_veicolo():
         dati["alimentazione"], fonti["alimentazione"] = d["alimentazione"], "DAL VIN"
     if "anno" not in dati and d["anno_modello"]:
         dati["anno"], fonti["anno"] = d["anno_modello"], "DAL VIN"
-    if not dati and not d["avvisi"]:
+    # 22/11/2026: VIN di un'auto già in stock con il suo adesivo -> niente nuovo inserimento, si prosegue con quella
+    esistente = _auto_esistente(v) if v is not None and v.tag is not None else None
+    if not dati and not d["avvisi"] and not esistente:
         return {}, 404
-    return {"vin": vin, **dati, "fonti": fonti, "da_vin": fonti.get("marca") == "DAL VIN",
+    return {"vin": vin, **dati, "fonti": fonti, "da_vin": fonti.get("marca") == "DAL VIN", "esistente": esistente,
+            "logo": marchi.url(dati["marca"]) if dati.get("marca") else None,
             "anno_modello": d["anno_modello"], "paese": d["paese"], "avvisi": d["avvisi"], "proposta": d["proposta"]}
+
+
+def _auto_esistente(v):
+    """Riassunto dell'auto già in Getvingo per la pagina Nuova auto: dove si trova e cosa si può fare da lì."""
+    m = v.movimento_aperto
+    return {"id": v.id, "nome": v.descrizione, "adesivo": v.tag.codice, "fase": Veicolo.FASI.get(v.fase, ""),
+            "dove": v.sede.nome if v.sede else "", "marca": v.marca or "", "logo": marchi.url(v.marca) if v.marca else None,
+            "puo_spostare": bool(servizi.puo_emettere(v, g.utente) or servizi.puo_emettere_ultimo_ddt(v, g.utente)),
+            "puo_preparare": not servizi.motivo_no_preparazione(v, g.utente),
+            "ddt": {"sigla": m.ddt.sigla, "url": url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)} if m and m.ddt else None}
+
+
+@bp.route("/abbina/<codice>/esistente", methods=["POST"])
+@solo_interni
+def abbina_esistente(codice):
+    """VIN letto sulla pagina Nuova auto che è già in stock con un altro adesivo (22/11/2026): chi è davanti
+    all'auto prosegue con quella. La lettura del VIN sul posto vale come tocco dell'auto (stessa posizione del
+    tocco appena fatto): Vedi i dati, Crea DDT (Dove la porti?) o Metti in preparazione."""
+    vin = vin_mod.normalizza(request.form.get("vin"))
+    v = Veicolo.query.filter_by(vin=vin).first() if vin_mod.valido(vin) else None
+    if v is None or v.tag is None:
+        flash("Quest'auto non è ancora in Getvingo: caricala come nuova.", "errore")
+        return redirect(url_for("main.abbina", codice=codice))
+    session["ultimo_tocco"] = {"veicolo": v.id, "at": time.time()}
+    scheda = url_for("main.tocco_scelta", veicolo_id=v.id)
+    azione = request.form.get("azione")
+    if azione == "dati":
+        return redirect(url_for("main.dati_auto", veicolo_id=v.id, torna=scheda))
+    if azione == "prepara":
+        try:
+            servizi.metti_in_preparazione(v, g.utente)
+            db.session.commit()
+            session.pop("ultimo_tocco", None)  # come dal tocco: il primo passo vuole un nuovo tocco
+            flash(f"{v.descrizione} è in preparazione per la consegna.", "ok")
+        except Vietato as e:
+            db.session.rollback()
+            flash(str(e), "errore")
+    return redirect(scheda)
 
 
 @bp.route("/api/versioni")

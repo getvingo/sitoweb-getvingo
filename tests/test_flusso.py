@@ -4280,3 +4280,39 @@ class TestTrasferimentoDealer(TestPiuClienti):
         r = self.c.post(f"/veicolo/{vid}/trasferisci", data={"dealer_id": self.org2, "conferma": "1"}, follow_redirects=True)
         self.assertIn("Solo un amministratore", r.get_data(as_text=True))
         self.assertNotIn("Togli dallo stock", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+
+
+class TestNuovaAutoAPassi(Base):
+    """22/11/2026: pagina Nuova auto a passi; VIN già in stock → Vedi i dati · Crea DDT · Metti in preparazione."""
+    def test_pagina_a_passi(self):
+        html = self.c.get("/abbina/ABCD2345").get_data(as_text=True)
+        for testo in ("Leggi il VIN", "Inquadra l'etichetta del VIN", "Scrivi il VIN a mano", "È giusto?",
+                      "Non riesco a leggerlo", "Targa, se c'è già", "nuova-auto.js"):
+            self.assertIn(testo, html)
+        self.assertNotIn("tesseract.min.js", html)  # l'OCR si scarica solo quando si scatta la foto
+
+    def test_vin_gia_in_stock(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            db.session.add(Tag(codice="NUOVO123"))
+            db.session.commit()
+        d = self.c.get(f"/api/veicolo?vin={VIN}").get_json()
+        self.assertEqual((d["esistente"]["id"], d["esistente"]["adesivo"]), (vid, "ABCD2345"))
+        self.assertTrue(d["esistente"]["puo_preparare"])
+        self.assertIsNone(self.c.get("/api/veicolo?vin=ZFA31200000999999").get_json().get("esistente"))
+        # Vedi i dati
+        r = self.c.post("/abbina/NUOVO123/esistente", data={"vin": VIN, "azione": "dati"})
+        self.assertIn(f"/veicolo/{vid}/dati", r.headers["Location"])
+        # Crea DDT: la lettura sul posto vale come tocco dell'auto
+        r = self.c.post("/abbina/NUOVO123/esistente", data={"vin": VIN, "azione": "sposta"})
+        self.assertTrue(r.headers["Location"].endswith(f"/veicolo/{vid}/tocco"))
+        with self.c.session_transaction() as s:
+            self.assertEqual(s["ultimo_tocco"]["veicolo"], vid)
+        # Metti in preparazione
+        self.c.post("/abbina/NUOVO123/esistente", data={"vin": VIN, "azione": "prepara"})
+        with self.app.app_context():
+            self.assertIsNotNone(db.session.get(Veicolo, vid).preparazione_attiva)
+            self.assertIsNone(Tag.query.filter_by(codice="NUOVO123").one().veicolo_id)  # l'adesivo nuovo resta libero
+        # VIN sconosciuto: si torna alla nuova auto
+        r = self.c.post("/abbina/NUOVO123/esistente", data={"vin": "ZFA31200000999999", "azione": "dati"})
+        self.assertTrue(r.headers["Location"].endswith("/abbina/NUOVO123"))

@@ -1,10 +1,23 @@
 // Lettura del VIN da foto: prima codice a barre (nativo o ZXing), poi OCR (Tesseract).
+// 22/11/2026 (pagina Nuova auto a passi): la pagina segue la lettura con l'evento "vin-fase"
+// ({fase: 'foto', url} · 'caratteri' · 'controllo' · 'letto' {vin, metodo} · 'errore'); ZXing e Tesseract
+// si scaricano solo quando si scatta la foto (prima si scaricavano all'apertura, anche per chi scrive a mano).
 (function () {
   var input = document.getElementById('foto-vin');
   var campo = document.getElementById('vin');
-  var stato = document.getElementById('stato-lettura');
   var conta = document.getElementById('conta-vin');
   var VIN_RE = /[A-HJ-NPR-Z0-9]{17}/;
+  var LIBRERIE = { ZXing: 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js',
+                   Tesseract: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js' };
+  function fase(nome, dati) { document.dispatchEvent(new CustomEvent('vin-fase', { detail: Object.assign({ fase: nome }, dati || {}) })); }
+  function carica(nome) {
+    if (window[nome]) return Promise.resolve();
+    return new Promise(function (ok) {
+      var s = document.createElement('script'); s.src = LIBRERIE[nome];
+      s.onload = s.onerror = function () { ok(); };
+      document.head.appendChild(s);
+    });
+  }
 
   function normalizza(t) {
     return (t || '').toUpperCase().replace(/[\s\-\.]/g, '')
@@ -45,6 +58,7 @@
     return migliore;
   }
   function aggiornaConta() {
+    if (!conta) return;
     var n = normalizza(campo.value).length;
     conta.textContent = n + '/17 caratteri' + (n === 17 ? ' ✓' : '');
     conta.classList.toggle('ok', n === 17);
@@ -52,7 +66,7 @@
   function trovato(vin, metodo) {
     campo.value = vin;
     aggiornaConta();
-    stato.textContent = 'Letto da ' + metodo + '. Confronta con l\'etichetta prima di confermare.';
+    fase('letto', { vin: vin, metodo: metodo });
     precompila(vin);
   }
   function precompila(vin) {
@@ -61,8 +75,8 @@
     fetch('/api/veicolo?vin=' + encodeURIComponent(vin)).then(function (r) {
       return r.ok ? r.json() : null;
     }).then(function (d) {
-      setTimeout(function () { document.dispatchEvent(new CustomEvent('vin-precompilato', { detail: d || {} })); });
-      if (!d) return;
+      if (!d) { setTimeout(function () { document.dispatchEvent(new CustomEvent('vin-precompilato', { detail: { vin: vin } })); }); return; }
+      setTimeout(function () { document.dispatchEvent(new CustomEvent('vin-precompilato', { detail: d })); });
       ['marca', 'modello', 'versione', 'colore'].forEach(function (k) {
         var el = document.querySelector('[name=' + k + ']');
         if (el && !el.value && d[k]) { el.value = d[k]; el.dataset.corretto = '1'; }  // nome ufficiale: non si riformatta
@@ -75,25 +89,7 @@
       if (alim && !alim.value && d.alimentazione) alim.value = d.alimentazione;
       var tipo = d.tipologia && document.querySelector('[name=tipologia][value=' + d.tipologia + ']');
       if (tipo) tipo.checked = true;
-      // cosa dice il VIN; se la cifra di controllo non torna, l'avviso (e la proposta da confermare a vista)
-      stato.textContent = '';
-      if (d.avvisi && d.avvisi.length) {
-        stato.textContent = d.avvisi[0] + ' ';
-        if (d.proposta) {
-          var usa = document.createElement('button');
-          usa.type = 'button'; usa.className = 'btn-link'; usa.textContent = 'Usa ' + d.proposta;
-          usa.addEventListener('click', function () {
-            campo.value = d.proposta;
-            campo.dispatchEvent(new Event('input', { bubbles: true }));  // riconta e rilegge i dati
-          });
-          stato.appendChild(usa);
-        }
-      } else {
-        var dalVin = Object.keys(d.fonti || {}).filter(function (k) { return d.fonti[k] === 'DAL VIN'; });
-        if (dalVin.length) stato.textContent = 'Dal VIN: ' + [d.marca, d.modello].filter(Boolean).join(' ') +
-          (d.modello ? '' : ' (il modello scrivilo tu)') + '. Controlla e completa.';
-      }
-    }).catch(function () {});
+    }).catch(function () { document.dispatchEvent(new CustomEvent('vin-precompilato', { detail: { vin: vin } })); });
   }
 
   async function barcodeNativo(img) {
@@ -164,27 +160,29 @@
     return scelto;
   }
 
-  input.addEventListener('change', async function () {
+  if (input) input.addEventListener('change', async function () {
     var file = input.files[0];
     if (!file) return;
-    stato.textContent = 'Lettura in corso…';
     var url = URL.createObjectURL(file);
+    fase('foto', { url: url });
     var img = new Image();
     img.src = url;
-    await img.decode();
     try {
+      await img.decode();
       var vin = await barcodeNativo(img);
       if (vin) return trovato(vin, 'codice a barre');
+      await carica('ZXing');
       vin = await barcodeZxing(url);
       if (vin) return trovato(vin, 'codice a barre');
-      stato.textContent = 'Nessun codice a barre, leggo i caratteri…';
+      fase('caratteri');
+      await carica('Tesseract');
       vin = await ocr(img, file);
-      if (vin) return trovato(vin, 'foto (OCR)');
-      stato.textContent = 'VIN non riconosciuto: riprova avvicinandoti all\'etichetta, oppure digitalo a mano.';
+      if (vin) { fase('controllo'); return trovato(vin, 'foto'); }
+      fase('errore');
     } catch (e) {
-      stato.textContent = 'Errore di lettura: digita il VIN a mano.';
+      fase('errore');
     } finally {
-      URL.revokeObjectURL(url);
+      input.value = '';  // la stessa foto si può riscegliere
     }
   });
   campo.addEventListener('input', function () {
