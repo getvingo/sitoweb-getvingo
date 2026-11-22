@@ -72,10 +72,10 @@
                                                             'admin.gruppo_fornitore', 'admin.utente', 'admin.prepara_adesivi'))
                   or ep.startswith('piattaforma.')) %}
 {% if g.utente %}
-{# 22/11/2026, design B1 "Getvingo Yard": da computer la barra laterale fissa (menu, vetture per stato, chi sei);
+{# 22/11/2026, design B1: da computer la barra laterale fissa (menu, vetture per stato, chi sei);
    dal telefono resta la testata in alto e il menu in basso #}
 <aside class="barra-laterale" aria-label="Menu principale">
-  <a class="bl-marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo.svg') }}" alt="getvingo"><span>Yard</span></a>
+  <a class="bl-marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="getvingo"></a>
   <nav class="bl-menu">
     {% if g.utente.interno %}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home') }}<span>Home</span></a>
@@ -114,7 +114,7 @@
 </aside>
 <header class="testata">
   <div class="testata-dentro">
-    <a class="marchio" href="{{ url_for('main.home') }}"><picture><source srcset="{{ url_for('static', filename='logo-negativo.svg') }}" media="(prefers-color-scheme: dark)"><img src="{{ url_for('static', filename='logo.svg') }}" alt="Getvingo"></picture></a>
+    <a class="marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="Getvingo"></a>
     <nav class="nav-alto">
       <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home', 's') }} {{ 'Home' if g.utente.interno else 'Lavorazioni' }}</a>
       {% if g.utente.interno %}

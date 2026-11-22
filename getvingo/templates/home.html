@@ -2,7 +2,7 @@
 {% from "_macro.html" import i, tocca_adesivo %}
 {% block titolo %}Home · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
-{# Home "Getvingo Yard" B1 (22/11/2026, getvingo-dashboard-B1-specifiche.md e i due riferimenti dell'utente).
+{# Home B1 (22/11/2026, getvingo-dashboard-B1-specifiche.md e i due riferimenti dell'utente).
    Ogni numero dice cosa conta e su quale periodo; ogni colore ha accanto il suo testo. #}
 {% macro logo_marca(marca, lato=30) %}{% set url = marca|marchio if marca else none %}
 <span class="y-logo" style="width:{{ lato }}px;height:{{ lato }}px" role="img" aria-label="Logo {{ marca or 'marca non indicata' }}">{% if url %}<img src="{{ url }}" alt="" loading="lazy">{% else %}<b style="font-size:{{ 9 if (marca or '')|length > 4 else 10.5 }}px">{{ ((marca or '?')|iniziali)[:4] }}</b>{% endif %}</span>
