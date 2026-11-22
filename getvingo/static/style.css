@@ -3703,3 +3703,7 @@ input, select, textarea, .campo input, .campo select, .campo textarea, .stato-vo
 .y-allerta > .btn, .y-allerta .btn.piccolo { flex: none !important; width: auto !important; }
 .y-frecce a.btn { display: inline-flex !important; width: auto !important; height: 36px !important; flex-direction: row; gap: 6px; padding: 0 12px; }
 .y-ev b { font-size: 11px; line-height: 1.25; }
+/* Calendario della settimana (22/11/2026): da lunedì, lunedì–venerdì riempiono il riquadro, sabato e domenica a destra scorrendo */
+.y-cal-scorre { overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
+.y-cal-scorre .y-cal { min-width: 0; width: 100%; grid-template-columns: repeat(7, calc((100% - 48px) / 5)); }
+.y-cal-scorre .y-cal-g { scroll-snap-align: start; }

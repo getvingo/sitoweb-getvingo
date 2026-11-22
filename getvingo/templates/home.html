@@ -91,12 +91,12 @@
   {# 5.4 Calendario · prossimi 7 giorni #}
   {% set primo, ultimo = calendario[0][0], calendario[-1][0] %}
   <section class="y-box">
-    <div class="y-box-testa"><div><h2>Calendario · oggi e prossimi 6 giorni</h2><span>Quando le vetture saranno pronte: fine lavori dai fornitori e preparazioni in sede</span></div>
+    <div class="y-box-testa"><div><h2>Calendario della settimana</h2><span>Quando le vetture saranno pronte: fine lavori dai fornitori e preparazioni in sede · sabato e domenica scorrendo di lato</span></div>
       <div class="y-frecce"><a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">{{ i('orologio', 's') }} Calendario completo</a><a href="{{ url_for('main.home', dal=(primo - timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana precedente">‹</a>
         <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
         <a href="{{ url_for('main.home', dal=(primo + timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana successiva">›</a></div></div>
     <div class="y-box-dentro">
-      <div class="y-scorre"><div class="y-cal">
+      <div class="y-scorre y-cal-scorre"><div class="y-cal">
         {% for d, ev in calendario %}
         <div class="y-cal-g {{ 'y-oggi-g' if d == ora.date() }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == ora.date() else giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
           {% for e in ev %}

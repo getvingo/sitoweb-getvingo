@@ -3796,7 +3796,7 @@ class TestTelefonoEssenziale(Base):
         # 22/11/2026, Home B1: da computer calendario a 7 giorni e fornitori degli ultimi 30 giorni;
         # dal telefono solo "Da fare per te" (niente statistiche né calendario)
         home = self.c.get("/").get_data(as_text=True)
-        for testo in ("Calendario · oggi e prossimi 6 giorni", "Fornitori esterni", "Carrozzeria B", "Stock per marca",
+        for testo in ("Calendario della settimana", "Fornitori esterni", "Carrozzeria B", "Stock per marca",
                       'class="y-tel solo-telefono"', 'class="y-home solo-computer"'):
             self.assertIn(testo, home)
 
@@ -3954,7 +3954,7 @@ class TestCalendarioPanoramica(Base):
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Calendario · oggi e prossimi 6 giorni", home)  # 22/11/2026: Home B1
+        self.assertIn("Calendario della settimana", home)  # 22/11/2026: Home B1
         self.assertIn("/calendario", home)
         cal = self.c.get("/calendario").get_data(as_text=True)  # il mese intero: preparazioni e lavorazioni insieme
         self.assertIn('class="cal-voce lavorazione previsto', cal)
@@ -4429,5 +4429,5 @@ class TestPagineStato(Base):
         self.assertEqual(self.c.get("/vetture/altro").status_code, 404)
         home = self.c.get("/").get_data(as_text=True)
         self.assertIn('href="/lavorazioni"', home)        # Dai fornitori → Lavorazioni
-        self.assertIn("Calendario · oggi e prossimi 6 giorni", home)
+        self.assertIn("Calendario della settimana", home)
         self.assertNotIn("<h2>Pronte oggi</h2>", home)     # era una ripetizione del calendario

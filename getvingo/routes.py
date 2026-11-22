@@ -463,7 +463,9 @@ def home():
     try:
         cal_dal = date.fromisoformat(request.args.get("dal", ""))
     except ValueError:
-        cal_dal = oggi  # 22/11/2026: da oggi (al posto di "Pronte oggi", che lo ripeteva)
+        # 22/11/2026: la settimana da lunedì (nel fine settimana quella che viene); si vede lunedì–venerdì,
+        # sabato e domenica scorrendo di lato
+        cal_dal = oggi - timedelta(days=oggi.weekday()) if oggi.weekday() < 5 else oggi + timedelta(days=7 - oggi.weekday())
     cal_giorni = [cal_dal + timedelta(days=k) for k in range(7)]
     eventi = _eventi_calendario(cal_giorni[0], cal_giorni[-1])
     calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
