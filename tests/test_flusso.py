@@ -855,7 +855,7 @@ class TestDanni(Base):
             d = Danno.query.one()
             self.assertEqual((d.contesto, len(d.foto), d.aperto), ("piazzale", 1, True))
             nome = d.foto[0].file
-        self.assertIn("danno da verificare", self.c.get("/").get_data(as_text=True))
+        self.assertIn('aria-label="1 da verificare"', self.c.get("/").get_data(as_text=True))  # Danni nel menu
         self.assertEqual(self.c.get(f"/foto/{nome}").data, JPEG)
         self.entra("carr")
         self.assertEqual(self.c.get(f"/foto/{nome}").status_code, 403)  # auto non sua
@@ -865,12 +865,12 @@ class TestDanni(Base):
         self.assertIn(f"/foto/{nome}", self.c.get("/danno/1").get_data(as_text=True))
         # per chiuderlo serve la foto della riparazione
         self.c.post("/danno/1/risolvi", data={"nota": "era già presente"})
-        self.assertIn("danno da verificare", self.c.get("/").get_data(as_text=True))
+        self.assertIn('aria-label="1 da verificare"', self.c.get("/").get_data(as_text=True))
         self.c.post("/danno/1/risolvi", data={"nota": "era già presente", "foto": [(io.BytesIO(JPEG), "ok.jpg")]},
                     content_type="multipart/form-data")
         with self.app.app_context():
             self.assertEqual(len(db.session.get(Danno, 1).foto_risoluzione), 1)
-        self.assertNotIn("danno da verificare", self.c.get("/").get_data(as_text=True))
+        self.assertNotIn('aria-label="1 da verificare"', self.c.get("/").get_data(as_text=True))
         self.assertIn("era già presente", self.c.get("/danni?vista=risolti").get_data(as_text=True))
 
     def test_danno_all_arrivo(self):
@@ -2969,16 +2969,12 @@ class TestSistemaDesign(Base):
         with self.app.app_context():
             db.session.add(Danno(veicolo_id=vid, zona="Tetto", descrizione="grandine", segnalato_da_id=1))
             db.session.commit()
+        # 22/11/2026, design B1: i danni da verificare stanno nel menu laterale (Danni con il numero);
+        # "Vetture per stato" in ordine: In viaggio · Dai fornitori · Da ritirare · In preparazione · Consegnate oggi
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("riga-avviso-danni", home)
-        self.assertNotIn("blocca 1 consegna", home)  # auto in sede: non blocca consegne
-        self.assertLess(home.index("In viaggio</span>"), home.index("Da ritirare</span>"))  # 14/11 sera: In viaggio · Dai fornitori · Da ritirare…
-        self.assertNotIn("In stock</span>", home)  # tolto dalla Home
-        self.c.post("/t/ABCD2345", data=POS)
-        self.c.post(f"/veicolo/{vid}/preparazione")
-        home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("riga-avviso-danni", home)
-        self.assertIn("blocca 1 consegna", home)
+        self.assertIn('aria-label="1 da verificare"', home)
+        ordine = [home.index(f"<b>{n}</b>") for n in ("In viaggio", "Dai fornitori", "Da ritirare", "In preparazione", "Consegnate oggi")]
+        self.assertEqual(ordine, sorted(ordine))
 
 
 class TestDdtEssenzialeEAnalisi(TestLavorazioniStimaESolleciti):
@@ -3401,11 +3397,13 @@ class TestQui(Base):
 class TestDaFareSoloLeMie(Base):
     """15/11/2026: "Solo le mie" di base per tutti (admin compreso), a sinistra di "Tutte"."""
     def test_vista_iniziale_per_mansione(self):
+        # 22/11/2026, Home B1: amministratore e resp. commerciale partono da "Tutte", le altre mansioni da "Solo le mie"
         home = self.c.get("/").get_data(as_text=True)  # admin
-        self.assertIn('href="/?mie=1" class="attivo"', home)
-        self.assertIn('href="/?mie=0" class=""', home)
-        self.assertLess(home.index('href="/?mie=1"'), home.index('href="/?mie=0"'))
-        self.assertIn('href="/?mie=0" class="attivo"', self.c.get("/?mie=0").get_data(as_text=True))
+        self.assertIn('mie=0" aria-pressed="true">Tutte', home)
+        self.assertLess(home.index(">Solo le mie<"), home.index(">Tutte<"))
+        self.entra("autista")
+        self.assertIn('mie=1" aria-pressed="true">Solo le mie', self.c.get("/").get_data(as_text=True))
+        self.assertIn('mie=0" aria-pressed="true">Tutte', self.c.get("/?mie=0").get_data(as_text=True))
 
 
 class TestControlliDellaSera(Base):
@@ -3419,9 +3417,8 @@ class TestControlliDellaSera(Base):
             m.partenza_at = adesso() - timedelta(minutes=(m.stima_viaggio_min or 20) + 90)
             db.session.commit()
         pagina = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Arrivo in ritardo", pagina)
-        self.assertIn("Verifica il viaggio", pagina)
-        self.assertIn("Pronte oggi", pagina)  # 14/11/2026: al posto di "Preparazioni · oggi"
+        self.assertIn("Arrivo in ritardo", pagina)  # 22/11/2026: nell'agenda, sotto l'attività
+        self.assertIn("Movimentazioni e preparazioni", pagina)
 
     def test_viaggio_dal_fornitore_senza_stima(self):
         """Rientro da un fornitore senza posizione sulla mappa: l'arrivo non si stima, ma dopo 3 ore è da verificare."""
@@ -3440,7 +3437,7 @@ class TestControlliDellaSera(Base):
             db.session.commit()
         pagina = self.c.get("/").get_data(as_text=True)
         self.assertIn("Arrivo in ritardo", pagina)
-        self.assertIn("arrivo non stimabile", pagina)
+        self.assertIn("arrivo non stimabile", pagina)  # 22/11/2026: nell'agenda della Home
 
     def test_analisi_solo_admin(self):
         self.assertEqual(self.c.get("/analisi").status_code, 200)
@@ -3756,7 +3753,8 @@ class TestTelefonoSnello(Base):
         self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
         self.entra("autista")
         pagina = self.c.get("/").get_data(as_text=True)
-        for testo in ("Cosa fai adesso?", "data-leggi-nfc", "Ritiro assegnato a te", "<h1>Home</h1>"):  # Panoramica → Home (14/11/2026)
+        # 22/11/2026, telefono B1: Tocca l'adesivo e "Da fare per te" con l'azione e la destinazione
+        for testo in ("data-leggi-nfc", "Da fare per te", "Porta a Carrozzeria B", "<h1>Home</h1>"):
             self.assertIn(testo, pagina)
 
 
@@ -3795,15 +3793,12 @@ class TestTelefonoEssenziale(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
-        self.entra("autista")  # mansione Consegne: solo ciò che serve (14/11/2026): ritiri e calendario
+        # 22/11/2026, Home B1: da computer calendario a 7 giorni e fornitori degli ultimi 30 giorni;
+        # dal telefono solo "Da fare per te" (niente statistiche né calendario)
         home = self.c.get("/").get_data(as_text=True)
-        self.assertNotIn("Fornitori in ritardo", home)          # quello è per l'ufficio
-        self.assertIn("Quando saranno pronte", home)
-        self.assertIn('"t": "lavorazione"', home)                # la fine lavori sta nel calendario
-        self.entra("admin")
-        self.assertIn("data-cal-tel", self.c.get("/").get_data(as_text=True))
-        self.assertNotIn("cerca-veloce", home)  # la ricerca sta nella scheda Cerca
-        self.assertIn('class="home-telefono tocco solo-telefono"', home)  # sul computer non si vede
+        for testo in ("Calendario · prossimi 7 giorni", "Fornitori esterni", "Carrozzeria B", "Stock per marca",
+                      'class="y-tel solo-telefono"', 'class="y-home solo-computer"'):
+            self.assertIn(testo, home)
 
     def test_admin_gestisce_gli_account_dal_telefono(self):
         pagina = self.c.get("/admin/aziende").get_data(as_text=True)
@@ -3959,7 +3954,7 @@ class TestCalendarioPanoramica(Base):
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
         home = self.c.get("/").get_data(as_text=True)
-        self.assertIn("Pronte oggi", home)              # in Home solo oggi (14/11/2026)
+        self.assertIn("Calendario · prossimi 7 giorni", home)  # 22/11/2026: Home B1
         self.assertIn("/calendario", home)
         cal = self.c.get("/calendario").get_data(as_text=True)  # il mese intero: preparazioni e lavorazioni insieme
         self.assertIn('class="cal-voce lavorazione previsto', cal)

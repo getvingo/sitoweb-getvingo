@@ -1,233 +1,196 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, icona_fase, tocca_adesivo, marchio, badge_condizione %}
+{% from "_macro.html" import i, tocca_adesivo %}
+{% block titolo %}Home · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
+{# Home "Getvingo Yard" B1 (22/11/2026, getvingo-dashboard-B1-specifiche.md e i due riferimenti dell'utente).
+   Ogni numero dice cosa conta e su quale periodo; ogni colore ha accanto il suo testo. #}
+{% macro logo_marca(marca, lato=30) %}{% set url = marca|marchio if marca else none %}
+<span class="y-logo" style="width:{{ lato }}px;height:{{ lato }}px" role="img" aria-label="Logo {{ marca or 'marca non indicata' }}">{% if url %}<img src="{{ url }}" alt="" loading="lazy">{% else %}<b style="font-size:{{ 9 if (marca or '')|length > 4 else 10.5 }}px">{{ ((marca or '?')|iniziali)[:4] }}</b>{% endif %}</span>
+{% endmacro %}
+{% macro stato_att(s) %}<span class="y-stato y-{{ s }}"><i aria-hidden="true"></i>{{ {'fatto': 'Fatto', 'corso': 'In corso', 'dafare': 'Da fare'}[s] }}</span>{% endmacro %}
+{% macro barra3(c) %}{% set tot = c.fatto + c.corso + c.dafare %}
+<div class="y-barra" role="img" aria-label="{{ c.fatto }} fatte, {{ c.corso }} in corso, {{ c.dafare }} da fare">
+  {% if tot %}<span class="fatto" style="flex:{{ c.fatto }} 1 0"></span><span class="corso" style="flex:{{ c.corso }} 1 0"></span><span class="dafare" style="flex:{{ c.dafare }} 1 0"></span>{% endif %}</div>
+<div class="y-legenda"><span><i class="fatto"></i><b>{{ c.fatto }}</b> fatte</span><span><i class="corso"></i><b>{{ c.corso }}</b> in corso</span><span><i class="dafare"></i><b>{{ c.dafare }}</b> da fare</span></div>
+{% endmacro %}
 {% block contenuto %}
-{# Dal telefono (sotto 1024 px), come nella demo (12/11/2026): tocca un'auto, le tue cose da fare, cerca.
-   Il quadro di tutta la concessionaria (Panoramica) sul telefono non si mostra: resta sul computer. #}
-<section class="home-telefono tocco solo-telefono">
-  <div class="tocco-titolo"><small class="sopra">Ciao {{ g.utente.nome.split()[0] }}</small><h1>Cosa fai adesso?</h1></div>
+
+{# ======================= TELEFONO DEL PERSONALE: solo ciò che serve per muovere e preparare le auto ======================= #}
+<section class="y-tel solo-telefono">
   {{ tocca_adesivo() }}
-
-  {# 14/11/2026 sera: dal telefono lo stesso "Da fare" del computer (fasce Adesso · Oggi · Prossimi giorni,
-     Solo le mie (predefinito, a sinistra) · Tutte); al posto di "Da andare a prendere",
-     "Fornitori in ritardo" e "In preparazione", che erano le stesse auto. Poi "I tuoi lavori" senza doppioni. #}
-  <div class="tel-fare-testa"><h2 class="sezione-t">Da fare{% if totale_da_fare.mostrate %} · {{ totale_da_fare.mostrate }}{% endif %}</h2>
-    <nav class="interruttore filtro-gruppo in-riga" aria-label="Quali voci">
-      <a href="{{ url_for('main.home', mie=1) }}" class="{{ 'attivo' if solo_mie }}">Mie</a>
-      <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte</a></nav></div>
-  {% set gia = [] %}
-  {% for chiave, titolo, icona, voci in da_fare if voci %}
-  <h3 class="tel-fascia fascia-{{ chiave }}">{{ i(icona, 's') }} {{ titolo }}</h3>
-  <div class="per-te">
-    {% for x in voci %}{% set _ = gia.append(x.v.id) %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
-    <a class="per-te-voce fare-tel fare-{{ chiave }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
-      <span><span class="fare-tel-etichetta">{{ x.etichetta }} · {{ rep[0] }}</span><b>{{ x.v.descrizione }}</b><small>{{ x.testo }}</small>
-        {% if x.azione %}{% set dal_tel = x.azione[0] in ('Verifica il viaggio', 'Apri il DDT', 'Verifica il danno', 'Apri la preparazione') %}
-        <em class="{{ '' if dal_tel else 'dal-computer' }}">{{ x.azione[0] }}{{ '' if dal_tel else ' · dal computer' }}</em>{% endif %}</span>{{ i('chevron', 's') }}</a>
-    {% endfor %}
-  </div>
-  {% else %}<p class="vuoto-telefono">{{ 'Nessuna attività urgente da fare.' }}</p>
+  <div class="y-tel-testa"><h1>Da fare per te</h1><span>{{ compiti|length }}</span></div>
+  {% for c in compiti %}
+  <a class="y-tel-voce" href="{{ c.url }}">{{ logo_marca(c.v.marca, 40) }}
+    <span class="y-tel-t"><b>{{ c.azione }}</b><span>{{ c.v.descrizione }}{{ ' · ' ~ c.v.colore|lower if c.v.colore }}</span><small>{{ c.dove }}</small></span>{{ i('chevron') }}</a>
+  {% else %}
+  <p class="y-tel-vuoto">Niente da fare per te adesso. Tocca l'adesivo di un'auto per vedere cosa c'è da fare.</p>
   {% endfor %}
-
-  {% set lavori = per_te|rejectattr('v.id', 'in', gia)|list %}
-  {% if lavori %}
-  <h2 class="sezione-t">I tuoi lavori</h2>
-  <div class="per-te">
-    {% for x in lavori %}
-    <a class="per-te-voce {{ x.tipo }}" href="{{ x.url }}"><span class="per-te-barra" aria-hidden="true"></span>
-      <span><b>{{ x.titolo }}</b><small>{{ x.v.descrizione }} · {{ x.testo }}</small></span>{{ i('chevron', 's') }}</a>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {# Calendario (14/11/2026): chiuso mostra solo oggi; "Apri il calendario" mostra il mese come un calendario vero,
-     con i pallini (verde acqua preparazioni, senape fine lavori, rosso ritardi); toccando un giorno compaiono le sue auto #}
-  <h2 class="sezione-t">{{ 'Calendario preparazioni' if cal_solo_prep else 'Quando saranno pronte' }}</h2>
-  <section class="cal-tel" data-cal-tel data-oggi="{{ oggi_iso }}">
-    <script type="application/json" data-cal-eventi>{{ eventi_cal|tojson }}</script>
-    <div class="cal-tel-mese" data-cal-mese hidden>
-      <div class="cal-tel-testa"><button type="button" class="cal-tel-freccia" data-cal-prec aria-label="Mese prima">‹</button>
-        <b data-cal-titolo></b><button type="button" class="cal-tel-freccia" data-cal-succ aria-label="Mese dopo">›</button></div>
-      <div class="cal-tel-griglia" data-cal-griglia></div>
-      <div class="cal-tel-legenda">{% if not cal_solo_prep %}<span class="lg preparazione">Preparazione</span><span class="lg lavorazione">Fine lavori</span>{% endif %}<span class="lg anticipo-preparazione">Pronta prima</span>{% if not cal_solo_prep %}<span class="lg anticipo-lavorazione">Finita prima</span>{% endif %}</div>
-    </div>
-    <h3 class="cal-tel-giorno" data-cal-giorno></h3>
-    <div class="per-te" data-cal-voci></div>
-    <button type="button" class="btn pieno cal-tel-apri" data-cal-apri>{{ i('orologio', 's') }} Apri il calendario</button>
-  </section>
 </section>
-<div class="titolo-pagina">
-  <div><div class="sopratitolo">Ciao {{ g.utente.nome.split()[0] }}</div><h1>Home</h1>
-    <p class="descrizione-pagina">Cosa c'è da fare adesso e dove sono le auto, a colpo d'occhio.</p></div>
-</div>
 
-{# Barra "Trova" (11/11/2026): risultati mentre si scrive (auto, DDT, adesivi). Invio: se c'è un solo risultato
-   lo apre, altrimenti la pagina Cerca. La chat con l'assistente torna con CHAT_PANORAMICA (routes.py) #}
-{% if chat_panoramica %}
-{# Barra unica: cerca o chiedi. Toccandola si allarga e diventa la chat con l'assistente #}
-<section class="chiedi" id="chiedi" data-ia="{{ '1' if ia_attiva else '' }}">
-  <form class="chiedi-barra" id="chat-form" action="{{ url_for('main.cerca') }}">
-    {{ i('chat') }}
-    <input id="chat-testo" name="q" autocomplete="off" placeholder="Cerca un'auto o chiedi…" aria-label="Cerca un'auto o chiedi all'assistente">
-    <button type="button" class="btn-mic-piccolo" id="chat-mic" aria-label="Parla">{{ i('mic') }}</button>
-  </form>
-  <div class="chiedi-corpo">
-    <div class="chat-msg" id="chat-msg">
-      {% if ia_attiva %}
-      <div class="suggerimenti">
-        <button data-domanda="Dov'è la Golf bianca?">Dov'è la Golf bianca?</button>
-        <button data-domanda="Quali auto sono ferme dai fornitori da più di una settimana?">Quali auto sono ferme dai fornitori da più di una settimana?</button>
-        <button data-domanda="Quanti veicoli commerciali abbiamo in piazzale?">Quanti veicoli commerciali abbiamo in piazzale?</button>
+{# ======================= COMPUTER: HOME DEI GESTORI ======================= #}
+<div class="y-home solo-computer">
+  <header class="y-testa">
+    <div><span class="y-data">{{ data_lunga }} · aggiornato alle {{ ora.strftime('%H:%M') }}</span><h1>Home</h1></div>
+    <div class="y-testa-dx">
+      <form method="get" class="y-sede">
+        <input type="hidden" name="periodo" value="{{ periodo }}">
+        <select name="sede" aria-label="Sede" onchange="this.form.submit()">
+          <option value="">Tutte le sedi</option>
+          {% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if sede_id == s.id }}>{{ s.nome }}</option>{% endfor %}
+        </select>
+      </form>
+      <section class="chiedi trova y-cerca" id="trova" role="search">
+        <form class="chiedi-barra" id="trova-form" action="{{ url_for('main.cerca') }}">
+          {{ i('cerca', 's') }}
+          <input id="trova-testo" name="q" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"
+                 placeholder="Cerca VIN, targa o DDT" aria-label="Cerca VIN, targa o DDT"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trova-risultati">
+          <button type="button" class="btn-mic-piccolo" id="trova-mic" aria-label="Detta cosa cercare">{{ i('mic', 's') }}</button>
+        </form>
+        <div class="trova-risultati" id="trova-risultati" role="listbox" aria-label="Risultati" hidden></div>
+        <p class="nascosto" id="trova-stato" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+  </header>
+
+  {# 5.1 La giornata in tre numeri #}
+  <div class="y-tre">
+    <div class="y-num"><span class="y-num-t">Movimentazioni di oggi</span>
+      <span class="y-num-n">{{ giornata.mov.totale }} <small>tra trasporti, spostamenti, arrivi e consegne</small></span>{{ barra3(giornata.mov) }}</div>
+    <div class="y-num"><span class="y-num-t">Preparazioni di oggi</span>
+      <span class="y-num-n">{{ giornata.prep.totale }} <small>preparazioni da finire oggi</small></span>{{ barra3(giornata.prep) }}</div>
+    <div class="y-num"><span class="y-num-t">Lavorazioni che finiscono nei prossimi 3 giorni</span>
+      <span class="y-num-n">{{ giornata.lav.totale }} <small>vetture da ritirare dai fornitori</small></span>
+      <div class="y-legenda">{% for g_, n in giornata.lav.giorni %}<span><b>{{ n }}</b> {{ g_ }}</span>{% endfor %}
+        {% if giornata.lav.ritardo %}<span class="y-att">{{ giornata.lav.ritardo }} già in ritardo</span>{% endif %}</div></div>
+  </div>
+
+  {# 5.2 Stock per marca #}
+  <section class="y-box">
+    <div class="y-box-testa"><div><h2>Stock per marca</h2><span>Colpo d'occhio sulle {{ n_attivi }} vetture in carico · {{ 'le ' ~ marche|length ~ ' marche principali' if n_marche > marche|length else (marche|length ~ (' marca' if marche|length == 1 else ' marche')) }}</span></div>
+      <a href="{{ url_for('main.piazzale') }}">Tutte le {{ n_marche }} {{ 'marca' if n_marche == 1 else 'marche' }}</a></div>
+    <div class="y-box-dentro">
+      <div class="y-marche">
+        {% for r in marche %}
+        <a class="y-marca" href="{{ url_for('main.piazzale', marca=r.marca) }}">
+          <div class="y-marca-testa">{{ logo_marca(r.marca, 40) }}<div><b>{{ r.marca }}</b><small>in carico</small></div><span class="y-marca-n">{{ r.totale }}</span></div>
+          <div class="y-barra sottile" role="img" aria-label="{{ r.marca }}: {{ r.sede }} in sede, {{ r.preparazione }} in preparazione, {{ r.fornitori }} dai fornitori, {{ r.viaggio }} in viaggio">
+            <span class="sede" style="flex:{{ r.sede }} 1 0"></span><span class="prep" style="flex:{{ r.preparazione }} 1 0"></span><span class="forn" style="flex:{{ r.fornitori }} 1 0"></span><span class="viaggio" style="flex:{{ r.viaggio }} 1 0"></span></div>
+          <div class="y-marca-num"><span>In sede <b>{{ r.sede }}</b></span><span>In preparazione <b>{{ r.preparazione }}</b></span><span>Dai fornitori <b>{{ r.fornitori }}</b></span><span>In viaggio <b>{{ r.viaggio }}</b></span></div>
+        </a>
+        {% else %}<p class="tenue">Nessuna vettura in carico.</p>{% endfor %}
       </div>
+      <div class="y-legenda"><span><i class="sede"></i>In sede</span><span><i class="prep"></i>In preparazione</span><span><i class="forn"></i>Dai fornitori</span><span><i class="viaggio"></i>In viaggio</span></div>
+    </div>
+  </section>
+
+  {# 5.3 Movimentazioni e preparazioni (agenda) #}
+  <section class="y-box">
+    <div class="y-box-testa"><div><h2>Movimentazioni e preparazioni</h2><span>Chi fa cosa, dove e a che punto è{{ ' · solo le tue' if solo_mie }}</span></div>
+      <div class="y-filtri">
+        <div class="y-segmenti" role="group" aria-label="Periodo">
+          {% for k, nome in (('oggi', 'Oggi'), ('domani', 'Domani'), ('7', 'Prossimi 7 giorni')) %}
+          <a href="{{ url_for('main.home', periodo=k, sede=sede_id, mie='1' if solo_mie else '0') }}" aria-pressed="{{ 'true' if periodo == k else 'false' }}">{{ nome }} · {{ conta_agenda[k] }}</a>{% endfor %}
+        </div>
+        <div class="y-segmenti" role="group" aria-label="Quali attività">
+          <a href="{{ url_for('main.home', periodo=periodo, sede=sede_id, mie='1') }}" aria-pressed="{{ 'true' if solo_mie else 'false' }}">Solo le mie</a>
+          <a href="{{ url_for('main.home', periodo=periodo, sede=sede_id, mie='0') }}" aria-pressed="{{ 'false' if solo_mie else 'true' }}">Tutte</a>
+        </div>
+      </div></div>
+    <div class="y-scorre"><table class="y-tab">
+      <thead><tr><th>Ora</th><th>Attività</th><th>Vettura</th><th>Da → a</th><th>Chi</th><th>Stato</th></tr></thead>
+      <tbody>
+      {% for x in agenda %}
+      <tr data-href="{{ x.url }}" tabindex="0">
+        <td class="y-mono">{{ x.at.strftime('%H:%M') if periodo != '7' else (giorni_brevi[x.at.weekday()] ~ ' ' ~ x.at.day ~ ' · ' ~ x.at.strftime('%H:%M')) }}</td>
+        <td><b>{{ x.attivita }}</b>{% if x.ddt %}<small class="y-mono">DDT {{ x.ddt }}</small>{% endif %}{% if x.nota %}<small class="y-att">{{ x.nota|capitalize }}</small>{% endif %}</td>
+        <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
+          <small class="y-vin">{{ x.v.impronta|impronta(14) }}<span class="y-mono">{{ x.v.vin[:3] }}…{{ x.v.vin[-6:] }}</span></small></div></div></td>
+        <td>{% if x.a and x.a != x.da %}{{ x.da or '—' }} <span class="tenue">→</span> {{ x.a }}{% else %}{{ x.da or x.a or '—' }}{% endif %}</td>
+        <td>{{ x.chi }}</td>
+        <td>{{ stato_att(x.stato) }}</td>
+      </tr>
       {% else %}
-      <div class="m assistente errore">L'assistente IA non è ancora attivo su questo server: serve la chiave Anthropic (vedi LEGGIMI.txt).
-Intanto scrivi o detta le ultime cifre del VIN, il modello o il colore e premi Invio: cerco l'auto.</div>
-      {% endif %}
+      <tr><td colspan="6" class="y-vuoto">Nessuna movimentazione o preparazione {{ {'oggi': 'oggi', 'domani': 'domani', '7': 'nei prossimi 7 giorni'}[periodo] }}{{ ' per te' if solo_mie }}.</td></tr>
+      {% endfor %}
+      </tbody></table></div>
+  </section>
+
+  {# 5.4 Calendario · prossimi 7 giorni #}
+  {% set primo, ultimo = calendario[0][0], calendario[-1][0] %}
+  <section class="y-box">
+    <div class="y-box-testa"><div><h2>Calendario · prossimi 7 giorni</h2><span>Quando finiscono le lavorazioni dai fornitori e le preparazioni in sede</span></div>
+      <div class="y-frecce"><a class="y-link" href="{{ url_for('main.calendario_completo') }}">Calendario completo</a><a href="{{ url_for('main.home', dal=(primo - timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana precedente">‹</a>
+        <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
+        <a href="{{ url_for('main.home', dal=(primo + timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana successiva">›</a></div></div>
+    <div class="y-box-dentro">
+      <div class="y-scorre"><div class="y-cal">
+        {% for d, ev in calendario %}
+        <div class="y-cal-g"><div class="y-cal-t"><b>{{ giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
+          {% for e in ev %}
+          <a class="y-ev {{ e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
+            <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Fine preparazione' }}</b><span>{{ e.v.descrizione }}</span>
+              <small>{% if e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
+          {% else %}<span class="y-cal-vuoto">Niente in scadenza</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div></div>
+      <div class="y-legenda"><span><i class="forn"></i>Fine lavorazione = la vettura sarà pronta dal fornitore</span><span><i class="prep"></i>Fine preparazione = la vettura sarà pronta in sede</span></div>
     </div>
-    <div class="chiedi-piede">
-      {% if ia_attiva %}<button type="button" class="btn-link" id="chat-voce">{{ i('voce', 's') }} Leggi le risposte ad alta voce</button>{% else %}<span></span>{% endif %}
-      <button type="button" class="btn-link" id="chat-chiudi">Chiudi</button>
-    </div>
+  </section>
+
+  {# 5.5 Stock e piazzali + Chi ha fatto cosa #}
+  <div class="y-due">
+    <section class="y-box">
+      {% set in_sede = piazzali|sum(attribute='n') %}
+      <div class="y-box-testa"><div><h2>Stock e piazzali</h2><span>{{ n_attivi }} vetture in carico · {{ in_sede }} nelle vostre sedi</span></div>
+        <a href="{{ url_for('main.piazzale') }}">Apri la mappa</a></div>
+      {% for p in piazzali %}
+      <div class="y-piazzale">
+        <div class="y-piazzale-t"><b>{{ p.sede.nome }}</b><span>{% if p.posti %}{{ p.n }} su {{ p.posti }} posti{% else %}{{ p.n }} {{ 'vettura' if p.n == 1 else 'vetture' }}{% endif %}</span></div>
+        {% if p.posti %}
+        <div class="y-riga-pz"><span>Vetture presenti</span><span><b>{{ p.n }}</b> <span class="tenue">vetture su {{ p.posti }} posti ·</span> <b class="{{ 'y-att' if p.pct > 90 }}">{{ p.pct }}%</b></span></div>
+        <div class="y-riempi"><span class="{{ 'att' if p.pct > 90 }}" style="width:{{ [p.pct, 100]|min }}%"></span></div>
+        {% elif g.utente.ruolo == 'admin' %}<small class="tenue"><a href="{{ url_for('admin.sede', sede_id=p.sede.id) }}">Indica i posti</a> per vedere quanto è pieno.</small>{% endif %}
+      </div>
+      {% else %}<p class="tenue y-pad">Nessuna sede della concessionaria.</p>{% endfor %}
+    </section>
+    <section class="y-box">
+      <div class="y-box-testa"><div><h2>Chi ha fatto cosa</h2><span>Registro di oggi, in ordine di tempo</span></div></div>
+      <ol class="y-registro">
+        {% for r in registro %}<li><span class="y-mono">{{ r.at.strftime('%H:%M') }}</span><a href="{{ r.url }}"><b>{{ r.chi }}</b> {{ r.frase }}</a></li>
+        {% else %}<li class="y-vuoto">Ancora niente oggi.</li>{% endfor %}
+      </ol>
+    </section>
   </div>
-</section>
-{% else %}
-<section class="chiedi trova" id="trova" role="search">
-  <form class="chiedi-barra" id="trova-form" action="{{ url_for('main.cerca') }}">
-    {{ i('cerca') }}
-    <input id="trova-testo" name="q" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"
-           placeholder="Trova: VIN, targa, modello, n. DDT, adesivo" aria-label="Trova un'auto, un DDT o un adesivo"
-           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trova-risultati">
-    <button type="button" class="btn-mic-piccolo" id="trova-mic" aria-label="Detta cosa cercare">{{ i('mic') }}</button>
-  </form>
-  <div class="trova-risultati" id="trova-risultati" role="listbox" aria-label="Risultati" hidden></div>
-  <p class="nascosto" id="trova-stato" role="status" aria-live="polite"></p>
-</section>
-{% endif %}
 
-{# Panoramica (14/11/2026): stesso stile delle altre pagine. In alto una riga di numeri a pillole (ognuno porta
-   alla sua pagina; in ordine: viaggi, fornitori, ritiri, preparazione, pronte, stock), poi l'avviso danni e "Da fare" a righe: colore della gravità sul bordo e sull'etichetta #}
-<div class="panoramica-righe">
-<nav class="numeri-riga" aria-label="Le auto oggi">
-  {% macro numero(url, fase, icona, n, etichetta) %}<a href="{{ url }}" class="numero-voce {{ fase }} {{ 'zero' if not n }}"><span class="numero-icona">{{ i(icona, 's') }}</span><b>{{ n }}</b><span>{{ etichetta }}</span></a>{% endmacro %}
-  {{ numero(url_for('main.archivio_ddt', stato='aperto'), 'in_viaggio', 'camion', conteggi.in_viaggio, 'In viaggio') }}
-  {{ numero(url_for('main.lavorazioni'), 'lavorazione', 'chiave', conteggi.lavorazione, 'Dai fornitori') }}
-  {{ numero(url_for('main.archivio_ddt', stato='predisposto'), 'da_ritirare', 'ritiro', conteggi.da_ritirare, 'Da ritirare') }}
-  {{ numero(url_for('main.preparazione'), 'preparazione', 'brilla', conteggi.preparazione, 'In preparazione') }}
-  {{ numero(url_for('main.preparazione', vista='pronte'), 'pronta', 'bandiera', conteggi.pronta, 'Pronte') }}
-</nav>
-
-{% if danni %}
-{% set bloccanti = danni|selectattr('veicolo.fase', 'in', ['preparazione', 'pronta'])|list %}
-<a class="riga-avviso-danni" href="{{ url_for('main.danni') }}">
-  <span class="numero-icona">{{ i('attenzione', 's') }}</span>
-  <b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
-  {% set primo = bloccanti[0] if bloccanti else danni[0] %}
-  <span class="tenue">{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span>
-  {{ i('chevron', 's') }}
-</a>
-{% endif %}
-
-{# Pronte oggi (14/11/2026): solo il programma di oggi (14/11 sera: i ritardi stanno in Da fare, con la loro azione); il mese intero nel Calendario completo #}
-<div class="fare-testa"><h2>Pronte oggi{% if pronte_oggi %} <span class="conteggio">{{ pronte_oggi|length }}</span>{% endif %}</h2>
-  <a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">{{ i('orologio', 's') }} Calendario completo</a></div>
-<div class="oggi-pronte">
-  {% for e in pronte_oggi %}
-  <a class="cal-voce {{ e.tipo }} {{ e.stato }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
-    <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
-  {% else %}<p class="vuoto">Niente in calendario per oggi.</p>
-  {% endfor %}
-</div>
-{% if pronte_oggi %}<p class="legenda-pronte" style="margin:-8px 0 18px"><span class="lg preparazione">Preparazione</span><span class="lg preparazione-anticipo">Pronta in anticipo</span><span class="lg lavorazione">Fine lavori</span><span class="lg lavorazione-anticipo">Finita in anticipo</span></p>{% endif %}
-
-{# "Da fare" (14/11/2026 sera): solo ciò che chiede un intervento, in tre fasce di urgenza; su ogni riga il reparto,
-   cosa succede e il pulsante dell'azione. "Solo le mie": le voci che toccano a chi guarda (routes._da_fare_home) #}
-<div class="fare-testa"><h2>Da fare{% if totale_da_fare.mostrate %} <span class="conta-arancio">{{ totale_da_fare.mostrate }}</span>{% endif %}</h2>
-  <nav class="interruttore filtro-gruppo in-riga" aria-label="Quali voci">
-    <a href="{{ url_for('main.home', mie=1) }}" class="{{ 'attivo' if solo_mie }}">{{ i('utente', 's') }} Solo le mie <span class="n">{{ totale_da_fare.mie }}</span></a>
-    <a href="{{ url_for('main.home', mie=0) }}" class="{{ 'attivo' if not solo_mie }}">Tutte <span class="n">{{ totale_da_fare.tutte }}</span></a>
-  </nav></div>
-{% if not totale_da_fare.mostrate %}<div class="vuoto">{{ i('check') }}{{ 'Nessuna attività urgente da fare.' }}</div>
-{% else %}
-<table class="tabella-stock tabella-fare">
-  <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-azione"></colgroup>
-  <thead class="nascosto"><tr><th>Auto</th><th>Cosa succede</th><th>Azione</th></tr></thead>
-  {% for chiave, titolo, icona, voci in da_fare if voci %}
-  <tbody class="gruppo-stock fascia-{{ chiave }}">
-    <tr class="riga-gruppo"><th colspan="3" scope="rowgroup">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th></tr>
-    {% for x in voci %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
-    <tr class="riga-stock fare-{{ chiave }} reparto-{{ x.reparto }}" data-url="{{ x.url }}">
-      <td class="cella-auto"><div>{{ marchio(x.v) }}<span><a href="{{ x.url }}"><b>{{ x.v.descrizione }}</b></a>
-        <small>{{ badge_condizione(x.v) }}{% if x.v.targa %} <span class="targa-chip">{{ x.v.targa }}</span>{% endif %} <span class="vin">{{ x.v.vin[-8:] }}</span></small></span></div></td>
-      <td class="cella-stato"><span class="fare-riga-testa"><span class="pillola-stato"><i aria-hidden="true"></i>{{ x.etichetta }}</span>
-        <span class="reparto">{{ i(rep[1], 's') }} {{ rep[0] }}</span></span><small>{{ x.testo }}</small></td>
-      <td class="cella-azione">{% if x.azione %}<a class="btn piccolo" href="{{ x.azione[1] }}">{{ x.azione[0] }}</a>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-  {% endfor %}
-</table>
-{% endif %}
+  {# 5.6 Fornitori esterni #}
+  <section class="y-box">
+    <div class="y-box-testa"><div><h2>Fornitori esterni</h2><span>Ultimi 30 giorni</span></div></div>
+    <div class="y-scorre"><table class="y-tab y-forn">
+      <thead><tr><th>Fornitore</th><th>Vetture da loro ora</th><th>Lavori finiti</th><th title="Lavori con fine lavori confermata entro la fine prevista">Finiti nei tempi</th><th>Ritardo medio</th><th>In ritardo ora</th></tr></thead>
+      <tbody>
+      {% for f in fornitori %}
+      <tr><td><b>{{ f.nome }}</b></td><td>{{ f.ora }}</td><td>{{ f.finiti }}</td>
+        <td>{% if f.pct is none %}<span class="tenue">—</span>{% else %}<b class="{{ 'y-att' if f.pct < 80 else 'y-ok' }}">{{ f.pct }}%</b>{% endif %}</td>
+        <td class="tenue">{% if f.ritardo_medio is none %}—{% elif f.ritardo_medio == 0 %}nessuno{% else %}{{ ('%.1f'|format(f.ritardo_medio))|replace('.', ',') }} giorni{% endif %}</td>
+        <td>{% if f.ritardo_ora %}<b class="y-att">{{ f.ritardo_ora }}</b>{% else %}0{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="y-vuoto">Nessuna lavorazione dai fornitori negli ultimi 30 giorni.</td></tr>{% endfor %}
+      </tbody></table></div>
+  </section>
 </div>
 {% endblock %}
 {% block script %}
-<script src="{{ url_for('static', filename='righe.js', v=versione_statici) }}"></script>
 <script>
-  // Calendario dal telefono (14/11/2026): compatto su oggi, espandibile al mese
-  (function () {
-    var box = document.querySelector('[data-cal-tel]');
-    if (!box) return;
-    var eventi = JSON.parse(box.querySelector('[data-cal-eventi]').textContent || '[]');
-    var oggi = box.dataset.oggi, scelto = oggi;
-    var base = new Date(oggi + 'T12:00:00'), mese = new Date(base.getFullYear(), base.getMonth(), 1);
-    var MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
-    var GIORNI = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
-    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-    function del(g) { return eventi.filter(function (e) { return e.d === g; }); }
-    function voci() {
-      var lista = del(scelto), d = new Date(scelto + 'T12:00:00');
-      box.querySelector('[data-cal-giorno]').textContent = (scelto === oggi ? 'Oggi · ' : '') + GIORNI[d.getDay()] + ' ' + d.getDate() + ' ' + MESI[d.getMonth()];
-      var dove = box.querySelector('[data-cal-voci]'); dove.innerHTML = '';
-      if (!lista.length) { var p = document.createElement('p'); p.className = 'vuoto-telefono'; p.textContent = 'Nessuna auto in calendario.'; dove.appendChild(p); return; }
-      lista.forEach(function (e) {
-        var a = document.createElement('a'); a.href = e.u;
-        a.className = 'per-te-voce ' + (e.r ? 'ritardo cal-ritardo' : e.s === 'anticipo' ? 'anticipo-' + e.t : (e.t === 'preparazione' ? 'preparazione' : 'lavorazione'));
-        a.innerHTML = '<span class="per-te-barra" aria-hidden="true"></span><span><b></b><small></small></span>';
-        a.querySelector('b').textContent = e.o + ' · ' + e.n; a.querySelector('small').textContent = e.c;
-        dove.appendChild(a);
-      });
-    }
-    function griglia() {
-      box.querySelector('[data-cal-titolo]').textContent = MESI[mese.getMonth()] + ' ' + mese.getFullYear();
-      var g = box.querySelector('[data-cal-griglia]'); g.innerHTML = '';
-      ['L','M','M','G','V','S','D'].forEach(function (x) { var h = document.createElement('span'); h.className = 'cal-tel-sett'; h.textContent = x; g.appendChild(h); });
-      var primo = (mese.getDay() + 6) % 7;
-      for (var k = 0; k < primo; k++) g.appendChild(document.createElement('span'));
-      var giorni = new Date(mese.getFullYear(), mese.getMonth() + 1, 0).getDate();
-      for (var n = 1; n <= giorni; n++) {
-        var d = new Date(mese.getFullYear(), mese.getMonth(), n), id = iso(d), lista = del(id);
-        var b = document.createElement('button'); b.type = 'button'; b.className = 'cal-tel-cella';
-        if (id === oggi) b.classList.add('oggi'); if (id === scelto) b.classList.add('scelto'); if (id < oggi) b.classList.add('passato');
-        b.innerHTML = '<span>' + n + '</span><i></i>';
-        var punti = b.querySelector('i');
-        ['preparazione', 'lavorazione'].forEach(function (t) {
-          if (lista.some(function (e) { return e.t === t && e.s === 'previsto'; })) { var p = document.createElement('em'); p.className = t; punti.appendChild(p); }
-          if (lista.some(function (e) { return e.t === t && e.s === 'anticipo'; })) { var q = document.createElement('em'); q.className = 'anticipo-' + t; punti.appendChild(q); }
-        });
-        if (lista.some(function (e) { return e.r; })) { var p = document.createElement('em'); p.className = 'ritardo'; punti.appendChild(p); }
-        b.dataset.giorno = id;
-        b.addEventListener('click', function () { scelto = this.dataset.giorno; griglia(); voci(); });
-        g.appendChild(b);
-      }
-    }
-    box.querySelector('[data-cal-apri]').addEventListener('click', function () {
-      var m = box.querySelector('[data-cal-mese]'), apri = m.hidden;
-      m.hidden = !apri; this.innerHTML = apri ? 'Chiudi il calendario' : 'Apri il calendario';
-      if (apri) griglia(); else { scelto = oggi; voci(); }
-    });
-    box.querySelector('[data-cal-prec]').addEventListener('click', function () { mese = new Date(mese.getFullYear(), mese.getMonth() - 1, 1); griglia(); });
-    box.querySelector('[data-cal-succ]').addEventListener('click', function () { mese = new Date(mese.getFullYear(), mese.getMonth() + 1, 1); griglia(); });
-    voci();
-  })();
+  // righe dell'agenda: tutta la riga apre la vettura (anche con Invio); aggiornamento ogni 60 secondi
+  document.querySelectorAll('.y-tab tr[data-href]').forEach(function (r) {
+    r.addEventListener('click', function (e) { if (!e.target.closest('a')) location.href = r.dataset.href; });
+    r.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = r.dataset.href; });
+  });
+  if (window.matchMedia('(min-width: 1024px)').matches) setInterval(function () {
+    var cerca = document.getElementById('trova-testo');
+    if (document.visibilityState === 'visible' && !(cerca && cerca.value) && !document.querySelector('.bl-utente[open]')) location.reload();
+  }, 60000);
 </script>
 <script>
   // Trova: risultati mentre si scrive (frecce per scegliere, Invio per aprire, Esc per chiudere)

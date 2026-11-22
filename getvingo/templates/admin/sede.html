@@ -7,6 +7,9 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <div class="scheda">
     <label class="campo"><span>{{ 'Nome' if gruppo == 'proprie' else 'Nome / ragione sociale' }}</span><input name="nome" value="{{ s.nome }}" required></label>
+    {% if s.tipo in ('propria', 'esposizione') %}<label class="campo"><span>Posti auto <span class="tenue">(facoltativo)</span></span>
+      <input name="posti" type="number" min="1" max="100000" inputmode="numeric" value="{{ s.posti or '' }}" placeholder="Es. 600" style="max-width:200px">
+      <small class="tenue">In Home: quante vetture ci sono su quanti posti, in arancio oltre il 90%.</small></label>{% endif %}
     {% if s.sede_legale %}
       <p class="tenue piccolo">È la sede legale della concessionaria: indirizzo e posizione seguono i <a href="{{ url_for('admin.azienda') }}">Dati aziendali</a>.</p>
       <input type="hidden" name="tipo" value="propria">

@@ -72,6 +72,13 @@ def _offri_annulla(veicolo_id):
 
 
 @bp.app_context_processor
+def _barra_laterale():
+    """Barra laterale da computer (design B1, 22/11/2026): conteggi chiamati solo quando la barra si disegna."""
+    from . import dashboard
+    return {"stati_vetture": dashboard.stati_vetture}
+
+
+@bp.app_context_processor
 def _annulla_subito():
     def annulla_subito():
         """(azione, secondi rimasti) da offrire una volta sola nella pagina che segue l'azione, o None."""
@@ -441,32 +448,33 @@ def _da_fare_home(gruppi, attivi):
 def home():
     if not g.utente.interno:
         return _home_fornitore()
-    attivi = Veicolo.query.filter(Veicolo.stato != "consegnato").all()
-    danni = Danno.query.filter(Danno.risolto_at.is_(None), Danno.rimosso.is_(False)) \
-        .order_by(Danno.segnalato_at.desc()).all()
-
-    # riquadri: ogni auto in un solo gruppo, contata come auto (non come DDT)
-    gruppi = {k: [] for k in ("in_viaggio", "da_ritirare", "lavorazione", "preparazione", "pronta", "stock")}
-    for v in attivi:
-        fase = v.fase
-        if fase == "in_viaggio":
-            gruppi["in_viaggio"].append(v)
-        elif fase == "da_ritirare" or v.movimento_predisposto is not None:
-            gruppi["da_ritirare"].append(v)
-        elif fase in ("lavorazione", "preparazione", "pronta"):
-            gruppi[fase].append(v)
-        elif v.sede is not None and v.sede.tipo == "propria":
-            gruppi["stock"].append(v)
-    conteggi = {k: len(lista) for k, lista in gruppi.items()}
-    conteggi["ddt_in_viaggio"] = len({v.movimento_aperto.ddt_id for v in gruppi["in_viaggio"] if v.movimento_aperto})
-
-    da_fare, totale_da_fare, mie = _da_fare_home(gruppi, attivi)
-    return render_template("home.html", da_fare=da_fare, totale_da_fare=totale_da_fare, solo_mie=mie, REPARTI_DA_FARE=REPARTI_DA_FARE, danni=danni, per_te=_da_fare_per_te(),
-                           # i ritardi stanno in "Da fare" (con la loro azione): qui solo il programma di oggi
-                           pronte_oggi=[e for e in _eventi_calendario(adesso().date(), adesso().date()) if e["stato"] != "ritardo"],
-                           **_home_telefono(),
-                           conteggi=conteggi, tipi_evento=TIPI_EVENTO,
-                           ia_attiva=ia.disponibile(), chat_panoramica=CHAT_PANORAMICA and ia.disponibile())
+    # 22/11/2026: Home "Getvingo Yard" B1 (getvingo-dashboard-B1-specifiche.md): da computer la giornata in tre
+    # numeri, stock per marca, agenda, calendario, piazzali, registro, fornitori; dal telefono solo "Da fare per te"
+    from . import dashboard
+    oggi = adesso().date()
+    sede_id = request.args.get("sede", type=int)
+    attivi = dashboard.attive(sede_id)
+    periodo = request.args.get("periodo") if request.args.get("periodo") in ("oggi", "domani", "7") else "oggi"
+    mie_arg = request.args.get("mie")
+    solo_mie = (mie_arg == "1") if mie_arg in ("0", "1") else g.utente.ruolo not in dashboard.RUOLI_TUTTO
+    finestre = {"oggi": (oggi, oggi), "domani": (oggi + timedelta(days=1),) * 2, "7": (oggi, oggi + timedelta(days=6))}
+    agende = {k: dashboard.agenda(*d, sede_id=sede_id, solo_mie=solo_mie) for k, d in finestre.items()}
+    try:
+        cal_dal = date.fromisoformat(request.args.get("dal", ""))
+    except ValueError:
+        cal_dal = oggi + timedelta(days=1)
+    cal_giorni = [cal_dal + timedelta(days=k) for k in range(7)]
+    eventi = [e for e in _eventi_calendario(cal_giorni[0], cal_giorni[-1]) if e["stato"] != "anticipo"]
+    calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
+    marche, n_marche = dashboard.stock_per_marca(attivi)
+    return render_template(
+        "home.html", ora=adesso(), data_lunga=dashboard.data_lunga(oggi), sede_id=sede_id,
+        sedi=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
+        giornata=dashboard.giornata(sede_id), marche=marche, n_marche=n_marche, n_attivi=len(attivi),
+        periodo=periodo, agenda=agende[periodo], conta_agenda={k: len(v) for k, v in agende.items()}, solo_mie=solo_mie,
+        calendario=calendario, cal_dal=cal_dal, giorni_brevi=dashboard.GIORNI_BREVI, mesi=dashboard.MESI,
+        piazzali=dashboard.piazzali(attivi), registro=dashboard.registro_oggi(), fornitori=dashboard.fornitori_30(),
+        compiti=dashboard.compiti_telefono(), timedelta=timedelta)
 
 
 @bp.route("/analisi")

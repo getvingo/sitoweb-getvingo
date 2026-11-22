@@ -202,6 +202,8 @@ class Sede(PerOrganizzazione, ConIndirizzo, db.Model):
     firma = db.Column(db.Text)
     # 22/11/2026: timbro della società da solo, sotto le firme col dito (conducente del fornitore, destinatario)
     timbro = db.Column(db.Text)
+    # 22/11/2026: posti auto del piazzale (Home: "N vetture su N posti"); le zone verranno dopo
+    posti = db.Column(db.Integer)
 
     @property
     def esterna(self):

@@ -1,7 +1,7 @@
 {% from "_macro.html" import i %}
 <!doctype html>
 <html lang="it">
-<head>
+<head>{% if false %}{% block classe_pagina %}{% endblock %}{% endif %}
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#11171D">
@@ -17,7 +17,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=versione_statici) }}">
   {% block head %}{% endblock %}
 </head>
-<body class="{% block classe_pagina %}{% endblock %}" {{ 'data-demo' if config.DEMO }}>
+{% set classe_corpo = self.classe_pagina() | trim %}
+<body class="{{ classe_corpo }}{{ (' ' if classe_corpo else '') ~ 'con-barra' if g.utente and 'pagina-anteprima' not in classe_corpo }}" {{ 'data-demo' if config.DEMO }}>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
   <symbol id="i-cerca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
@@ -71,9 +72,49 @@
                                                             'admin.gruppo_fornitore', 'admin.utente', 'admin.prepara_adesivi'))
                   or ep.startswith('piattaforma.')) %}
 {% if g.utente %}
+{# 22/11/2026, design B1 "Getvingo Yard": da computer la barra laterale fissa (menu, vetture per stato, chi sei);
+   dal telefono resta la testata in alto e il menu in basso #}
+<aside class="barra-laterale" aria-label="Menu principale">
+  <a class="bl-marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo.svg') }}" alt="getvingo"><span>Yard</span></a>
+  <nav class="bl-menu">
+    {% if g.utente.interno %}
+    <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home') }}<span>Home</span></a>
+    <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo', 'main.nuova_auto', 'main.modifica_auto') }}">{{ i('auto') }}<span>Vetture</span></a>
+    <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
+    <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla') }}<span>Preparazioni</span></a>
+    <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
+    <a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}">{{ i('attenzione') }}<span>Danni</span>{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</a>
+    {% if g.utente.ruolo == 'admin' %}<span class="bl-linea" role="separator"></span>
+    <a href="{{ url_for('main.analisi') }}" class="{{ 'attivo' if ep == 'main.analisi' }}">{{ i('cronometro') }}<span>Report</span></a>{% endif %}
+    {% else %}
+    <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
+    <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
+    {% endif %}
+  </nav>
+  {% if g.utente.interno %}
+  <span class="bl-linea" role="separator"></span>
+  <div class="bl-stati">
+    <span class="bl-titolo">Vetture per stato</span>
+    {% for s in stati_vetture() %}
+    <a href="{{ s.url }}" class="bl-stato st-{{ s.chiave }}"><span class="bl-pallino" aria-hidden="true"></span>
+      <span class="bl-stato-t"><b>{{ s.nome }}</b><small>{{ s.nota }}</small></span><span class="bl-n">{{ s.n }}</span></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <details class="bl-utente">
+    <summary><span class="avatar">{{ g.utente.nome|iniziali }}</span><span class="bl-chi"><b>{{ g.utente.nome }}</b><small>{{ g.utente.RUOLI[g.utente.ruolo] }}</small></span>{{ i('chevron', 's') }}</summary>
+    <div class="bl-tendina">
+      <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
+      {% if g.utente.ruolo == 'admin' %}<a href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
+      {% if gestore() %}<a href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}
+      <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button>{{ i('esci', 's') }} Esci</button></form>
+    </div>
+  </details>
+</aside>
 <header class="testata">
   <div class="testata-dentro">
-    <a class="marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="Getvingo"></a>
+    <a class="marchio" href="{{ url_for('main.home') }}"><picture><source srcset="{{ url_for('static', filename='logo-negativo.svg') }}" media="(prefers-color-scheme: dark)"><img src="{{ url_for('static', filename='logo.svg') }}" alt="Getvingo"></picture></a>
     <nav class="nav-alto">
       <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home', 's') }} {{ 'Home' if g.utente.interno else 'Lavorazioni' }}</a>
       {% if g.utente.interno %}

@@ -14,6 +14,8 @@
 <form method="post" class="scheda" style="margin-bottom:16px" data-una-volta>
   <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="gruppo" value="{{ gruppo }}">
   <label class="campo"><span>{{ 'Nome' if gruppo == 'proprie' else 'Nome / ragione sociale' }}</span><input name="nome" value="{{ nuova.nome if nuova and nuova.nome else '' }}" required placeholder="{{ 'Es. Piazzale Villorba' if gruppo == 'proprie' else 'Es. Carrozzeria Rossi S.n.c.' }}"></label>
+  {% if gruppo == 'proprie' %}<label class="campo"><span>Posti auto <span class="tenue">(facoltativo)</span></span>
+    <input name="posti" type="number" min="1" max="100000" inputmode="numeric" placeholder="Es. 600" style="max-width:200px"></label>{% endif %}
   {% if tipi|length > 1 %}
   <div class="scelta-tipo scelta-tipo-luogo" role="radiogroup" aria-label="Tipo">
     {% for k, n in tipi.items() %}<label><input type="radio" name="tipo" value="{{ k }}" {{ 'checked' if (nuova.tipo if nuova else 'carrozzeria') == k }}> {{ n.split(' (')[0] }}</label>{% endfor %}

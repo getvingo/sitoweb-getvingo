@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block classe_pagina %}pagina-preparazione{% endblock %}
 {% from "_macro.html" import i, marchio, badge_condizione, icona_fase, csrf_input, riepilogo_lavorazione, pillole, tappe_preparazione, annulla, fase_css, calendario_mese, interruttore_modo, filtro_tipologia, scegli_slot, filtri_stato, scelta_orario_prep %}
-{% block titolo %}Preparazione · Getvingo{% endblock %}
+{% block titolo %}Preparazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {# Elimina la preparazione: solo amministratore (14/11/2026) #}
 {% macro elimina_prep(p, torna=none) %}{% if g.utente.ruolo == 'admin' %}
@@ -43,7 +43,7 @@
 </div></td></tr>{% endif %}
 {% endmacro %}
 {% block contenuto %}
-<div class="titolo-pagina"><div><h1>Preparazione</h1>
+<div class="titolo-pagina"><div><h1>Preparazioni</h1>
   <p class="descrizione-pagina">Auto vendute da preparare per la consegna: controllo rientro, preparazione, lavaggio, pronta. Ogni attività si conferma dal telefono, toccando l'adesivo dell'auto.</p></div>
   {% if da_preparare %}<button type="button" class="btn piccolo primario" data-apri="pannello-prepara" aria-expanded="false">{{ i('brilla', 's') }} Metti in preparazione</button>{% endif %}</div>
 

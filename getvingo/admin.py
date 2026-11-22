@@ -174,6 +174,9 @@ def _luogo_dal_modulo(s):
         tipo = "propria"  # la sede legale resta della concessionaria
     s.nome, s.tipo = _testo("nome"), tipo
     anagrafica.leggi_indirizzo(s)
+    if tipo in ("propria", "esposizione"):  # 22/11/2026: posti auto (Home: vetture su posti)
+        posti = request.form.get("posti", "").strip()
+        s.posti = int(posti) if posti.isdigit() and 0 < int(posti) <= 100000 else None
     if tipo == "propria":
         s.piva = s.codice_fiscale = ""
     else:

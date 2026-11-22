@@ -190,7 +190,9 @@ def aggiungi_colonne():
              ("veicolo", "trasferita_a", "VARCHAR(200) DEFAULT ''"),
              # 22/11/2026: firme col dito sopra il timbro della società; timbro e sigla del vettore sul DDT
              ("azienda", "timbro", "TEXT"), ("sede", "timbro", "TEXT"), ("vettore", "firma", "TEXT"),
-             ("movimento", "firma_vettore", "TEXT")]
+             ("movimento", "firma_vettore", "TEXT"),
+             # 22/11/2026: posti auto di sedi e piazzali (Home B1)
+             ("sede", "posti", "INTEGER")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:
