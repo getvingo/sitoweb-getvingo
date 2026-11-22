@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, tocca_adesivo, marchio, badge_condizione %}
+{% from "_macro.html" import i, tocca_adesivo, marchio, badge_condizione, logo_marca %}
 {% block titolo %}Home · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {# Home B1 (22/11/2026, getvingo-dashboard-B1-specifiche.md e i due riferimenti dell'utente).
    Ogni numero dice cosa conta e su quale periodo; ogni colore ha accanto il suo testo. #}
-{% macro logo_marca(marca, lato=30) %}{% set url = marca|marchio if marca else none %}
-<span class="y-logo" style="width:{{ lato }}px;height:{{ lato }}px" role="img" aria-label="Logo {{ marca or 'marca non indicata' }}">{% if url %}<img src="{{ url }}" alt="" loading="lazy">{% else %}<b style="font-size:{{ 9 if (marca or '')|length > 4 else 10.5 }}px">{{ ((marca or '?')|iniziali)[:4] }}</b>{% endif %}</span>
-{% endmacro %}
+
 {% macro stato_att(s) %}<span class="y-stato y-{{ s }}"><i aria-hidden="true"></i>{{ {'fatto': 'Fatto', 'corso': 'In corso', 'dafare': 'Da fare'}[s] }}</span>{% endmacro %}
 {% macro barra3(c) %}{% set tot = c.fatto + c.corso + c.dafare %}
 <div class="y-barra" role="img" aria-label="{{ c.fatto }} fatte, {{ c.corso }} in corso, {{ c.dafare }} da fare">
@@ -58,7 +56,7 @@
   <a class="y-allerta" href="{{ url_for('main.danni') }}">{{ i('attenzione') }}
     <span><b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
       <small>{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</small></span>
-    <em>Vedi i danni</em>{{ i('chevron', 's') }}</a>
+    <span class="btn piccolo">Vedi i danni</span></a>
   {% endif %}
   <div class="y-cima">
     <section class="y-box">
@@ -88,17 +86,30 @@
       </table></div>
       {% endif %}
     </section>
-    <section class="y-box">
-      <div class="y-box-testa"><div><h2>Pronte oggi</h2><span>Preparazioni e fine lavori di oggi</span></div>
-        <a href="{{ url_for('main.calendario_completo') }}">Calendario completo</a></div>
-      <div class="y-oggi">
-        {% for e in pronte_oggi %}
-        <a class="y-ev {{ e.tipo }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
-          <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Fine preparazione' }}{{ ' · in anticipo' if e.stato == 'anticipo' }}</b><span>{{ e.v.descrizione }}</span><small>{{ e.ora }} · {{ e.cosa }}</small></span></a>
-        {% else %}<p class="y-vuoto">Niente in calendario per oggi.</p>{% endfor %}
-      </div>
-    </section>
   </div>
+
+  {# 5.4 Calendario · prossimi 7 giorni #}
+  {% set primo, ultimo = calendario[0][0], calendario[-1][0] %}
+  <section class="y-box">
+    <div class="y-box-testa"><div><h2>Calendario · oggi e prossimi 6 giorni</h2><span>Quando le vetture saranno pronte: fine lavori dai fornitori e preparazioni in sede</span></div>
+      <div class="y-frecce"><a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">{{ i('orologio', 's') }} Calendario completo</a><a href="{{ url_for('main.home', dal=(primo - timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana precedente">‹</a>
+        <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
+        <a href="{{ url_for('main.home', dal=(primo + timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana successiva">›</a></div></div>
+    <div class="y-box-dentro">
+      <div class="y-scorre"><div class="y-cal">
+        {% for d, ev in calendario %}
+        <div class="y-cal-g {{ 'y-oggi-g' if d == ora.date() }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == ora.date() else giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
+          {% for e in ev %}
+          <a class="y-ev {{ e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
+            <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Vettura pronta alla consegna' }}{{ ' · in ritardo' if e.stato == 'ritardo' }}</b><span>{{ e.v.descrizione }}</span>
+              <small>{% if e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
+          {% else %}<span class="y-cal-vuoto">Niente in scadenza</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div></div>
+      <div class="y-legenda"><span><i class="forn"></i>Fine lavorazione = la vettura sarà pronta dal fornitore</span><span><i class="prep"></i>Vettura pronta alla consegna = finita la preparazione in sede</span></div>
+    </div>
+  </section>
 
   {# sotto: i dati della dashboard #}
   {# 5.1 La giornata in tre numeri #}
@@ -116,7 +127,7 @@
   {# 5.2 Stock per marca #}
   <section class="y-box">
     <div class="y-box-testa"><div><h2>Stock per marca</h2><span>Colpo d'occhio sulle {{ n_attivi }} vetture in carico · {{ 'le ' ~ marche|length ~ ' marche principali' if n_marche > marche|length else (marche|length ~ (' marca' if marche|length == 1 else ' marche')) }}</span></div>
-      <a href="{{ url_for('main.piazzale') }}">Tutte le {{ n_marche }} {{ 'marca' if n_marche == 1 else 'marche' }}</a></div>
+      <a class="btn piccolo" href="{{ url_for('main.piazzale') }}">Tutte le {{ n_marche }} {{ 'marca' if n_marche == 1 else 'marche' }}</a></div>
     <div class="y-box-dentro">
       <div class="y-marche">
         {% for r in marche %}
@@ -164,42 +175,19 @@
       </tbody></table></div>
   </section>
 
-  {# 5.4 Calendario · prossimi 7 giorni #}
-  {% set primo, ultimo = calendario[0][0], calendario[-1][0] %}
-  <section class="y-box">
-    <div class="y-box-testa"><div><h2>Calendario · prossimi 7 giorni</h2><span>Quando finiscono le lavorazioni dai fornitori e le preparazioni in sede</span></div>
-      <div class="y-frecce"><a class="y-link" href="{{ url_for('main.calendario_completo') }}">Calendario completo</a><a href="{{ url_for('main.home', dal=(primo - timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana precedente">‹</a>
-        <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
-        <a href="{{ url_for('main.home', dal=(primo + timedelta(days=7)).isoformat(), periodo=periodo, sede=sede_id) }}" aria-label="Settimana successiva">›</a></div></div>
-    <div class="y-box-dentro">
-      <div class="y-scorre"><div class="y-cal">
-        {% for d, ev in calendario %}
-        <div class="y-cal-g"><div class="y-cal-t"><b>{{ giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
-          {% for e in ev %}
-          <a class="y-ev {{ e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
-            <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Fine preparazione' }}</b><span>{{ e.v.descrizione }}</span>
-              <small>{% if e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
-          {% else %}<span class="y-cal-vuoto">Niente in scadenza</span>{% endfor %}
-        </div>
-        {% endfor %}
-      </div></div>
-      <div class="y-legenda"><span><i class="forn"></i>Fine lavorazione = la vettura sarà pronta dal fornitore</span><span><i class="prep"></i>Fine preparazione = la vettura sarà pronta in sede</span></div>
-    </div>
-  </section>
-
   {# 5.5 Stock e piazzali + Chi ha fatto cosa #}
   <div class="y-due">
     <section class="y-box">
       {% set in_sede = piazzali|sum(attribute='n') %}
       <div class="y-box-testa"><div><h2>Stock e piazzali</h2><span>{{ n_attivi }} vetture in carico · {{ in_sede }} nelle vostre sedi</span></div>
-        <a href="{{ url_for('main.piazzale') }}">Apri la mappa</a></div>
+        <a class="btn piccolo" href="{{ url_for('main.piazzale') }}">{{ i('pin', 's') }} Apri la mappa</a></div>
       {% for p in piazzali %}
       <div class="y-piazzale">
         <div class="y-piazzale-t"><b>{{ p.sede.nome }}</b><span>{% if p.posti %}{{ p.n }} su {{ p.posti }} posti{% else %}{{ p.n }} {{ 'vettura' if p.n == 1 else 'vetture' }}{% endif %}</span></div>
         {% if p.posti %}
         <div class="y-riga-pz"><span>Vetture presenti</span><span><b>{{ p.n }}</b> <span class="tenue">vetture su {{ p.posti }} posti ·</span> <b class="{{ 'y-att' if p.pct > 90 }}">{{ p.pct }}%</b></span></div>
         <div class="y-riempi"><span class="{{ 'att' if p.pct > 90 }}" style="width:{{ [p.pct, 100]|min }}%"></span></div>
-        {% elif g.utente.ruolo == 'admin' %}<small class="tenue"><a href="{{ url_for('admin.sede', sede_id=p.sede.id) }}">Indica i posti</a> per vedere quanto è pieno.</small>{% endif %}
+        {% elif g.utente.ruolo == 'admin' %}<div class="y-riga-pz"><span class="tenue">Posti non indicati</span><a class="btn piccolo" href="{{ url_for('admin.sede', sede_id=p.sede.id) }}">Indica i posti</a></div>{% endif %}
       </div>
       {% else %}<p class="tenue y-pad">Nessuna sede della concessionaria.</p>{% endfor %}
     </section>
@@ -207,7 +195,7 @@
       <div class="y-box-testa"><div><h2>Chi ha fatto cosa</h2><span>Registro di oggi, in ordine di tempo</span></div></div>
       <ol class="y-registro">
         {% for r in registro %}<li><span class="y-mono">{{ r.at.strftime('%H:%M') }}</span><a href="{{ r.url }}"><b>{{ r.chi }}</b> {{ r.frase }}</a></li>
-        {% else %}<li class="y-vuoto">Ancora niente oggi.</li>{% endfor %}
+        {% else %}<li class="y-vuoto y-una-riga">Ancora niente oggi.</li>{% endfor %}
       </ol>
     </section>
   </div>

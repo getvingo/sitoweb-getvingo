@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, logo_marca, calendario_mese %}
+{% set titoli = {'in-viaggio': ('In viaggio', 'Auto su strada con un DDT aperto: tratta, chi la porta, partenza e arrivo previsto.'),
+                 'da-ritirare': ('Da ritirare', 'Lavoro finito dal fornitore o DDT da ritirare: dove sono, da quando, chi le riporta ed entro quando.'),
+                 'consegnate': ('Consegnate', 'Consegne al cliente confermate: il calendario del mese e l\'elenco.')} %}
+{% set titolo, descrizione = titoli[chiave] %}
+{% block titolo %}{{ titolo }} · Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{% block contenuto %}
+{# Pagine dedicate della barra laterale (22/11/2026, routes.stato_vetture, dashboard.in_viaggio / da_ritirare / consegnate) #}
+<div class="y-home">
+<div class="titolo-pagina"><div><div class="sopratitolo">Vetture per stato</div><h1>{{ titolo }}</h1><p class="descrizione-pagina">{{ descrizione }}</p></div></div>
+
+{% macro vettura(v) %}<div class="y-auto">{{ logo_marca(v.marca, 30) }}<div><b>{{ v.descrizione }}</b>
+  <small class="y-vin">{{ v.impronta|impronta(14) }}<span class="y-mono">{{ v.vin[:3] }}…{{ v.vin[-6:] }}</span>{% if v.targa %} · {{ v.targa }}{% endif %}</small></div></div>{% endmacro %}
+
+{% if chiave == 'in-viaggio' %}
+<div class="y-tre">
+  <div class="y-num"><span class="y-num-t">Su strada adesso</span><span class="y-num-n">{{ righe|length }}<small>{{ 'vettura con DDT aperto' if righe|length == 1 else 'vetture con DDT aperto' }}</small></span></div>
+  {% set rit = righe|selectattr('ritardo_min')|list %}
+  <div class="y-num"><span class="y-num-t">In ritardo</span><span class="y-num-n {{ 'y-att' if rit }}">{{ rit|length }}<small>oltre un'ora dopo l'arrivo previsto</small></span></div>
+</div>
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Viaggi in corso</h2><span>Prima i ritardi, poi in ordine di partenza</span></div></div>
+  <div class="y-scorre"><table class="y-tab">
+    <thead><tr><th>Vettura</th><th>DDT</th><th>Da → a</th><th>Chi la porta</th><th>Partita</th><th>Arrivo</th><th></th></tr></thead>
+    <tbody>
+    {% for r in righe %}{% set m = r.m %}
+    <tr data-href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt_id) }}" tabindex="0">
+      <td>{{ vettura(r.v) }}</td>
+      <td class="y-mono">{{ m.ddt.sigla }}{% if m.ddt.multiplo %}<small>multiplo</small>{% endif %}</td>
+      <td>{{ m.da_sede.nome if m.da_sede else '—' }} <span class="tenue">→</span> {{ m.a_sede.nome }}<small>{{ m.causale }}{{ ' · ' ~ m.lavorazione if m.con_lavorazione }}</small></td>
+      <td>{{ m.conducente or '—' }}<small>{{ m.mezzo }}</small></td>
+      <td class="y-mono">{{ m.partenza_at.strftime('%d/%m %H:%M') }}</td>
+      <td>{% if r.ritardo_min %}<span class="y-etichetta y-et-adesso">In ritardo</span><small>doveva arrivare alle {{ r.atteso.strftime('%H:%M') }}{{ '' if r.stimato else ' · non stimabile' }}</small>
+          {% else %}<span class="y-mono">{{ r.atteso.strftime('%H:%M') }}</span><small>previsto{{ '' if r.stimato else ' · riferimento 2 h' }}</small>{% endif %}</td>
+      <td class="y-azione"><a class="btn piccolo" href="{{ url_for('main.ddt_dettaglio', ddt_id=m.ddt_id) }}">Apri il DDT</a></td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="y-vuoto">Nessuna vettura in viaggio adesso.</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+
+{% elif chiave == 'da-ritirare' %}
+{% set scaduti = righe|selectattr('scaduto')|list %}{% set senza = righe|rejectattr('ddt')|list %}
+<div class="y-tre">
+  <div class="y-num"><span class="y-num-t">Da ritirare</span><span class="y-num-n">{{ righe|length }}<small>{{ 'vettura' if righe|length == 1 else 'vetture' }} pronte da riportare</small></span></div>
+  <div class="y-num"><span class="y-num-t">Senza DDT di rientro</span><span class="y-num-n {{ 'y-att' if senza }}">{{ senza|length }}<small>lavoro finito, rientro da predisporre</small></span></div>
+  <div class="y-num"><span class="y-num-t">Ritiro scaduto</span><span class="y-num-n {{ 'y-att' if scaduti }}">{{ scaduti|length }}<small>oltre il tempo di ritiro</small></span></div>
+</div>
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Da riportare</h2><span>Prima i ritiri scaduti e quelli senza DDT di rientro</span></div></div>
+  <div class="y-scorre"><table class="y-tab">
+    <thead><tr><th>Vettura</th><th>Dove si trova</th><th>DDT di ritiro</th><th>Chi la ritira</th><th>Entro</th><th></th></tr></thead>
+    <tbody>
+    {% for r in righe %}
+    <tr data-href="{{ r.url }}" tabindex="0">
+      <td>{{ vettura(r.v) }}</td>
+      <td>{{ r.dove }}{% if r.finita %}<small>{{ r.lavorazione }} finita il {{ r.finita.strftime('%d/%m') }}</small>{% endif %}</td>
+      <td>{% if r.ddt %}<span class="y-mono">DDT {{ r.ddt.sigla }}</span><small>verso {{ r.verso }}</small>{% else %}<span class="y-etichetta y-et-oggi">DDT da predisporre</span>{% endif %}</td>
+      <td>{{ r.chi or '—' }}</td>
+      <td>{% if r.entro %}{% if r.scaduto %}<span class="y-etichetta y-et-adesso">Scaduto</span><small>il {{ r.entro.strftime('%d/%m %H:%M') }}</small>{% else %}<span class="y-mono">{{ r.entro.strftime('%d/%m %H:%M') }}</span>{% endif %}{% else %}—{% endif %}</td>
+      <td class="y-azione"><a class="btn piccolo" href="{{ r.url }}">{{ ('Rinnova il ritiro' if r.scaduto else 'Apri il DDT') if r.ddt else 'Predisponi rientro' }}</a></td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="y-vuoto">Nessuna vettura da ritirare.</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+
+{% else %}
+<div class="y-tre">
+  <div class="y-num"><span class="y-num-t">Consegnate oggi</span><span class="y-num-n">{{ numeri.oggi }}<small>consegne al cliente confermate</small></span></div>
+  <div class="y-num"><span class="y-num-t">Ultimi 7 giorni</span><span class="y-num-n">{{ numeri.settimana }}<small>consegne</small></span></div>
+  <div class="y-num"><span class="y-num-t">Questo mese</span><span class="y-num-n">{{ numeri.mese }}<small>consegne</small></span></div>
+</div>
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Calendario delle consegne</h2><span>Ogni consegna fatta, nel giorno e all'ora in cui è stata confermata</span></div></div>
+  <div class="y-box-dentro">{{ calendario_mese(calendario, url_for('main.stato_vetture', chiave='consegnate', mese=calendario.prec), url_for('main.stato_vetture', chiave='consegnate', mese=calendario.succ), tipi_evento) }}</div>
+</section>
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Consegnate · {{ calendario.titolo }}</h2><span>{{ righe|length }} {{ 'consegna' if righe|length == 1 else 'consegne' }} nel mese</span></div></div>
+  <div class="y-scorre"><table class="y-tab">
+    <thead><tr><th>Vettura</th><th>Consegnata</th><th>Sede</th><th>Cliente · venditore</th><th></th></tr></thead>
+    <tbody>
+    {% for v in righe %}
+    <tr data-href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" tabindex="0">
+      <td>{{ vettura(v) }}</td>
+      <td class="y-mono">{{ v.consegnato_at.strftime('%d/%m %H:%M') }}</td>
+      <td>{{ v.sede.nome if v.sede else '—' }}</td>
+      <td>{{ v.cliente_nome or '—' }}<small>{{ v.venditore.nome if v.venditore else '' }}</small></td>
+      <td class="y-azione"><a class="btn piccolo" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Apri</a></td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="y-vuoto">Nessuna consegna in questo mese.</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+{% endif %}
+</div>
+{% endblock %}
+{% block script %}
+<script>
+  document.querySelectorAll('.y-tab tr[data-href]').forEach(function (r) {
+    r.addEventListener('click', function (e) { if (!e.target.closest('a')) location.href = r.dataset.href; });
+    r.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = r.dataset.href; });
+  });
+</script>
+{% endblock %}

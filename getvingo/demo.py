@@ -48,10 +48,13 @@ def carica():
     db.session.add(Azienda(ragione_sociale="Concessionaria Demo S.r.l.", piva="01234567897", codice_fiscale="01234567897",
                            indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", stato="Italia",
                            lat=45.6672, lon=12.2431, firma=_png_firma(1)))
-    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", tipo="propria", sede_legale=True,
-                   lat=45.6672, lon=12.2431)
+    # 22/11/2026: la sede legale è un indirizzo, non un piazzale; i due piazzali hanno i loro posti auto
+    legale = Sede(nome="Sede legale", indirizzo="Viale Europa 1", cap="31100", comune="Treviso", provincia="TV", tipo="propria",
+                  sede_legale=True, lat=45.6674, lon=12.2428)
+    treviso = Sede(nome="Sede Treviso", indirizzo="Viale Europa 5", cap="31100", comune="Treviso", provincia="TV", tipo="propria",
+                   lat=45.6672, lon=12.2431, posti=40)
     villorba = Sede(nome="Piazzale Villorba", indirizzo="Via Postumia 50", cap="31020", comune="Villorba", provincia="TV",
-                    tipo="propria", lat=45.7051, lon=12.2468)
+                    tipo="propria", lat=45.7051, lon=12.2468, posti=5)
     carrozzeria = Sede(nome="Carrozzeria Rossi", indirizzo="Via Roma 12", cap="31050", comune="Ponzano Veneto", provincia="TV", codice_fiscale="09876543210",
                        piva="09876543210", tipo="carrozzeria", lat=45.7089, lon=12.2101, firma=_png_firma(2))
     officina = Sede(nome="Officina Bianchi", indirizzo="Via Feltrina 88", cap="31100", comune="Treviso", provincia="TV", codice_fiscale="05556667778",
@@ -63,7 +66,7 @@ def carica():
     esterno = Vettore(nome="Trasporti Bianchi S.r.l.", piva="11223344556", codice_fiscale="11223344556",
                       indirizzo="Via Industria 5", cap="31030", comune="Casier", provincia="TV",
                       firma=_png_firma(4))  # 22/11/2026: timbro e sigla del legale rappresentante
-    db.session.add_all([treviso, villorba, carrozzeria, officina, detailing, proprio, esterno])
+    db.session.add_all([legale, treviso, villorba, carrozzeria, officina, detailing, proprio, esterno])
     db.session.flush()
 
     utenti = {}
@@ -225,7 +228,7 @@ def carica():
 
     # ------------------------------------------------------------- CONSEGNATE (calendario: mese scorso e questo)
     consegnata(smart, treviso, (adesso().replace(day=1) - timedelta(days=9)).replace(hour=15, minute=30))
-    consegnata(c3, treviso, _indietro(days=12).replace(hour=16, minute=15))
+    consegnata(c3, treviso, adesso() - timedelta(hours=2))  # una consegna anche oggi
     consegnata(avenger, villorba, _indietro(days=3).replace(hour=10, minute=30))
     consegnata(ypsilon, treviso, _indietro(days=1).replace(hour=11, minute=0))
 

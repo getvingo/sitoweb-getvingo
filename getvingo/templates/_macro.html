@@ -437,3 +437,8 @@
   <input name="{{ nome }}" id="{{ id }}" maxlength="{{ massimo }}" placeholder="{{ segnaposto }}" hidden>
 </div>
 {% endmacro %}
+
+{# Logo della marca in un cerchio (Home e pagine di stato, 22/11/2026): file caricato in Gestione, altrimenti le iniziali #}
+{% macro logo_marca(marca, lato=30) %}{% set url = marca|marchio if marca else none %}
+<span class="y-logo" style="width:{{ lato }}px;height:{{ lato }}px" role="img" aria-label="Logo {{ marca or 'marca non indicata' }}">{% if url %}<img src="{{ url }}" alt="" loading="lazy">{% else %}<b style="font-size:{{ 9 if (marca or '')|length > 4 else 10.5 }}px">{{ ((marca or '?')|iniziali)[:4] }}</b>{% endif %}</span>
+{% endmacro %}

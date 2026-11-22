@@ -3680,3 +3680,26 @@ details.filtri-stock > summary { min-height: 44px !important; border-radius: 8px
 .y-reparto { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .y-fare td:nth-child(2) { line-height: 1.5; }
 .y-fare td small { font-size: 13px !important; color: var(--testo-2); }
+
+/* Raggio unico (22/11/2026 notte, richiesta dell'utente): tutti i rettangoli con lo stesso raggio, un po' più tondo,
+   per un'identità comune. 14 px per riquadri, tabelle, campi, pulsanti e allerte; dentro un contenitore (segmenti)
+   11 px, cioè 14 meno il bordo interno, perché le curve restino parallele. Pillole ed etichette restano tonde. */
+:root { --raggio: 14px; --r: 14px; --r-s: 14px; --r-l: 14px; --r-m: 14px; }
+.scheda, .voce, .carta-auto, .carta-auto.anagrafica, .ddt-testata, .blocco-fase, .blocco-lavoro, .ddt-sezione, .note-interne,
+.carta-lavoro, .scheda-danno, .ddt-tratta, .info-striscia, .tabella-stock, .y-box, .y-num, .y-marca, .y-allerta, .y-ev, .na-campo,
+.na-mirino, .na-auto, .na-vin-box, .na-consigli > div, .menu-tendina, .bl-tendina, .vuoto, .oggi-pronte, .foglio, .calendario,
+.btn, .btn.piccolo, .btn.pieno, .ricerca, .ricerca input, details.filtri-stock > summary, .barra-filtri, .y-sede select,
+input, select, textarea, .campo input, .campo select, .campo textarea, .stato-voce, .interruttore, .y-segmenti, .scorri.come-pulsante,
+.bl-menu a, .bl-stato, .bl-utente summary, .na-libero, .na-vin-input, .foglio-firma-carta { border-radius: var(--raggio) !important; }
+.interruttore a, .y-segmenti a, .interruttore button { border-radius: 11px !important; }
+.y-cima { grid-template-columns: 1fr; }
+.y-cal-g.y-oggi-g .y-cal-t { border-bottom: 2px solid var(--testo); }
+.y-ev.ritardo { box-shadow: inset 3px 0 0 var(--in-ritardo); background: var(--in-ritardo-tenue); }
+.y-ev.ritardo b { color: var(--in-ritardo-testo); }
+.y-una-riga { display: block !important; white-space: nowrap; }
+.y-allerta .btn { pointer-events: none; }
+.y-box-testa .btn.piccolo { flex: none; }
+.y-frecce .btn.piccolo { width: auto; height: 36px; }
+.y-allerta > .btn, .y-allerta .btn.piccolo { flex: none !important; width: auto !important; }
+.y-frecce a.btn { display: inline-flex !important; width: auto !important; height: 36px !important; flex-direction: row; gap: 6px; padding: 0 12px; }
+.y-ev b { font-size: 11px; line-height: 1.25; }

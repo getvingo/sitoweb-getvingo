@@ -463,9 +463,9 @@ def home():
     try:
         cal_dal = date.fromisoformat(request.args.get("dal", ""))
     except ValueError:
-        cal_dal = oggi + timedelta(days=1)
+        cal_dal = oggi  # 22/11/2026: da oggi (al posto di "Pronte oggi", che lo ripeteva)
     cal_giorni = [cal_dal + timedelta(days=k) for k in range(7)]
-    eventi = [e for e in _eventi_calendario(cal_giorni[0], cal_giorni[-1]) if e["stato"] != "anticipo"]
+    eventi = _eventi_calendario(cal_giorni[0], cal_giorni[-1])
     calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
     marche, n_marche = dashboard.stock_per_marca(attivi)
     # 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario come nella Home di prima (avviso danni,
@@ -2637,6 +2637,28 @@ def elimina_veicolo(veicolo_id):
             pass
     flash(f"{nome} eliminata.", "ok")
     return redirect(url_for("main.piazzale"))
+
+
+@bp.route("/vetture/<chiave>")
+@solo_interni
+def stato_vetture(chiave):
+    """Pagine dedicate della barra laterale (22/11/2026, richiesta dell'utente): In viaggio, Da ritirare, Consegnate
+    (con il calendario delle consegne fatte). Dai fornitori e In preparazione portano a Lavorazioni e Preparazioni."""
+    from . import dashboard
+    if chiave == "in-viaggio":
+        return render_template("stato_vetture.html", chiave=chiave, righe=dashboard.in_viaggio(), adesso_=adesso())
+    if chiave == "da-ritirare":
+        return render_template("stato_vetture.html", chiave=chiave, righe=dashboard.da_ritirare(), adesso_=adesso())
+    if chiave == "consegnate":
+        tutte, numeri = dashboard.consegnate()
+        mese = request.args.get("mese") or adesso().strftime("%Y-%m")
+        calendario = _calendario([{"at": v.consegnato_at, "tipo": "consegnata", "v": v, "nota": v.sede.nome if v.sede else ""}
+                                  for v in tutte], mese)
+        anno, m = (int(x) for x in mese.split("-")) if re.fullmatch(r"\d{4}-\d{2}", mese) else (adesso().year, adesso().month)
+        del_mese = [v for v in tutte if v.consegnato_at.year == anno and v.consegnato_at.month == m]
+        return render_template("stato_vetture.html", chiave=chiave, righe=del_mese, numeri=numeri, calendario=calendario,
+                               tipi_evento=TIPI_EVENTO, adesso_=adesso())
+    abort(404)
 
 
 @bp.route("/api/dealer")

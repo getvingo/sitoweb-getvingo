@@ -18,7 +18,7 @@ MESI = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", 
 # stati della barra laterale: (chiave, nome, nota sotto il nome, filtro fase dello Stock)
 STATI = (("in_viaggio", "In viaggio", "su strada con DDT aperto", "in_viaggio"),
          ("lavorazione", "Dai fornitori", "in lavorazione esterna", "lavorazione"),
-         ("da_ritirare", "Da ritirare", "lavoro finito, da riportare", "da_ritirare"),
+         ("da_ritirare", "Da ritirare", "DDT da ritirare o lavoro finito", "da_ritirare"),
          ("preparazione", "In preparazione", "in preparazione in sede", "preparazione"))
 # Home gestori completa: amministratore e responsabile commerciale; gli altri partono da "Solo le mie"
 RUOLI_TUTTO = ("admin", "resp_commerciale")
@@ -42,30 +42,32 @@ def stati_vetture():
     """Barra laterale (ogni pagina da computer): vetture per stato + consegnate oggi e nel mese.
     Conteggi veloci: niente calcolo della fase auto per auto su tutto lo stock."""
     in_viaggio = Veicolo.query.filter_by(stato="in_viaggio").count()
-    lavorazione = da_ritirare = 0
+    # 22/11/2026: gli stessi conteggi delle pagine che si aprono (Lavorazioni, Da ritirare)
+    lavorazione = 0
     for sede, elenco in servizi.presso_fornitori():
         if not sede.esterna:
             continue
         for v, m in elenco:
-            if m and m.lavorazione_completata_at:
-                da_ritirare += 1
-            else:
+            if m and m.con_lavorazione and not m.lavorazione_completata_at:
                 lavorazione += 1
+    n_ritirare = len(da_ritirare())
     preparazione = (Preparazione.query.join(Veicolo, Preparazione.veicolo_id == Veicolo.id)
                     .filter(Preparazione.completata_at.is_(None), Veicolo.stato == "in_sede")
                     .with_entities(Preparazione.veicolo_id).distinct().count())
-    conta = {"in_viaggio": in_viaggio, "lavorazione": lavorazione, "da_ritirare": da_ritirare,
+    conta = {"in_viaggio": in_viaggio, "lavorazione": lavorazione, "da_ritirare": n_ritirare,
              "preparazione": preparazione}
     oggi = adesso().date()
     dal, al = _giorno(oggi)
     inizio_mese = datetime(oggi.year, oggi.month, 1)
     consegnate = [v for v in Veicolo.query.filter(Veicolo.stato == "consegnato", Veicolo.consegnato_at >= inizio_mese)
                   .with_entities(Veicolo.consegnato_at, Veicolo.trasferita_a).all() if not v.trasferita_a]
-    righe = [{"chiave": k, "nome": n, "nota": nota, "n": conta[k], "url": url_for("main.piazzale", fase=f)}
-             for k, n, nota, f in STATI]
+    # 22/11/2026: in viaggio e da ritirare hanno la loro pagina; dai fornitori → Lavorazioni; in preparazione → Preparazioni
+    dove = {"in_viaggio": url_for("main.stato_vetture", chiave="in-viaggio"), "lavorazione": url_for("main.lavorazioni"),
+            "da_ritirare": url_for("main.stato_vetture", chiave="da-ritirare"), "preparazione": url_for("main.preparazione")}
+    righe = [{"chiave": k, "nome": n, "nota": nota, "n": conta[k], "url": dove[k]} for k, n, nota, f in STATI]
     righe.append({"chiave": "consegnato", "nome": "Consegnate oggi", "nota": f"{len(consegnate)} questo mese",
                   "n": sum(1 for v in consegnate if dal <= v.consegnato_at < al),
-                  "url": url_for("main.preparazione", vista="consegnate")})
+                  "url": url_for("main.stato_vetture", chiave="consegnate")})
     return righe
 
 
@@ -333,3 +335,50 @@ def compiti_telefono():
                             "dove": f"Ora è in {v.sede.nome if v.sede else '—'} · ultimo DDT prima della consegna",
                             "url": url_for("main.tocco_scelta", veicolo_id=v.id)})
     return out[:15]
+
+
+# ---------------------------------------------------------------- pagine dedicate della barra laterale (22/11/2026)
+
+def in_viaggio():
+    """Auto su strada con DDT aperto: tratta, chi la porta, partenza, arrivo previsto o ritardo."""
+    out = []
+    base = Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(Ddt.annullato_at.is_(None), Movimento.stato == "aperto")
+    for m in base.order_by(Movimento.partenza_at).all():
+        atteso, stimato = servizi.arrivo_atteso(m)
+        ritardo = servizi.viaggio_in_ritardo(m) or 0
+        out.append({"m": m, "v": m.veicolo, "atteso": atteso, "stimato": stimato, "ritardo_min": ritardo if ritardo > 60 else 0})
+    out.sort(key=lambda r: (-r["ritardo_min"], r["m"].partenza_at))
+    return out
+
+
+def da_ritirare():
+    """Lavoro finito dal fornitore e DDT da ritirare: dove sono, da quando, chi le riporta, entro quando."""
+    out, visti = [], set()
+    base = Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(Ddt.annullato_at.is_(None))
+    for m in base.filter(Movimento.stato == "predisposto").order_by(Movimento.ritiro_entro_at).all():
+        visti.add(m.veicolo_id)
+        out.append({"v": m.veicolo, "dove": m.da_sede.nome if m.da_sede else "—", "verso": m.a_sede.nome if m.a_sede else "—",
+                    "ddt": m.ddt, "entro": m.ritiro_entro_at, "scaduto": m.scaduto, "chi": m.assegnato_a.nome if m.assegnato_a else "",
+                    "finita": None, "url": url_for("main.ddt_dettaglio", ddt_id=m.ddt_id)})
+    for sede, elenco in servizi.presso_fornitori():
+        for v, m in elenco:
+            if v.id in visti or not (m and m.lavorazione_completata_at):
+                continue
+            out.append({"v": v, "dove": sede.nome, "verso": "", "ddt": None, "entro": None, "scaduto": False, "chi": "",
+                        "finita": m.lavorazione_completata_at, "lavorazione": m.lavorazione,
+                        "url": url_for("main.veicolo", veicolo_id=v.id) + "#predisponi"})
+    out.sort(key=lambda r: (not r["scaduto"], r["ddt"] is not None, r["entro"] or r["finita"] or adesso()))
+    return out
+
+
+def consegnate(mese=None):
+    """Consegne al cliente confermate: oggi, ultimi 7 giorni, mese; elenco del mese scelto."""
+    oggi = adesso().date()
+    tutte = [v for v in Veicolo.query.filter(Veicolo.stato == "consegnato", Veicolo.consegnato_at.isnot(None))
+             .order_by(Veicolo.consegnato_at.desc()).all() if not v.trasferita_a]
+    dal_oggi, _ = _giorno(oggi)
+    settimana = datetime.combine(oggi - timedelta(days=6), time.min)
+    inizio_mese = datetime(oggi.year, oggi.month, 1)
+    return tutte, {"oggi": sum(1 for v in tutte if v.consegnato_at >= dal_oggi),
+                   "settimana": sum(1 for v in tutte if v.consegnato_at >= settimana),
+                   "mese": sum(1 for v in tutte if v.consegnato_at >= inizio_mese)}
