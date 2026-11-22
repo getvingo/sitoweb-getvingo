@@ -4431,3 +4431,28 @@ class TestPagineStato(Base):
         self.assertIn('href="/lavorazioni"', home)        # Dai fornitori → Lavorazioni
         self.assertIn("Calendario della settimana", home)
         self.assertNotIn("<h2>Pronte oggi</h2>", home)     # era una ripetizione del calendario
+
+
+class TestVetturePova(Base):
+    """22/11/2026: Gestione → Carica vetture di prova (la simulazione della demo nella concessionaria, senza
+    cancellare niente) e Svuota che le toglie con partner, vettore e luoghi "(prova)"."""
+    def test_carica_e_svuota(self):
+        vid = self.abbina()  # un'auto vera già presente: resta
+        r = self.c.post("/admin/prova", follow_redirects=True)
+        self.assertIn("Vetture di prova caricate", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertGreater(Veicolo.query.count(), 30)
+            self.assertEqual(Veicolo.query.filter(Veicolo.stato == "consegnato").count(), 4)
+            self.assertTrue(Sede.query.filter(Sede.nome == "Carrozzeria Rossi (prova)").count())
+            self.assertTrue(Tag.query.filter(Tag.codice.like("%-P001")).count())
+        for url in ("/", "/vetture/in-viaggio", "/vetture/da-ritirare", "/vetture/consegnate", "/lavorazioni",
+                    "/preparazione", "/stock", "/ddt", "/danni"):
+            self.assertEqual(self.c.get(url).status_code, 200, url)
+        # una seconda volta no
+        self.assertIn("ci sono già", self.c.post("/admin/prova", follow_redirects=True).get_data(as_text=True))
+        self.c.post("/admin/svuota", data={"conferma": "SVUOTA"})
+        with self.app.app_context():
+            self.assertEqual(Veicolo.query.count(), 0)
+            self.assertEqual(Sede.query.filter(Sede.nome.like("%(prova)")).count(), 0)
+            self.assertEqual(Utente.query.filter(Utente.email.like("%prova.getvingo.invalid")).count(), 0)
+            self.assertTrue(Sede.query.filter_by(nome="Sede A").count())  # i luoghi veri restano

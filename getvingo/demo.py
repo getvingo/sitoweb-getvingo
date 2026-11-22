@@ -87,7 +87,13 @@ def carica():
         db.session.add(u)
         utenti[chiave] = u
     db.session.flush()
+    _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, esterno, utenti,
+            nuovo_tag=lambda n: Tag(codice=f"DEMO{n:04d}"), liberi=True)
 
+
+def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, esterno, utenti, nuovo_tag, liberi=True):
+    """Le vetture della demo in ogni stato, nei luoghi e con le persone date (22/11/2026: usata anche da
+    prova.carica per le vetture di prova in una concessionaria vera). nuovo_tag(n) dà l'adesivo dell'n-esima auto."""
     from flask import current_app
     import base64 as b64
     import os
@@ -108,7 +114,9 @@ def carica():
         v = Veicolo(vin=vin, marca=marca, modello=modello, versione=versione, colore=colore, sede=sede, stato="in_sede",
                     condizione=condizione, tipologia=tipologia, targa=targa,
                     lat=sede.lat + dove[0], lon=sede.lon + dove[1], posizione_at=_indietro(days=20))
-        db.session.add_all([v, Tag(codice=f"DEMO{contatore_tag[0]:04d}", veicolo=v, abbinato_at=_indietro(days=20))])
+        t = nuovo_tag(contatore_tag[0])
+        t.veicolo, t.abbinato_at = v, _indietro(days=20)
+        db.session.add_all([v, t])
         db.session.flush()
         return v
 
@@ -306,6 +314,7 @@ def carica():
                                   [foto_demo(10)])
     danno.segnalato_at = _indietro(days=5)
     servizi.risolvi_danno(danno, utenti["ufficio"], "Riparato con levabolli", [foto_demo(11)])
-    for n in range(5):
-        db.session.add(Tag(codice=f"LIBERO{n + 1:02d}"))
+    if liberi:
+        for n in range(5):
+            db.session.add(Tag(codice=f"LIBERO{n + 1:02d}"))
     db.session.commit()

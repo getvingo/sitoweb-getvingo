@@ -823,6 +823,28 @@ def importa():
     return render_template("admin/import.html")
 
 
+@bp.route("/prova", methods=["POST"])
+@ruolo_richiesto("admin")
+def carica_prova():
+    """Carica vetture di prova (22/11/2026, prova.carica): la simulazione della demo nella concessionaria, senza
+    cancellare niente. Si tolgono con "Svuota per un nuovo test"."""
+    from . import prova
+    try:
+        n = prova.carica(g.utente)
+        db.session.commit()
+    except prova.GiaCaricate as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+        return redirect(url_for("admin.indice"))
+    except servizi.Vietato as e:
+        db.session.rollback()
+        flash(f"Vetture di prova non caricate: {e}", "errore")
+        return redirect(url_for("admin.indice"))
+    flash(f"Vetture di prova caricate: {n} in carico in tutti gli stati, con DDT, lavorazioni, preparazioni, danni e "
+          "consegne. Partner, luoghi e vettore di prova hanno \"(prova)\" nel nome. Le togli con Svuota per un nuovo test.", "ok")
+    return redirect(url_for("main.home", mie=0))
+
+
 @bp.route("/svuota", methods=["GET", "POST"])
 @ruolo_richiesto("admin")
 def svuota():

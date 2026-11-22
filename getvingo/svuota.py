@@ -50,5 +50,9 @@ def svuota(org_id):
     tolte = {}
     for m in ORDINE:
         tolte[m.__tablename__] = _righe(m, org_id).delete(synchronize_session=False)
+    # 22/11/2026: anche partner, vettore e luoghi "(prova)" delle vetture di prova (prova.carica)
+    from . import prova
+    db.session.expire_all()
+    tolte["prova"] = prova.togli_luoghi_e_persone_di_prova(org_id)
     db.session.commit()
     return tolte

@@ -37,6 +37,13 @@
 </div>
 {# 22/11/2026: in fondo, separato, lo svuotamento per ripartire con un test #}
 <div class="zona-pericolo-gestione" style="margin-top:32px;padding-top:16px;border-top:1px dashed var(--bordo-forte)">
-  <a class="btn-link" style="color:var(--danno-scuro)" href="{{ url_for('admin.svuota') }}">{{ i('attenzione', 's') }} Svuota per un nuovo test: togli auto, DDT e adesivi</a>
+  <div class="azioni" style="gap:10px">
+    <form method="post" action="{{ url_for('admin.carica_prova') }}" data-una-volta
+          onsubmit="return confirm('Aggiungere una trentina di vetture di prova in tutti gli stati? Si tolgono con Svuota per un nuovo test.')">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="btn">{{ i('auto', 's') }} Carica vetture di prova</button></form>
+    <a class="btn" style="color:var(--danno-scuro)" href="{{ url_for('admin.svuota') }}">{{ i('attenzione', 's') }} Svuota per un nuovo test</a>
+  </div>
+  <p class="tenue piccolo" style="margin-top:8px">Le vetture di prova si aggiungono a quelle che ci sono (niente viene cancellato); "Svuota" toglie auto, DDT, adesivi e tutto ciò che è "(prova)".</p>
 </div>
 {% endblock %}
