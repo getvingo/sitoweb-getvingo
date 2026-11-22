@@ -3545,3 +3545,135 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .y-tel .tocca-adesivo .onde-nfc i { display: none; }
 .y-tel .tocca-adesivo .onde-nfc .icona { width: 34px; height: 34px; color: var(--marchio-via); }
 .y-frecce a.y-link { width: auto; height: auto; border: 0; font-weight: 600; font-size: 13px; color: var(--segnale); margin-right: 8px; }
+
+/* =====================================================================================================
+   ARMONIZZAZIONE B1 (22/11/2026 sera, analisi in knowledge/analisi-ux-ui-portale-v2.txt). Un solo linguaggio
+   per tutte le pagine, quello della Home "Getvingo Yard". Regole:
+   1. Un colore = un significato. Stato della vettura: blu in viaggio · ocra dai fornitori · ruggine da ritirare
+      · viola in preparazione · verde pronta/consegnata. Tempo: NEUTRO se nei tempi (asfalto/grigio), ARANCIO
+      attenzione se in ritardo. Rosso pieno solo per i danni. Verde testi per link e "fatto".
+   2. Superfici piatte: carta bianca, filo 1px #E6E8E3, raggio 12 px, niente ombre né gradienti.
+   3. Gerarchia del testo: titolo pagina 28 px · titolo sezione 17 px · testo 14–15 px · etichette 11 px MAIUSCOLO.
+   4. Un solo pulsante pieno per area (asfalto); gli altri bianchi col filo; il colore sta nell'icona.
+   ===================================================================================================== */
+:root {
+  --in-tempo: #3A444E; --in-tempo-tenue: #EEF0EC; --in-tempo-testo: #3A444E;
+  --in-ritardo: #A8360C; --in-ritardo-tenue: #FBE9E2; --in-ritardo-testo: #A8360C;
+  --st-viaggio-tenue: #E6EEF9; --st-viaggio-testo: #1F5FB0;
+  --st-pronta: #007A4E; --st-pronta-pieno: #007A4E; --pronta-verde: #007A4E; --consegnata-verde: #005C3B;
+  --arancio: #A8360C; --arancio-tenue: #FBE9E2; --arancio-testo: #A8360C;
+  --liv-1: #A8360C; --liv-1-fondo: #FBE9E2; --liv-1-testo: #A8360C; --liv-2: #C2410C;
+  --ombra: none; --r: 12px; --r-l: 12px;
+}
+body { background: var(--fondo-pagina); }
+
+/* 3. gerarchia del testo */
+h1 { font-size: 28px; letter-spacing: -.01em; }
+h2 { font: 700 17px/1.3 var(--font-titoli); text-transform: none; letter-spacing: 0; color: var(--testo); margin: 0 0 10px; }
+h2 .icona { color: var(--testo-2); }
+.sezione-t { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
+.titolo-pagina { margin-bottom: 20px; align-items: flex-end; }
+.descrizione-pagina { font-size: 14px; color: var(--testo-2); margin-top: 4px; }
+.sopratitolo { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
+
+/* 4. pulsanti: piatti, raggio 8 */
+.btn { min-height: 44px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); box-shadow: none !important;
+  font: 600 14px var(--font-testo); color: var(--testo); padding: 0 16px; }
+.btn:hover { border-color: var(--testo-2); background: var(--carta); }
+.btn.primario, .titolo-pagina .btn.primario { background: var(--inchiostro-fisso); border-color: var(--inchiostro-fisso); color: #fff; }
+.btn.primario:hover { background: #232D36; border-color: #232D36; }
+.btn.pieno { min-height: 48px; }
+.btn.pericolo { background: var(--danno-scuro); border-color: var(--danno-scuro); color: #fff; }
+.btn-predisponi, .btn-prepara, .btn-prepara-larga, .btn-sollecita, .btn.sollecita, .btn-predisponi-riga { color: var(--testo) !important; border-color: var(--linea) !important; background: var(--carta) !important; }
+.btn-predisponi .icona { color: var(--st-ritiro); } .btn-prepara .icona, .btn-prepara-larga .icona { color: var(--st-prep); }
+.btn-danno, .btn.btn-danno-larga, .btn-danno-riga { color: var(--danno-scuro) !important; border-color: var(--linea) !important; background: var(--carta) !important; }
+.btn-danno .icona { color: var(--danno); }
+.btn-link { color: var(--segnale); font-weight: 600; }
+.scorri, .scorri.verde, .scorri.magenta { background: var(--inchiostro-fisso); }
+.scorri.verde .scorri-pomo, .scorri.magenta .scorri-pomo { color: var(--inchiostro-fisso); }
+.scorri.come-pulsante { height: 48px; border-radius: 8px; }
+.indietro, a.btn.indietro { min-height: 36px; padding: 0 12px; }
+
+/* demo: un'etichetta discreta, non una fascia */
+.demo-barra { display: inline-flex; width: auto; min-height: 32px; padding: 0 12px; margin: 0 0 14px; border: 1px dashed var(--bordo-forte);
+  background: var(--carta); color: var(--testo-2); font-size: 12px; font-weight: 600; border-radius: 999px; }
+.demo-barra .icona { width: 14px; height: 14px; }
+
+/* 2. superfici piatte */
+.scheda, .voce, .carta-auto, .blocco-fase, .blocco-lavoro, .ddt-sezione, .note-interne, .y-box { box-shadow: none !important; }
+.scheda, .ddt-sezione { border: 1px solid var(--linea); border-radius: 12px; }
+
+/* badge Nuovo/Usato/Commerciale: dati, non stati → neutri */
+.badge.nuovo, .badge.usato, .anagrafica-dati .badge.nuovo, .anagrafica-dati .badge.usato, .badge.commerciale, .chip-commerciale {
+  background: var(--riquadro) !important; color: var(--testo-3) !important; border: 0; font: 700 11px var(--font-titoli); letter-spacing: .02em; }
+.badge.nuovo .icona, .badge.usato .icona { width: 12px; height: 12px; color: var(--testo-2); }
+
+/* tabelle degli elenchi (Vetture, Lavorazioni, Preparazioni, DDT, Danni): un riquadro, righe separate da un filo */
+.tabella-stock { border-collapse: separate; border-spacing: 0; background: var(--carta); border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+.tabella-stock thead th { background: var(--fondo-pagina); padding: 10px 12px; font: 700 11px var(--font-titoli); letter-spacing: .06em; border-bottom: 1px solid var(--linea); }
+.tabella-stock .riga-gruppo th { background: var(--carta); padding: 14px 12px 6px; font: 700 13px var(--font-titoli); color: var(--testo-2); border-top: 1px solid var(--linea); }
+.riga-stock > td, .riga-stock > td:first-child, .riga-stock > td:last-child { border: 0; border-top: 1px solid var(--linea); border-radius: 0; background: var(--carta); padding: 12px; }
+.riga-stock:hover > td { background: var(--fondo-pagina); }
+.riga-stock.con-danno > td:first-child { box-shadow: inset 3px 0 0 var(--danno); }
+.tabella-stock .riga-dettagli > td, .riga-dettagli > td { border-left: 0 !important; border-radius: 0 !important; }
+
+/* filtri di stato: segmenti come l'agenda della Home */
+.stato-filtri, .filtri-stato { gap: 4px !important; background: var(--carta); border: 1px solid var(--linea); border-radius: 10px; padding: 3px; display: inline-flex; flex-wrap: wrap; }
+.stato-voce, .stato-voce:first-child { border: 0 !important; border-radius: 8px !important; min-height: 36px; padding: 0 12px 0 8px; background: transparent; box-shadow: none !important; }
+.stato-voce .stato-icona { width: 22px; height: 22px; background: transparent !important; color: var(--c, var(--testo-2)); }
+.stato-voce b { font-size: 14px; }
+.stato-voce .stato-nome { font-size: 13px; color: var(--testo-3); }
+.stato-voce.attivo { background: var(--inchiostro-fisso) !important; }
+.stato-voce.attivo b, .stato-voce.attivo .stato-nome, .stato-voce.attivo .stato-icona { color: #fff !important; }
+.stato-voce:hover { background: var(--fondo-pagina); }
+
+/* intestazioni di scheda auto e DDT: chiare, il colore dello stato solo nel pallino */
+.carta-auto.anagrafica { border: 1px solid var(--linea); border-top: 1px solid var(--linea); box-shadow: none; }
+.anagrafica .carta-auto-testa { background: var(--carta); color: var(--testo); border-bottom: 1px solid var(--linea); }
+.anagrafica .logo-marca { box-shadow: inset 0 0 0 1px var(--bordo-forte); width: 64px; height: 64px; border-radius: 50%; }
+.anagrafica .logo-marca img { width: 44px; height: 44px; }
+.anagrafica .carta-auto-nome small { opacity: 1; color: var(--testo-2); }
+.anagrafica .modifica-auto { background: var(--carta); color: var(--testo); border-color: var(--linea); }
+.anagrafica .modifica-auto:hover { background: var(--fondo-pagina); color: var(--testo); }
+.anagrafica .impronta-testa, .anagrafica .carta-auto-impronta { background: var(--riquadro); }
+.ddt-testata { border: 1px solid var(--linea); border-top: 1px solid var(--linea); box-shadow: none; border-radius: 12px; }
+.ddt-testata-alto { background: var(--carta); color: var(--testo); border-bottom: 1px solid var(--linea); }
+.ddt-testata-nome h1 { color: var(--testo); font-size: 28px; }
+.ddt-testata-nome small, .ddt-testata-nome > span { opacity: 1; color: var(--testo-2); }
+.ddt-testata-dx .badge { background: var(--riquadro); }
+.ddt-testata-dx .btn { background: var(--carta); color: var(--testo); border-color: var(--linea); }
+.ddt-testata-dx .btn:hover { background: var(--fondo-pagina); color: var(--testo); }
+
+/* pillole di stato: fondo tenue + pallino del colore + testo (come l'agenda) */
+.pillola-stato, .badge.in_viaggio, .badge.aperto { font-weight: 600; }
+
+/* barra degli strumenti degli elenchi: ricerca, Filtri, tipo e vista alti uguali (44 px) e vicini */
+:root { --bordo-stato: 3px; }
+.stock-cerca { margin-bottom: 10px !important; gap: 8px !important; }
+.ricerca { min-height: 44px; border-radius: 8px !important; border: 1px solid var(--linea) !important; background: var(--carta); box-shadow: none !important; }
+.ricerca input { min-height: 42px; font-size: 14px; }
+details.filtri-stock > summary, .filtri-stock > summary { min-height: 44px !important; border-radius: 8px !important; border: 1px solid var(--linea) !important; box-shadow: none !important; font-size: 14px; }
+.barra-modo { margin: 0 0 12px !important; }
+.interruttore, .filtro-gruppo.interruttore { background: var(--carta) !important; border: 1px solid var(--linea); border-radius: 10px !important; padding: 3px !important; box-shadow: none !important; gap: 2px; }
+.interruttore a, .interruttore button { min-height: 34px !important; border-radius: 8px !important; font-size: 13px !important; color: var(--testo-3); box-shadow: none !important; }
+.interruttore a.attivo, .interruttore button.attivo { background: var(--inchiostro-fisso) !important; color: #fff !important; }
+.interruttore a.attivo .icona { color: #fff; }
+.pillole-sedi a, .pillole a { box-shadow: none !important; }
+
+/* Da ritirare ≠ in ritardo (22/11/2026 sera): nelle specifiche B1 avevano lo stesso ruggine #A8360C. Ruggine resta
+   all'attenzione (ritardi, oltre il 90%); "Da ritirare" passa a prugna, ovunque: barra laterale, DDT, lavorazioni finite */
+:root { --st-ritiro: #A3266B; --st-ritiro-pieno: #A3266B; --st-ritiro-tenue: #F8E8F0; }
+.riga-stock.lavoro-finita, .blocco-fase.lavoro-finita { --fase: var(--st-ritiro); }
+.stato-filtri .finita { --c: var(--st-ritiro); --c-tenue: var(--st-ritiro-tenue); --c-testo: var(--st-ritiro); }
+.barra-lavoro.lavoro-finita .barra-avanzamento { background: var(--st-ritiro-tenue); }
+.barra-lavoro.lavoro-finita .barra-avanzamento span, .lavoro-finita .lavoro-binario .fatto { background: var(--st-ritiro); }
+.barra-lavoro.lavoro-finita b, .lavoro-finita .anello-lavoro .anello-testo b { color: var(--st-ritiro); }
+.lavoro-finita .anello-lavoro .anello-pieno { stroke: var(--st-ritiro); }
+.carta-lavoro.lavoro-finita, .lavoro-breve.finita { border-left-color: var(--st-ritiro); }
+.pagina-lavorazioni .cal-auto.ev.lavoro_finita, .pagina-lavorazioni .legenda-calendario .ev.lavoro_finita { background: var(--st-ritiro-tenue); color: var(--st-ritiro); }
+.badge-comm { background: var(--riquadro) !important; color: var(--testo-3) !important; font: 700 11px var(--font-titoli); }
+.badge-comm .icona { color: var(--testo-2); }
+.condizione.nuovo, .condizione.usato { color: var(--testo-3) !important; border-color: transparent !important; background: var(--riquadro) !important; }
+.y-num-n small { display: block; margin-top: 6px; font: 600 13px/1.3 var(--font-testo); color: var(--testo-2); }
+.y-sede select { height: 40px !important; min-height: 40px !important; font-size: 14px !important; padding: 0 32px 0 12px !important; }
+.y-cerca .btn-mic-piccolo { background: transparent !important; color: var(--testo-2); }
