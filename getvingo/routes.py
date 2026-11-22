@@ -31,6 +31,12 @@ ORE_RITIRO = [4, 8, 24, 48, 72]
 GIORNI_SETTIMANA = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
 
 
+def serve_permesso(azione, motivo):
+    """22/11/2026: la mansione deve avere il permesso (Utente.PERMESSI); i partner passano ai controlli di sempre."""
+    if g.utente.interno and not g.utente.puo(azione):
+        abort(403, motivo)
+
+
 def solo_interni(view):
     """Pagine riservate al personale della concessionaria (non ai fornitori)."""
     @wraps(view)
@@ -345,9 +351,11 @@ def _da_fare_home(gruppi, attivi):
     ordine_fascia = {"adesso": 0, "oggi": 1, "prossimi": 2}
     voci = {}
 
-    def aggiungi(reparto, fascia, etichetta, v, testo, url, azione=None, persone=(), ruoli=()):
+    def aggiungi(reparto, fascia, etichetta, v, testo, url, azione=None, persone=(), ruoli=(), permesso=None):
+        if permesso and azione and g.utente.interno and not g.utente.puo(permesso):
+            azione = ("Apri la scheda", url)  # 22/11/2026: chi non può farlo vede la voce, non il comando
         x = {"reparto": reparto, "fascia": fascia, "etichetta": etichetta, "v": v, "testo": testo, "url": url,
-             "azione": azione, "mia": io in persone or (v.venditore_id == io) or ruolo in ruoli}
+             "azione": azione, "mia": io in persone or (v.venditore_id == io)}  # 22/11/2026: solo per persona, non per mansione
         if v.id not in voci or ordine_fascia[fascia] < ordine_fascia[voci[v.id]["fascia"]]:
             voci[v.id] = x
 
@@ -392,7 +400,7 @@ def _da_fare_home(gruppi, attivi):
             m = v.arrivo_qui
             aggiungi("lavorazioni", "oggi", "Finita, manca il rientro", v,
                      f"{m.lavorazione if m else 'Lavorazione'} finita presso {v.sede.nome}: prepara il DDT di rientro", url,
-                     ("Predisponi rientro", url + "#predisponi"), persone=(m.ddt.creato_da_id,) if m and m.ddt else (),
+                     ("Predisponi rientro", url + "#predisponi"), permesso="predisporre", persone=(m.ddt.creato_da_id,) if m and m.ddt else (),
                      ruoli=("backoffice", "resp_commerciale"))
         elif v.fase == "lavorazione" and v.arrivo_qui and v.arrivo_qui.con_lavorazione and v.arrivo_qui.giorni_ritardo:
             m = v.arrivo_qui
@@ -401,23 +409,24 @@ def _da_fare_home(gruppi, attivi):
             aggiungi("lavorazioni", "adesso", "In ritardo", v,
                      f"{m.lavorazione} presso {v.sede.nome}: in ritardo di {rit} {'giorno' if rit == 1 else 'giorni'} "
                      f"(fine prevista {m.lavorazione_prevista_at:%d/%m})" + (" · sollecitata, in attesa di risposta" if in_attesa else ""),
-                     url, ("Vedi il sollecito" if in_attesa else f"Sollecita {v.sede.nome}", url),
+                     url, ("Vedi il sollecito" if in_attesa else f"Sollecita {v.sede.nome}", url), permesso="fornitori",
                      persone=(m.ddt.creato_da_id,) if m.ddt else (), ruoli=("backoffice", "resp_commerciale"))
     # preparazioni che chiedono qualcosa: bloccate, in ritardo, senza orario
     for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
         v, url = prep.veicolo, url_for("main.veicolo", veicolo_id=prep.veicolo_id)
         ruoli = ("preparatore",)
+        fatte_da = tuple(f.utente_id for f in prep.fasi)
         if servizi.bloccata_da_danni(prep):
             d = v.danni_aperti[0]
             aggiungi("preparazione", "adesso", "Bloccata da un danno", v, f"Ferma prima di “{prep.prossima_fase}”: {d.zona.lower()} da verificare",
-                     url, ("Verifica il danno", url_for("main.danno", danno_id=d.id, torna=url_for("main.home"))), ruoli=ruoli + ("backoffice",))
+                     url, ("Verifica il danno", url_for("main.danno", danno_id=d.id, torna=url_for("main.home"))), persone=fatte_da)
         elif prep.pronta_entro_at and prep.pronta_entro_at < ora:
             aggiungi("preparazione", "adesso", "In ritardo", v,
                      f"Doveva essere pronta il {prep.pronta_entro_at:%d/%m alle %H:%M} · ora: {prep.prossima_fase}", url,
-                     ("Apri la preparazione", url + "#preparazione"), ruoli=ruoli)
+                     ("Apri la preparazione", url + "#preparazione"), persone=fatte_da)
         elif not prep.pronta_entro_at:
             aggiungi("preparazione", "prossimi", "Orario da fissare", v, f"Non è in calendario · ora: {prep.prossima_fase}", url,
-                     ("Fissa l'orario", url_for("main.preparazione")), ruoli=ruoli + ("backoffice",))
+                     ("Fissa l'orario", url_for("main.preparazione")), persone=fatte_da, permesso="orario_preparazione")
     # auto pronte: cosa manca per consegnarle
     for v in gruppi["pronta"]:
         url = url_for("main.veicolo", veicolo_id=v.id) + "#consegna"
@@ -426,13 +435,13 @@ def _da_fare_home(gruppi, attivi):
             continue
         if not v.consegna_sede:
             aggiungi("consegna", "prossimi", "Sede da indicare", v, "Pronta: indica in quale sede si consegna", url,
-                     ("Indica la sede di consegna", url), ruoli=ruoli)
+                     ("Indica la sede di consegna", url), ruoli=ruoli, permesso="consegnare")
         elif v.sede_id != v.consegna_sede_id:
             aggiungi("consegna", "oggi", "Da spostare", v, f"Pronta a {v.sede.nome}, si consegna a {v.consegna_sede.nome}", url,
                      ("Crea l'ultimo DDT", url), ruoli=ruoli)
         elif not v.targa:
             aggiungi("consegna", "prossimi", "Senza targa", v, "Pronta nella sede di consegna: manca la targa", url,
-                     ("Inserisci la targa", url), ruoli=ruoli)
+                     ("Inserisci la targa", url), ruoli=ruoli, permesso="consegnare")
 
     tutte = list(voci.values())
     # di base "Solo le mie" per tutti, admin compreso (15/11/2026); "Tutte" con ?mie=0
@@ -500,14 +509,19 @@ def home():
 
 
 @bp.route("/analisi")
-@ruolo_richiesto("admin")
+@solo_interni
 def analisi():
-    """Tempi dalla vendita alla consegna, fase per fase; fornitori; tratte (stimato e reale)."""
+    """Tempi dalla vendita alla consegna, fase per fase; fornitori; tratte (stimato e reale).
+    22/11/2026: anche il responsabile commerciale, senza la sezione Persone (solo amministratore)."""
+    serve_permesso("statistiche", "Le statistiche le vedono amministratore e responsabile commerciale.")
     from . import analisi as analisi_mod, statistiche, dashboard
     periodo = request.args.get("periodo", "90")
     dati = analisi_mod.calcola(periodo)
     # 22/11/2026: "Statistiche" con dati su tutto; i fornitori esterni (ultimi 30 giorni) spostati qui dalla Home
-    return render_template("analisi.html", a=dati, s=statistiche.calcola(periodo), fornitori_30=dashboard.fornitori_30(),
+    calcolate = statistiche.calcola(periodo)
+    if g.utente.ruolo != "admin" and not g.utente.supporto:
+        calcolate["persone"] = None
+    return render_template("analisi.html", a=dati, s=calcolate, fornitori_30=dashboard.fornitori_30(),
                            periodi=analisi_mod.PERIODI, durata=analisi_mod.durata)
 
 
@@ -566,6 +580,41 @@ def api_trova():
 STATI_FORNITORE = ("corso", "ritardo", "finita")
 
 
+def _calendario_partner(sede, in_arrivo, lavori, ritiri, dal):
+    """Calendario della settimana del partner lavorazioni (22/11/2026, richiesta dell'utente: "in partner
+    lavorazioni serve un calendario"): auto in arrivo (arrivo stimato), lavori da finire (fine prevista) e
+    ritiri (entro quando passa a prenderla chi è incaricato). Ritardi su oggi."""
+    oggi, ora = adesso().date(), adesso()
+    giorni = [dal + timedelta(days=k) for k in range(7)]
+    per_giorno = {d: [] for d in giorni}
+
+    def metti(at, tipo, titolo, v, sotto, url, ritardo=False):
+        d = max(at.date(), oggi) if ritardo else at.date()
+        if d in per_giorno:
+            per_giorno[d].append({"at": at, "tipo": tipo, "titolo": titolo, "v": v, "sotto": sotto, "url": url,
+                                  "ritardo": ritardo, "ora": at.strftime("%d/%m %H:%M" if at.date() != d else "%H:%M")})
+
+    for m in in_arrivo:
+        at, _ = servizi.arrivo_atteso(m)
+        metti(at, "arrivo", "In arrivo", m.veicolo, f"DDT {m.ddt.sigla} · {m.lavorazione or 'lavorazione da indicare'}",
+              url_for("main.arrivo_da_tap", ddt_id=m.ddt_id), ritardo=at < ora)
+    for v, m in lavori:
+        if m.lavorazione_completata_at or not m.lavorazione_prevista_at:
+            continue
+        rit = bool(m.giorni_ritardo)
+        metti(m.lavorazione_prevista_at, "fine", "Da finire" + (" · in ritardo" if rit else ""), v, m.lavorazione,
+              url_for("main.tocco_scelta", veicolo_id=v.id), ritardo=rit)
+    for m in ritiri:
+        if not m.ritiro_entro_at:
+            continue
+        chi = m.assegnato_a.nome if m.assegnato_a else "da assegnare"
+        metti(m.ritiro_entro_at, "ritiro", "Ritiro", m.veicolo, f"la ritira {chi} · DDT {m.ddt.sigla}",
+              url_for("main.ddt_dettaglio", ddt_id=m.ddt_id), ritardo=m.oltre_orario)
+    for d in giorni:
+        per_giorno[d].sort(key=lambda e: (not e["ritardo"], e["at"]))
+    return [(d, per_giorno[d]) for d in giorni]
+
+
 def _home_fornitore():
     """Home di chi esegue le lavorazioni esterne. In cima le auto in arrivo (da confermare), poi un solo
     elenco di lavorazioni filtrabile per stato: Nei tempi · In ritardo · Completate (prima i ritardi)."""
@@ -597,7 +646,14 @@ def _home_fornitore():
     # dal telefono (12/11/2026 sera): auto in arrivo, in lavorazione e pronte (da ritirare)
     in_corso_tel = [(v, m) for v, m in lavori if not m.lavorazione_completata_at]
     pronte_tel = [(v, m, da_ritirare.get(v.id)) for v, m in lavori if m.lavorazione_completata_at]
+    oggi = adesso().date()
+    try:
+        cal_dal = date.fromisoformat(request.args.get("dal", ""))
+    except ValueError:
+        cal_dal = oggi  # il partner vede da oggi in avanti: i ritardi stanno su oggi
+    calendario = _calendario_partner(sede, in_arrivo, lavori, list(da_ritirare.values()), cal_dal)
     return render_template("home_fornitore.html", sede=sede, stato=stato, conteggi=conteggi, in_arrivo=in_arrivo, in_corso_tel=in_corso_tel,
+                           calendario=calendario, cal_dal=cal_dal, ora=adesso(), timedelta=timedelta,
                            pronte_tel=pronte_tel,
                            lavori=visibili, da_ritirare=da_ritirare, senza_lavoro=senza_lavoro,
                            solleciti=solleciti, rientrate=rientrate, dipendenti=dipendenti, noi=noi)
@@ -722,6 +778,7 @@ def prepara_rientro(mov_id):
 @bp.route("/movimento/<int:mov_id>/stima", methods=["POST"])
 @login_richiesto
 def stima_lavorazione(mov_id):
+    serve_permesso("fornitori", "La fine prevista la cambiano backoffice, responsabile commerciale e amministratore.")
     """Giorni di lavorazione stimati: da qui si calcolano avanzamento e ritardo."""
     mov = db.get_or_404(Movimento, mov_id)
     try:
@@ -741,6 +798,7 @@ def stima_lavorazione(mov_id):
 @bp.route("/movimento/<int:mov_id>/sollecito", methods=["POST"])
 @solo_interni
 def sollecito(mov_id):
+    serve_permesso("fornitori", "I fornitori li sollecitano backoffice, responsabile commerciale e amministratore.")
     """Tempo stimato finito e nessuna fine lavorazione: si chiede al fornitore il motivo del ritardo."""
     mov = db.get_or_404(Movimento, mov_id)
     try:
@@ -1024,6 +1082,7 @@ def elimina_preparazione(prep_id):
 @solo_interni
 def scadenza_preparazione(prep_id):
     """Quando l'auto deve essere pronta: si fissa una volta sola (se manca), poi non si sposta."""
+    serve_permesso("orario_preparazione", "L'orario della preparazione lo fissano backoffice, preparatore, responsabile commerciale e amministratore.")
     prep = db.get_or_404(Preparazione, prep_id)
     try:
         servizi.controlla_slot_scelto(_data_ora("pronta_entro"))
@@ -1041,6 +1100,7 @@ def scadenza_preparazione(prep_id):
 def sede_consegna(veicolo_id):
     """Auto pronta: in quale sede verrà consegnata al cliente. L'appuntamento con il cliente non si
     fissa qui: lo gestisce il portale delle consegne della concessionaria."""
+    serve_permesso("consegnare", "La consegna la gestiscono backoffice, venditori, consegne, responsabile commerciale e amministratore.")
     v = db.get_or_404(Veicolo, veicolo_id)
     try:
         servizi.imposta_consegna(v, g.utente, db.session.get(Sede, request.form.get("sede_id", type=int) or 0))
@@ -1056,6 +1116,7 @@ def sede_consegna(veicolo_id):
 @bp.route("/veicolo/<int:veicolo_id>/consegna", methods=["POST"])
 @solo_interni
 def consegna(veicolo_id):
+    serve_permesso("consegnare", "La consegna la gestiscono backoffice, venditori, consegne, responsabile commerciale e amministratore.")
     v = db.get_or_404(Veicolo, veicolo_id)
     lat, lon = _coord()
     if lat is None and current_app.config["DEMO"] and v.sede is not None:
@@ -1660,6 +1721,7 @@ def nuova_auto():
 def modifica_auto(veicolo_id):
     """Tutti i dati dell'auto, con gli stessi campi dell'ingresso in stock (tranne dove si trova:
     quello cambia solo con un DDT o con "Correggi la posizione" dell'amministratore)."""
+    serve_permesso("modificare_auto", "I dati dell'auto li modificano backoffice, responsabile commerciale e amministratore.")
     v = _veicolo_visibile(veicolo_id)
     puo_posizione = servizi.puo_correggere_posizione(v, g.utente)
     sedi = (Sede.query.filter(Sede.attiva.is_(True), Sede.tipo.in_(("propria",) + Sede.FORNITORI))
@@ -1891,6 +1953,7 @@ def api_formatta():
 def note_interne(veicolo_id):
     """Note interne della concessionaria sull'auto (cliente, venditore, appunti): non vanno sul DDT
     e i fornitori non le vedono."""
+    serve_permesso("note_interne", "Le note interne le scrivono backoffice, venditori, responsabile commerciale e amministratore.")
     v = _veicolo_visibile(veicolo_id)
     v.cliente_nome = " ".join(request.form.get("cliente_nome", "").split())[:200]
     vid = request.form.get("venditore_id", type=int)
@@ -2205,6 +2268,7 @@ def _aggiungi_a_multiplo(v):
 def ddt_multiplo():
     """Un solo DDT per più auto che partono insieme (si crea solo da qui, dalla pagina DDT).
     Le auto si spuntano dall'elenco oppure si aggiungono toccando i loro adesivi."""
+    serve_permesso("ddt_multiplo", "Il DDT multiplo lo creano backoffice, consegne, responsabile commerciale e amministratore.")
     per_sede = _candidati_multiplo()
     bozza = _bozza_multiplo()
     if request.method == "POST":

@@ -74,7 +74,7 @@
           <tr class="y-fascia fascia-{{ chiave }}"><th colspan="3">{{ i(icona, 's') }} {{ titolo }} <span>{{ voci|length }}</span></th></tr>
           {% for x in voci %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
           <tr data-href="{{ x.url }}" tabindex="0" class="y-fare-{{ chiave }}">
-            <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
+            <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}{% if x.altre %} <span class="tenue">+ {{ x.altre }} {{ "auto" }}</span>{% endif %}</b>
               <small class="y-vin"><span class="y-mono">…{{ x.v.vin[-8:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
             <td><span class="y-tipo y-tipo-{{ x.reparto }}{{ ' y-tipo-danno' if 'danno' in x.etichetta|lower }}{{ ' pieno' if chiave == 'adesso' }}">{{ i('attenzione' if 'danno' in x.etichetta|lower else rep[1], 's') }} {{ x.etichetta }}</span>
               <small>{{ x.testo }}</small></td>
@@ -144,7 +144,7 @@
       <tr data-href="{{ x.url }}" tabindex="0">
         <td><span class="y-mono">{% if x.at.date() != ora.date() or periodo == '7' %}{{ giorni_brevi[x.at.weekday()] }} {{ x.at.day }} · {% endif %}{{ x.at.strftime('%H:%M') }}</span><small>{{ x.quando }}</small></td>
         <td><b>{{ x.attivita }}</b>{% if x.ddt %}<small class="y-mono">DDT {{ x.ddt }}</small>{% endif %}{% if x.nota %}<small class="y-att">{{ x.nota|capitalize }}</small>{% endif %}</td>
-        <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
+        <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}{% if x.altre %} <span class="tenue">+ {{ x.altre }} {{ "auto" }}</span>{% endif %}</b>
           <small class="y-vin"><span class="y-mono">…{{ x.v.vin[-8:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
         <td>{% if x.a and x.a != x.da %}{{ x.da or '—' }} <span class="tenue">→</span> {{ x.a }}{% else %}{{ x.da or x.a or '—' }}{% endif %}</td>
         <td>{{ x.chi }}</td>

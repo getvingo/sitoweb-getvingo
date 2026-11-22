@@ -100,6 +100,7 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     firma_autista = _png_firma(3)
     MEZZO = Movimento.MEZZI  # su strada, bisarca, carro attrezzi, furgone/carrello, altro
     contatore_tag = [0]
+    create = []  # auto di questa simulazione (per riallineare gli orari del registro alla fine)
 
     def foto_demo(seme):
         nome = f"demo-danno-{seme}.png"
@@ -118,12 +119,14 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
         t.veicolo, t.abbinato_at = v, _indietro(days=20)
         db.session.add_all([v, t])
         db.session.flush()
+        create.append(v.id)
         return v
 
-    def viaggio(v, dest, causale, lavorazione, note, quando, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Consegne"):
+    def viaggio(v, dest, causale, lavorazione, note, quando, mezzo=MEZZO[0], vettore=proprio, conducente="Mario Consegne",
+                chi=None):
         dati = dict(a_sede_id=dest.id, causale=causale, vettore_id=vettore.id, conducente=conducente,
                     lavorazione=lavorazione, lavorazione_note=note, mezzo=mezzo)
-        return servizi.crea_movimento(v, dati, utenti["autista"], firma_conducente=firma_autista,
+        return servizi.crea_movimento(v, dati, chi or utenti["autista"], firma_conducente=firma_autista,
                                       partenza_at=quando).movimento
 
     def arriva(m, chi, quando):
@@ -155,7 +158,9 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     def passi(prep, quanti, ogni_ore=3):
         for k in range(quanti):
             servizi.avanza_preparazione(prep, utenti["autista"])
-            prep.fasi_fatte[-1].at = prep.creata_at + timedelta(hours=(k + 1) * ogni_ore)
+            # mai nel futuro: l'ultimo passo al più 20 minuti fa, gli altri prima (22/11/2026)
+            prep.fasi_fatte[-1].at = min(prep.creata_at + timedelta(hours=(k + 1) * ogni_ore),
+                                         adesso() - timedelta(minutes=20 + 40 * (quanti - 1 - k)))
         if prep.completata_at:
             prep.completata_at = prep.fasi_fatte[-1].at
 
@@ -262,7 +267,6 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     servizi.imposta_consegna(classe_a, utenti["ufficio"], treviso)
     pronta_diretta(troc, 3)                         # già in viaggio con l'ultimo DDT: resta tra le pronte fino alla consegna
     servizi.imposta_consegna(troc, utenti["ufficio"], villorba)
-    viaggio(troc, villorba, "Spostamento", Movimento.NESSUNA, "", _indietro(minutes=35))
 
     # ------------------------------------------------------------- DAI FORNITORI
     m = in_lavorazione(a3, carrozzeria, utenti["carrozzeria"], "Carrozzeria", "Paraurti anteriore", 16,
@@ -295,7 +299,9 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     scaduto.movimento.ritiro_entro_at = _indietro(hours=5)                                      # ritiro scaduto
 
     # ------------------------------------------------------------- IN VIAGGIO
-    viaggio(golf, carrozzeria, "Invio lavorazione", "Carrozzeria", "Graffio portiera post. sx", _indietro(minutes=50))
+    # 22/11/2026: una persona guida un'auto alla volta (Mario porta la T-Roc): la Golf va col carrello di Laura
+    viaggio(golf, carrozzeria, "Invio lavorazione", "Carrozzeria", "Graffio portiera post. sx", _indietro(minutes=50),
+            MEZZO[3], proprio, utenti["ufficio"].nome, chi=utenti["ufficio"])
     viaggio(transit2, officina, "Invio lavorazione", "Meccanica / tagliando", "Non parte: batteria e motorino",
             _indietro(hours=1, minutes=20), MEZZO[2], esterno, "Giulia Verdi (Trasporti Bianchi)")
     multiplo = servizi.crea_ddt_multiplo([aygo, clio, duster], dict(
@@ -304,9 +310,11 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
         mezzo=MEZZO[1]), utenti["autista"], firma_conducente=firma_autista)
     for mv in multiplo.movimenti:
         mv.partenza_at = _indietro(minutes=25)
+    # la T-Roc pronta parte per ultima: chi guida ha un viaggio solo alla volta (22/11/2026)
+    viaggio(troc, villorba, "Spostamento", Movimento.NESSUNA, "", _indietro(minutes=35))
 
     # ------------------------------------------------------------- DDT cancellato, danni, adesivi liberi
-    d = viaggio(peugeot, villorba, "Spostamento", "Nessuna (solo trasferimento)", "", _indietro(hours=3))
+    d = viaggio(peugeot, villorba, "Spostamento", "Nessuna (solo trasferimento)", "", _indietro(hours=3), MEZZO[3])
     servizi.annulla_ddt(d.ddt, utenti["admin"], "Creato sull'auto sbagliata")
     servizi.segnala_danno(golf_bianca, utenti["autista"], "Lato sinistro",
                           "Graffio di circa 10 cm sulla portiera posteriore", [foto_demo(7)])
@@ -317,4 +325,49 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     if liberi:
         for n in range(5):
             db.session.add(Tag(codice=f"LIBERO{n + 1:02d}"))
+    _orari_del_registro(create)
     db.session.commit()
+
+
+def _orari_del_registro(veicoli_ids):
+    """22/11/2026: la simulazione crea tutto in pochi secondi, quindi il registro "Chi ha fatto cosa" segnava
+    ogni azione allo stesso minuto (una persona con più cose nello stesso orario). Ogni azione prende
+    l'orario dell'evento che rappresenta: partenza, arrivo, fine lavori, passo, consegna, danno."""
+    from .models import Azione, Danno, PreparazioneFase
+    db.session.flush()
+    for a in Azione.query.filter(Azione.veicolo_id.in_(veicoli_ids)).all():
+        d = a.dati or {}
+        m = (Movimento.query.filter_by(ddt_id=a.ddt_id, veicolo_id=a.veicolo_id).first() if a.ddt_id else None)
+        quando = None
+        if a.tipo in ("partenza", "presa_in_carico") and m:
+            quando = m.partenza_at
+        elif a.tipo == "predisposizione" and a.ddt:
+            quando = a.ddt.emesso_at
+        elif a.tipo == "arrivo" and m:
+            quando = m.arrivo_at
+        elif a.tipo == "annullamento" and a.ddt:
+            quando = a.ddt.annullato_at
+        elif a.tipo == "lavorazione_completata":
+            mm = (db.session.get(Movimento, d["movimento_id"]) if d.get("movimento_id") else m if m and m.lavorazione_completata_at else
+                  Movimento.query.filter(Movimento.veicolo_id == a.veicolo_id, Movimento.lavorazione_completata_at.isnot(None))
+                  .order_by(Movimento.lavorazione_completata_at.desc()).first())
+            quando = mm.lavorazione_completata_at if mm else None
+        elif a.tipo == "preparazione_fase" and d.get("fase_id"):
+            f = db.session.get(PreparazioneFase, d["fase_id"])
+            quando = f.at if f else None
+        elif a.tipo == "consegna":
+            quando = a.veicolo.consegnato_at
+        elif a.tipo in ("danno", "danno_risolto"):
+            dn = db.session.get(Danno, d["danno_id"]) if d.get("danno_id") else None
+            quando = dn and (dn.risolto_at if a.tipo == "danno_risolto" else dn.segnalato_at)
+        if quando:
+            a.at = min(quando, adesso())
+    # una persona fa una cosa alla volta: azioni della stessa persona a meno di 6 minuti l'una dall'altra
+    # vengono distanziate all'indietro (la più recente resta dov'è)
+    db.session.flush()
+    per_persona = {}
+    for a in Azione.query.filter(Azione.veicolo_id.in_(veicoli_ids)).order_by(Azione.at.desc()).all():
+        prima = per_persona.get(a.utente_id)
+        if prima is not None and prima - a.at < timedelta(minutes=6):
+            a.at = prima - timedelta(minutes=7)
+        per_persona[a.utente_id] = a.at

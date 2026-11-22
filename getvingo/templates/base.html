@@ -84,7 +84,7 @@
     <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla') }}<span>Preparazioni</span></a>
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
     <a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}">{{ i('attenzione') }}<span>Danni</span>{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</a>
-    {% if g.utente.ruolo == 'admin' %}<span class="bl-linea" role="separator"></span>
+    {% if g.utente.puo('statistiche') %}<span class="bl-linea" role="separator"></span>
     <a href="{{ url_for('main.analisi') }}" class="{{ 'attivo' if ep == 'main.analisi' }}">{{ i('cronometro') }}<span>Statistiche</span></a>{% endif %}
     {% else %}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
@@ -132,7 +132,7 @@
         <div class="menu-chi"><b>{{ g.utente.nome }}</b><span>{{ g.utente.RUOLI[g.utente.ruolo] }} · {{ g.utente.sede.nome if g.utente.ruolo == 'fornitore' and g.utente.sede else g.utente.organizzazione.nome }}</span><span class="menu-email">{{ g.utente.email }}</span></div>
         <a href="{{ url_for('main.profilo') }}">{{ i('utente', 's') }} Il mio profilo</a>
         {% if g.utente.ruolo == 'admin' %}<a class="solo-telefono" href="{{ url_for('admin.aziende') }}">{{ i('gestione', 's') }} Utenti e partner</a>{% endif %}
-        {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Analisi dei tempi</a>{% endif %}
+        {% if g.utente.puo('statistiche') %}<a class="solo-computer" href="{{ url_for('main.analisi') }}">{{ i('cronometro', 's') }} Statistiche</a>{% endif %}
         {% if g.utente.ruolo == 'admin' or gestore() %}<div class="menu-separatore solo-computer" role="separator"></div>{% endif %}
         {% if g.utente.ruolo == 'admin' %}<a class="solo-computer" href="{{ url_for('admin.indice') }}">{{ i('gestione', 's') }} Gestione</a>{% endif %}
         {% if gestore() %}<a class="solo-computer" href="{{ url_for('piattaforma.indice') }}">{{ i('sede', 's') }} Pannello Getvingo</a>{% endif %}

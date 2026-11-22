@@ -10,7 +10,7 @@
 <div class="solo-computer">
 {{ indietro(url_for('main.piazzale') if g.utente.interno else url_for('main.home')) }}
 <div class="scheda-auto-testa">
-  {{ carta_auto(v, modificabile=g.utente.interno) }}
+  {{ carta_auto(v, modificabile=g.utente.puo('modificare_auto')) }}
   {{ info_auto(v) }}
 </div>
 <div class="azioni" style="margin:0 0 16px;align-items:center">
@@ -160,7 +160,7 @@
     <li><b>Consegnata</b></li>
   </ol>
 
-  {% if v.fase == 'pronta' %}
+  {% if v.fase == 'pronta' and g.utente.puo('consegnare') %}
   <details class="ripiega" {{ 'open' if not v.consegna_sede }} style="margin:12px 0 0">
     <summary>{{ i('bandiera', 's') }} {{ 'Cambia la sede di consegna' if v.consegna_sede else 'Indica la sede di consegna' }}</summary>
     <form method="post" action="{{ url_for('main.sede_consegna', veicolo_id=v.id) }}" data-una-volta>
@@ -315,6 +315,9 @@
   <summary>{{ i('matita', 's') }} Note interne <span class="tenue piccolo">Solo per la concessionaria, non vanno sul DDT</span>
     {% set parti_nota = [v.cliente_nome or '', ('venditore ' ~ v.venditore.nome) if v.venditore else '', ('venduta il ' ~ v.venduta_il.strftime('%d/%m/%Y')) if v.venduta_il else '']|select|list %}
     {% if parti_nota %}<span class="note-riassunto">{{ parti_nota|join(' · ') }}</span>{% endif %}</summary>
+  {% if not g.utente.puo('note_interne') %}
+  <p class="tenue piccolo" style="margin:10px 0 0">{{ v.note_interne or 'Nessuna nota.' }}<br>Le note interne le scrivono backoffice, venditori, responsabile commerciale e amministratore.</p>
+  {% else %}
   <form method="post" action="{{ url_for('main.note_interne', veicolo_id=v.id) }}" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <div class="griglia-2">
@@ -326,6 +329,7 @@
     <label class="campo"><span>Note</span><textarea name="note_interne" rows="3" maxlength="2000" placeholder="Es. consegna con accessori, cliente richiama martedì">{{ v.note_interne or '' }}</textarea></label>
     <button class="btn">{{ i('check', 's') }} Salva le note</button>
   </form>
+  {% endif %}
 </details>
 {% endif %}
 

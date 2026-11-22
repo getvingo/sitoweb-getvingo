@@ -164,7 +164,7 @@
 {% elif s %}
 <div class="sollecito-stato risposta">{{ i('chat', 's') }} <span><b>{{ s.risposta_utente.nome if s.risposta_utente else m.sede_arrivo_effettiva.nome }}, {{ s.risposta_at|data('%d/%m %H:%M') }}:</b> “{{ s.risposta }}”{% if s.nuova_stima_giorni %} · pronta tra {{ s.nuova_stima_giorni }} {{ 'giorno' if s.nuova_stima_giorni == 1 else 'giorni' }}{% endif %}</span></div>
 {% endif %}
-{% if puo_sollecitare(m) %}
+{% if puo_sollecitare(m) and g.utente.puo('fornitori') %}
 <details class="sollecita">
   <summary class="btn pieno btn-sollecito">{{ i('invia', 's') }} Sollecita {{ m.sede_arrivo_effettiva.nome }} · chiedi il motivo del ritardo</summary>
   <form method="post" action="{{ url_for('main.sollecito', mov_id=m.id) }}" class="scheda" data-una-volta>
@@ -181,6 +181,7 @@
 {# Cambia la stima dei giorni (concessionaria o fornitore) #}
 {% macro cambia_stima(m, torna) %}
 {# la fine prevista si fissa con una data (come il calendario della preparazione); il server la converte in giorni #}
+{% if not g.utente.interno or g.utente.puo('fornitori') %}
 <details class="cambia-stima">
   <summary>{{ i('orologio', 's') }} Cambia la fine prevista <span class="tenue">({{ m.lavorazione_prevista_at|data('%d/%m %H:%M') }} · {{ m.stima_giorni }} {{ 'giorno' if m.stima_giorni == 1 else 'giorni' }})</span></summary>
   <form method="post" action="{{ url_for('main.stima_lavorazione', mov_id=m.id) }}" class="azioni" style="align-items:flex-end" data-una-volta>
@@ -191,6 +192,7 @@
     <button class="btn piccolo">Salva</button>
   </form>
 </details>
+{% endif %}
 {% endmacro %}
 
 {# DDT di rientro: si crea solo dopo che la ditta esterna ha confermato la fine della lavorazione #}

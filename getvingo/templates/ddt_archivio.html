@@ -5,7 +5,7 @@
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>DDT</h1>
   <p class="descrizione-pagina">Tutti i documenti di trasporto: cerca, filtra per stato, apri o scarica il PDF.</p></div>
-  <a class="btn piccolo primario" href="{{ url_for('main.ddt_multiplo') }}">{{ i('camion', 's') }} DDT multiplo</a></div>
+  {% if g.utente.puo('ddt_multiplo') %}<a class="btn piccolo primario" href="{{ url_for('main.ddt_multiplo') }}">{{ i('camion', 's') }} DDT multiplo</a>{% endif %}</div>
 
 <form id="filtri" class="stock-cerca">
   <input type="hidden" name="stato" value="{{ stato }}">

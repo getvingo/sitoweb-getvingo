@@ -151,10 +151,30 @@ class Utente(PerOrganizzazione, db.Model):
     def interno(self):
         return self.ruolo in self.RUOLI_INTERNI
 
+    # Cosa può MODIFICARE ogni mansione (22/11/2026 notte, richiesta dell'utente dopo l'analisi
+    # knowledge/analisi-utenze-v1.txt). Tutte le mansioni VEDONO tutte le auto, i DDT e i danni; tutte toccano
+    # l'adesivo, caricano un'auto nuova, spostano un'auto col DDT, prendono in carico i ritiri assegnati a loro,
+    # confermano gli arrivi, mettono in preparazione e segnalano danni. Le altre modifiche sono per mansione;
+    # l'amministratore (e il Supporto Getvingo) può tutto.
+    PERMESSI = {
+        "predisporre": ("backoffice", "consegne", "resp_commerciale"),      # DDT da ritirare, assegnati a una persona
+        "ddt_multiplo": ("backoffice", "consegne", "resp_commerciale"),
+        "modificare_ddt": ("backoffice", "resp_commerciale"),               # DDT di altri o dopo l'arrivo
+        "modificare_auto": ("backoffice", "resp_commerciale"),              # Modifica dati (anagrafica)
+        "note_interne": ("backoffice", "venditore", "resp_commerciale"),    # cliente, venditore, venduta il
+        "fornitori": ("backoffice", "resp_commerciale"),                    # solleciti, fine prevista
+        "orario_preparazione": ("backoffice", "preparatore", "resp_commerciale"),
+        "consegnare": ("backoffice", "venditore", "consegne", "resp_commerciale"),  # sede, targa, consegna
+        "statistiche": ("resp_commerciale",),                               # senza la sezione Persone
+    }
+
+    def puo(self, azione):
+        return self.ruolo == "admin" or self.ruolo in self.PERMESSI.get(azione, ())
+
     @property
     def gestione(self):
-        # per ora ogni mansione interna può fare tutto (DDT da ritirare, modifiche dopo l'arrivo)
-        return self.interno
+        # 22/11/2026: modifiche "da ufficio" (DDT dopo l'arrivo) solo per le mansioni che ne hanno il permesso
+        return self.puo("modificare_ddt")
 
     def imposta_password(self, password):
         # pbkdf2: lo scrypt di default non c'è nel Python di sistema macOS (LibreSSL)

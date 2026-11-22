@@ -191,7 +191,7 @@ def lavorazione_in_corso(veicolo):
 
 def puo_predisporre(veicolo, utente):
     """Il DDT da ritirare si predispone da ovunque; dal fornitore solo dopo che ha concluso i lavori."""
-    return (puo_emettere(veicolo, utente) and (utente.gestione or not utente.interno)
+    return (puo_emettere(veicolo, utente) and (utente.puo("predisporre") or not utente.interno)
             and not lavorazione_in_corso(veicolo))
 
 
@@ -271,7 +271,7 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
         mov.assegnato_a = assegnato
     if predisponi_ore:
         mov.stato = "predisposto"
-        mov.ritiro_entro_at = adesso() + timedelta(hours=predisponi_ore)
+        mov.ritiro_entro_at = scadenza_ritiro(adesso(), predisponi_ore)
         db.session.add(mov)
         db.session.flush()
         ddt = _emetti_ddt(mov, utente)
@@ -287,7 +287,30 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
     return ddt
 
 
-def _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at=None):
+GUIDATA = "Su strada (guidata)"
+
+
+def controlla_un_viaggio_alla_volta(utente, mezzo, ddt_id=None):
+    """Chi guida un'auto non può guidarne un'altra nello stesso momento (22/11/2026, richiesta dell'utente:
+    "non è possibile avere più cose da fare nello stesso orario"). Vale solo per i viaggi su strada guidati:
+    bisarca, carro attrezzi e furgone portano più auto insieme."""
+    if mezzo != GUIDATA or utente is None:
+        return
+    with db.session.no_autoflush:
+        q = Movimento.query.filter(Movimento.stato == "aperto", Movimento.partenza_utente_id == utente.id,
+                                   Movimento.mezzo == GUIDATA)
+        if ddt_id:
+            q = q.filter(Movimento.ddt_id != ddt_id)
+        in_corso = q.first()
+    if in_corso is not None:
+        verso = in_corso.a_sede.nome if in_corso.a_sede else "destinazione"
+        raise Vietato(f"Stai già guidando {in_corso.veicolo.descrizione} verso {verso} (DDT "
+                      f"{in_corso.ddt.sigla if in_corso.ddt else '—'}): conferma l'arrivo prima di partire con un'altra auto.")
+
+
+def _in_partenza(mov, utente, firma_conducente, lat, lon, partenza_at=None, un_viaggio=True):
+    if un_viaggio:
+        controlla_un_viaggio_alla_volta(utente, mov.mezzo, mov.ddt_id)
     if not firma_conducente and not firme_facoltative():
         raise Vietato(SERVE_FIRMA_CONDUCENTE)
     with db.session.no_autoflush:  # il movimento non è ancora nella sessione
@@ -337,11 +360,12 @@ def crea_ddt_multiplo(veicoli, dati, utente, firma_conducente=None, lat=None, lo
             controlla_targa_consegna(v)
     if not firma_conducente and not firme_facoltative():
         raise Vietato("Serve la firma di chi sposta i mezzi.")
+    controlla_un_viaggio_alla_volta(utente, dati.get("mezzo"))
     ora = adesso()
     movimenti = [Movimento(veicolo=v, da_sede=origine, **dati) for v in veicoli]
     db.session.add_all(movimenti)
     for m in movimenti:
-        _in_partenza(m, utente, firma_conducente, lat, lon, ora)
+        _in_partenza(m, utente, firma_conducente, lat, lon, ora, un_viaggio=False)
     ddt = _emetti_ddt(movimenti[0], utente)
     for m in movimenti[1:]:
         m.ddt = ddt
@@ -812,6 +836,7 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
         if mezzo not in Movimento.MEZZI:
             raise Vietato("Indica come viaggia l'auto (su strada, bisarca, carro attrezzi…).")
         mov.mezzo = mezzo
+    controlla_un_viaggio_alla_volta(utente, mov.mezzo, mov.ddt_id)
     mov.stato = "aperto"
     mov.conducente = conducente
     mov.partenza_at = adesso()
@@ -825,7 +850,7 @@ def prendi_in_carico(mov, utente, conducente, firma_conducente, lat=None, lon=No
 
 
 def rinnova_ritiro(mov, ore=24):
-    mov.ritiro_entro_at = adesso() + timedelta(hours=ore)
+    mov.ritiro_entro_at = scadenza_ritiro(adesso(), ore)
 
 
 RAGGIO_ARRIVO_M = 200
@@ -946,6 +971,9 @@ def puo_modificare(ddt, utente):
         return False
     m = ddt.movimento
     if not account_del_luogo(m.da_sede, utente) and ddt.creato_da_id != utente.id:
+        return False
+    # 22/11/2026: prima dell'arrivo chi l'ha emesso (o una mansione d'ufficio); dopo solo le mansioni d'ufficio
+    if utente.interno and ddt.creato_da_id != utente.id and not utente.puo("modificare_ddt"):
         return False
     return m.stato != "chiuso" or utente.gestione
 
@@ -1074,7 +1102,7 @@ def _segna_consegnato(v, sede=None):
 
 def puo_consegnare(v, utente):
     """Si consegna un'auto pronta, già arrivata nella sede di consegna indicata, senza danni aperti."""
-    return (utente.interno and v.stato == "in_sede" and v.fase in ("pronta", "in_sede") and not v.danni_aperti
+    return (utente.interno and utente.puo("consegnare") and v.stato == "in_sede" and v.fase in ("pronta", "in_sede") and not v.danni_aperti
             and v.consegna_sede_id is not None and v.sede_id == v.consegna_sede_id)
 
 
@@ -1533,6 +1561,36 @@ def fine_lavori_prevista(arrivo, giorni):
         t = _primo_momento_lavorativo(fine_fascia, chiusi)
     if t.minute % 30 or t.second:
         t = t.replace(second=0, microsecond=0) + timedelta(minutes=30 - t.minute % 30)
+    return t
+
+
+def scadenza_ritiro(da, ore):
+    """Entro quando va ritirata l'auto (22/11/2026, richiesta dell'utente: niente scadenze di notte).
+    Le ore valgono come ore d'ufficio della concessionaria (8:30–12:30 e 14:30–18:30, lun–ven, saltando feste
+    e giorni chiusi), con un massimo di una giornata lavorativa per ogni 24 ore chieste; arrotondata alla
+    mezz'ora. Es. predisposto alle 22:55 "entro 4 ore" → il giorno lavorativo dopo alle 12:30."""
+    ore_ufficio = min(ore, 8 * max(1, round(ore / 24)))
+    chiusi = giorni_chiusi(da.date(), da.date() + timedelta(days=ore // 8 * 3 + 20))
+
+    def primo(t):
+        while True:
+            if motivo_chiusura(t.date(), chiusi) is None:
+                for inizio, fine in FASCE_PREPARAZIONE:
+                    if t < datetime.combine(t.date(), fine):
+                        return max(t, datetime.combine(t.date(), inizio))
+            t = datetime.combine(t.date() + timedelta(days=1), FASCE_PREPARAZIONE[0][0])
+
+    resto = timedelta(hours=ore_ufficio)
+    t = primo(da.replace(second=0, microsecond=0))
+    while True:
+        fine_fascia = next(datetime.combine(t.date(), f) for _, f in FASCE_PREPARAZIONE if datetime.combine(t.date(), f) > t)
+        if resto <= fine_fascia - t:
+            t += resto
+            break
+        resto -= fine_fascia - t
+        t = primo(fine_fascia)
+    if t.minute % 30:
+        t += timedelta(minutes=30 - t.minute % 30)
     return t
 
 

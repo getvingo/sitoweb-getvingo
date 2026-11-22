@@ -3747,3 +3747,54 @@ input, select, textarea, .campo input, .campo select, .campo textarea, .stato-vo
 .st-barra i { display: block; height: 100%; background: var(--segnale); border-radius: 999px; }
 .st-riga b { font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
 .pagina-analisi h2[id] { scroll-margin-top: 20px; margin-top: 32px; }
+
+/* =====================================================================================================
+   PAGINE SECONDARIE A TUTTA LARGHEZZA E CAMPI COME LE PAGINE PRINCIPALI (22/11/2026 notte, richiesta
+   dell'utente: "le schede secondarie sono tutte a sinistra, le voglio a tutta larghezza; i campi sembrano
+   diversi dai testi e dall'identità grafica delle pagine principali"). Identità del marchio: Red Hat Text
+   per i testi, etichette 11 px maiuscole grigie come le intestazioni delle tabelle, filo 1 px, raggio unico
+   14 px, segni attivi verde via scuro #00A86B, fuoco asfalto.
+   ===================================================================================================== */
+@media (min-width: 1024px) {
+  body.con-barra .colonna { max-width: none; margin: 0; }
+  body.con-barra .colonna > .scheda, body.con-barra .colonna form > .scheda { width: 100%; }
+}
+input[type=radio], input[type=checkbox] { accent-color: #00A86B; }
+.campo > span, .etichetta-campo {
+  font: 700 11px/1.3 var(--font-testi, "Red Hat Text"), sans-serif; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--testo-2); margin-bottom: 6px; }
+.campo small { font-size: 12.5px; line-height: 1.45; }
+input:where(:not([type=checkbox], [type=radio], [type=file], [type=hidden], [type=range])), select, textarea {
+  border: 1px solid var(--bordo); border-radius: var(--raggio, 14px); background-color: var(--carta); color: var(--testo);
+  font-family: "Red Hat Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 500; }
+input:where(:not([type=checkbox], [type=radio])):focus, select:focus, textarea:focus { border-color: var(--testo); box-shadow: 0 0 0 3px rgba(17, 23, 29, .08); }
+::placeholder { color: #8A949E; font-weight: 400; }
+@media (min-width: 1024px) {
+  input:where(:not([type=checkbox], [type=radio], [type=file], [type=hidden], [type=range])), select {
+    height: 44px; min-height: 44px; font-size: 14.5px; padding: 0 14px; }
+  select { padding-right: 40px; }
+  textarea { font-size: 14.5px; }
+  .campo { margin-bottom: 14px; }
+}
+/* scelte a schede (Nuova/Usata, Vettura/Commerciale…): stesso filo e raggio, testo come le righe delle tabelle */
+.scelta-tipo label, .scelta-tipo .opzione { border-width: 1px; border-radius: var(--raggio, 14px); }
+fieldset { border: 1px solid var(--bordo); border-radius: var(--raggio, 14px); }
+fieldset > legend { font: 700 15px/1.3 "Red Hat Display", sans-serif; text-transform: none; letter-spacing: 0; color: var(--testo); padding: 0 6px; }
+@media (min-width: 1024px) {
+  .scelta-tipo label { min-height: 44px; padding: 8px 14px; font-size: 14.5px; font-weight: 600; }
+  .scelta-tipo label:has(input:checked) { border-color: #00A86B; background: #E6F7F0; }
+}
+/* Calendario del partner lavorazioni (22/11/2026): arrivi viola, lavori senape, ritiri magenta (colori di stato) */
+.y-ev.p-arrivo { background: color-mix(in srgb, var(--st-viaggio) 10%, var(--carta)); box-shadow: inset 3px 0 0 var(--st-viaggio); }
+.y-ev.p-fine { background: color-mix(in srgb, var(--st-lavoro) 12%, var(--carta)); box-shadow: inset 3px 0 0 var(--st-lavoro); }
+.y-ev.p-ritiro { background: color-mix(in srgb, var(--st-ritiro) 10%, var(--carta)); box-shadow: inset 3px 0 0 var(--st-ritiro); }
+.y-ev.p-arrivo b { color: var(--st-viaggio); } .y-ev.p-fine b { color: var(--st-lavoro-pieno, var(--st-lavoro)); } .y-ev.p-ritiro b { color: var(--st-ritiro); }
+.y-legenda i.p-arrivo { background: var(--st-viaggio); } .y-legenda i.p-fine { background: var(--st-lavoro); } .y-legenda i.p-ritiro { background: var(--st-ritiro); }
+.cal-partner { margin: 16px 0; }
+@media (max-width: 1023px) {
+  .cal-partner .y-cal-scorre .y-cal { grid-template-columns: repeat(7, 72%); }
+  .cal-partner .y-box-testa { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+/* telaio, targa e codici restano in IBM Plex Mono anche con lo stile unico dei campi (22/11/2026) */
+input.input-vin:not([type=checkbox]), input.vin:not([type=checkbox]), input[name=vin]:not([type=checkbox]), input[name=targa]:not([type=checkbox]),
+input[name=codice]:not([type=checkbox]), .na-vin input:not([type=checkbox]) { font-family: var(--mono); letter-spacing: .06em; }

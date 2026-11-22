@@ -4,6 +4,32 @@
 {% from "_auto.html" import avanzamento_lavoro, cambia_stima, stima %}
 {% block titolo %}Lavorazioni · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
+{% macro calendario_partner() %}
+{# 22/11/2026: calendario della settimana del partner (arrivi, lavori da finire, ritiri) #}
+{% set primo, ultimo = calendario[0][0], calendario[-1][0] %}
+{% set mesi = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'] %}
+{% set gb = ['lun','mar','mer','gio','ven','sab','dom'] %}
+<section class="y-box cal-partner">
+  <div class="y-box-testa"><div><h2>Calendario della settimana</h2><span>Auto in arrivo, lavori da finire e ritiri, da oggi ai prossimi 6 giorni · gli altri giorni scorrendo di lato</span></div>
+    <div class="y-frecce"><a href="{{ url_for('main.home', dal=(primo - timedelta(days=7)).isoformat(), stato=stato or none) }}" aria-label="Settimana precedente">‹</a>
+      <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
+      <a href="{{ url_for('main.home', dal=(primo + timedelta(days=7)).isoformat(), stato=stato or none) }}" aria-label="Settimana successiva">›</a></div></div>
+  <div class="y-box-dentro">
+    <div class="y-scorre y-cal-scorre"><div class="y-cal">
+      {% for d, ev in calendario %}
+      <div class="y-cal-g {{ 'y-oggi-g' if d == ora.date() }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == ora.date() else gb[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
+        {% for e in ev %}
+        <a class="y-ev p-{{ e.tipo }}{{ ' ritardo' if e.ritardo }}" href="{{ e.url }}">
+          <span><b>{{ e.titolo }}{% if e.ritardo and e.tipo != 'fine' %} · in ritardo{% endif %}</b><span>{{ e.v.descrizione }}</span>
+            <small>{{ e.sotto }} · {{ e.ora }}</small></span></a>
+        {% else %}<span class="y-cal-vuoto">Niente in programma</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div></div>
+    <div class="y-legenda"><span><i class="p-arrivo"></i>In arrivo da voi</span><span><i class="p-fine"></i>Lavoro da finire</span><span><i class="p-ritiro"></i>Ritiro dell'auto</span></div>
+  </div>
+</section>
+{% endmacro %}
 {% block contenuto %}
 {# Dal telefono (12/11/2026 sera): tocca l'adesivo e le cose da fare; il quadro completo è sul computer #}
 <section class="solo-telefono tocco">
@@ -32,6 +58,7 @@
         <small>finita {{ m.lavorazione_completata_at|da_quanto }} · {% if r and r.assegnato_a %}la ritira {{ r.assegnato_a.nome }}{% elif r %}DDT di rientro pronto{% else %}da preparare il DDT di rientro{% endif %}</small></span>{{ i('chevron', 's') }}</a>
     {% else %}<p class="vuoto-telefono">Nessuna auto pronta da ritirare.</p>{% endfor %}
   </div>
+  {{ calendario_partner() }}
 </section>
 <div class="solo-computer">
 {# Home di chi esegue le lavorazioni esterne (carrozzeria, officina, allestitore…). In cima le auto in arrivo,
@@ -58,6 +85,7 @@
   <p class="tenue piccolo" style="margin:0">Nessuna auto in viaggio verso di voi.</p>
   {% endfor %}
 </section>
+{{ calendario_partner() }}
 
 {{ filtri_stato([
   ('corso', conteggi.corso, 'Nei tempi', 'orologio', url_for('main.home', stato=none if stato == 'corso' else 'corso'), True),

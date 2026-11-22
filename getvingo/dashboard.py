@@ -21,7 +21,7 @@ STATI = (("in_viaggio", "In viaggio", "su strada con DDT aperto", "in_viaggio"),
          ("da_ritirare", "Da ritirare", "DDT da ritirare o lavoro finito", "da_ritirare"),
          ("preparazione", "In preparazione", "in preparazione in sede", "preparazione"))
 # Home gestori completa: amministratore e responsabile commerciale; gli altri partono da "Solo le mie"
-RUOLI_TUTTO = ("admin", "resp_commerciale")
+RUOLI_TUTTO = ("admin",)  # 22/11/2026: "Solo le mie" di base per tutte le mansioni; "Tutte" di base solo all'amministratore
 
 
 def _giorno(d):
@@ -97,7 +97,9 @@ def _chi(m):
 
 
 def _mio_movimento(m, io):
-    return io in (m.assegnato_a_id, m.partenza_utente_id, m.ddt.creato_da_id if m.ddt else None)
+    """Mio = lo ritiro io, l'ho portato o lo porto io, ho creato il DDT, ho confermato l'arrivo o è un'auto che vendo."""
+    return io in (m.assegnato_a_id, m.partenza_utente_id, m.ddt.creato_da_id if m.ddt else None,
+                  m.arrivo_utente_id, m.veicolo.venditore_id if m.veicolo else None)
 
 
 def agenda(dal, al, sede_id=None, solo_mie=False):
@@ -114,13 +116,19 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
     movimenti = (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(Ddt.annullato_at.is_(None))
                  .filter(((Movimento.partenza_at >= inizio) & (Movimento.partenza_at < fine))
                          | ((Movimento.arrivo_at >= inizio) & (Movimento.arrivo_at < fine))
-                         | ((Movimento.stato == "predisposto") & (Movimento.ritiro_entro_at < fine))
+                         # ritiri: quelli del periodo; i ritiri in ritardo solo se il periodo comprende oggi
+                         | ((Movimento.stato == "predisposto") & (Movimento.ritiro_entro_at >= inizio) & (Movimento.ritiro_entro_at < fine))
+                         | ((Movimento.stato == "predisposto") & (Movimento.ritiro_entro_at < inizio) & (dal <= adesso().date()))
                          | ((Movimento.stato == "aperto") & (Movimento.partenza_at < inizio)
                             & (dal <= adesso().date())))
                  .all())
+    # 22/11/2026: un DDT multiplo è una riga sola ("con altre N auto"); "Solo le mie" = solo le mie, per persona
+    visti = set()
     for m in movimenti:
-        if not tiene(m) or (solo_mie and not _mio_movimento(m, io) and ruolo not in ("consegne",)):
+        if not tiene(m) or (solo_mie and not _mio_movimento(m, io)) or m.ddt_id in visti:
             continue
+        visti.add(m.ddt_id)
+        altre = max(0, len(m.ddt.movimenti) - 1) if m.ddt and m.ddt.multiplo else 0
         # 22/11/2026: l'orario mostrato è quello vero, con scritto cosa indica (partita, arrivata, entro…)
         if m.stato == "predisposto":
             quando, stato, att = m.ritiro_entro_at or m.ddt.emesso_at, "dafare", "Ritiro da fare"
@@ -140,14 +148,14 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
             nota = "arrivo in ritardo" + ("" if stimato else " · arrivo non stimabile")
         voci.append({"at": quando, "attivita": att, "ddt": m.ddt.sigla if m.ddt else "", "v": m.veicolo,
                      "da": m.da_sede.nome if m.da_sede else "", "a": m.sede_arrivo_effettiva.nome if m.a_sede else "",
-                     "chi": _chi(m), "stato": stato, "tipo": "movimento", "nota": nota, "quando": etichetta,
+                     "chi": _chi(m), "stato": stato, "tipo": "movimento", "nota": nota, "quando": etichetta, "altre": altre,
                      "url": url_for("main.ddt_dettaglio", ddt_id=m.ddt_id)})
     # consegne al cliente confermate (senza DDT verso il cliente: la consegna in sede)
     for v in Veicolo.query.filter(Veicolo.stato == "consegnato", Veicolo.consegnato_at >= inizio,
                                   Veicolo.consegnato_at < fine).all():
         if v.trasferita_a or (sede_id and v.sede_id != sede_id):
             continue
-        if solo_mie and v.venditore_id != io and ruolo not in ("consegne",):
+        if solo_mie and v.venditore_id != io:
             continue
         voci.append({"at": v.consegnato_at, "attivita": "Consegna al cliente", "ddt": "", "v": v,
                      "da": v.sede.nome if v.sede else "", "a": "", "chi": "—", "stato": "fatto", "tipo": "consegna", "quando": "consegnata",
@@ -157,15 +165,15 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
         v = p.veicolo
         if sede_id and v.sede_id != sede_id:
             continue
-        if solo_mie and ruolo != "preparatore" and not any(f.utente_id == io for f in p.fasi):
+        if solo_mie and v.venditore_id != io and not any(f.utente_id == io for f in p.fasi):
             continue
         fatte = len(p.fasi)
         stato = "fatto" if p.completata_at else ("corso" if fatte else "dafare")
         passo = "pronta" if p.completata_at else p.prossima_fase.lower()
         ultimo = p.fasi[-1].utente.nome if p.fasi and p.fasi[-1].utente else "—"
-        voci.append({"at": p.pronta_entro_at, "attivita": f"Preparazione · {passo}", "ddt": "", "v": v,
+        voci.append({"at": p.pronta_entro_at, "attivita": "Preparazione in sede", "ddt": "", "v": v,
                      "da": v.sede.nome if v.sede else "", "a": "", "chi": ultimo, "stato": stato, "tipo": "preparazione",
-                     "quando": "pronta entro",
+                     "quando": "pronta entro" + ("" if p.completata_at else f" · ora: {passo}"),
                      "url": url_for("main.veicolo", veicolo_id=v.id) + "#preparazione"})
     voci.sort(key=lambda x: x["at"])
     return voci

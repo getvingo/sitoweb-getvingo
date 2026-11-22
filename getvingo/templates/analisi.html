@@ -13,7 +13,7 @@
   {% for k, (nome, _) in periodi.items() %}<a href="{{ url_for('main.analisi', periodo=k) }}" class="{{ 'attivo' if a.periodo == k }}" {{ 'aria-current=true' if a.periodo == k }}><span class="nome">{{ nome }}</span></a>{% endfor %}
 </nav>
 
-<nav class="st-indice" aria-label="Sezioni">{% for id, nome in [('movimentazioni', 'Movimentazioni'), ('stock', 'Stock'), ('consegne', 'Consegne'), ('preparazioni', 'Preparazioni'), ('lavorazioni', 'Lavorazioni e fornitori'), ('persone', 'Persone'), ('danni', 'Danni'), ('tempi', 'Tempi delle fasi')] %}<a class="btn piccolo" href="#{{ id }}">{{ nome }}</a>{% endfor %}</nav>
+<nav class="st-indice" aria-label="Sezioni">{% for id, nome in [('movimentazioni', 'Movimentazioni'), ('stock', 'Stock'), ('consegne', 'Consegne'), ('preparazioni', 'Preparazioni'), ('lavorazioni', 'Lavorazioni e fornitori')] + ([('persone', 'Persone')] if s.persone is not none else []) + [('danni', 'Danni'), ('tempi', 'Tempi delle fasi')] %}<a class="btn piccolo" href="#{{ id }}">{{ nome }}</a>{% endfor %}</nav>
 
 {% set m = s.movimentazioni %}
 <h2 id="movimentazioni">{{ i('camion') }} Movimentazioni</h2>
@@ -69,6 +69,7 @@
 </table>
 </div>
 
+{% if s.persone is not none %}
 <h2 id="persone">{{ i('utente') }} Persone</h2>
 <p class="avviso" style="margin-bottom:12px">{{ i('attenzione') }}<span>Conteggi delle azioni registrate nel periodo, persona per persona. Prima di usarli per valutare il personale serve il parere del consulente del lavoro (art. 4 Statuto dei lavoratori).</span></p>
 <div class="scheda tabella-scorre">
@@ -78,6 +79,7 @@
   {% else %}<tr><td colspan="12" class="tenue">Nessuna azione registrata in questo periodo.</td></tr>{% endfor %}</tbody>
 </table>
 </div>
+{% endif %}
 
 {% set dn = s.danni %}
 <h2 id="danni">{{ i('attenzione') }} Danni</h2>

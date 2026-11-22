@@ -25,7 +25,7 @@
   <td class="cella-da">{{ (p.creata_at|da_tempo)|replace('da ', '') }}</td>
   <td class="cella-azione">
     {% if bloccata %}<a class="btn piccolo btn-danno-riga" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.preparazione')) }}">Verifica il danno</a>
-    {% elif not p.pronta_entro_at %}<button type="button" class="btn piccolo" data-apri-riga="prep-{{ p.id }}">{{ i('orologio', 's') }} Fissa l'orario</button>{% endif %}
+    {% elif not p.pronta_entro_at and g.utente.puo('orario_preparazione') %}<button type="button" class="btn piccolo" data-apri-riga="prep-{{ p.id }}">{{ i('orologio', 's') }} Fissa l'orario</button>{% endif %}
     {# 14/11/2026: "⋯" apre un piccolo menu lì accanto (niente riga che si espande) #}
     <span class="menu-riga-box"><button type="button" class="btn-icona" data-menu-riga aria-expanded="false" title="Altre azioni" aria-label="Altre azioni per {{ v.descrizione }}">⋯</button>
       <span class="menu-riga" hidden>
@@ -34,7 +34,7 @@
         {% if not p.fasi and g.utente.ruolo != 'admin' %}<span class="tenue piccolo">Nessuna azione</span>{% endif %}
       </span></span></td>
 </tr>
-{% if not p.pronta_entro_at %}<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
+{% if not p.pronta_entro_at and g.utente.puo('orario_preparazione') %}<tr class="riga-dettagli" id="prep-{{ p.id }}" hidden><td colspan="6"><div class="dettagli-lavoro">
   <form method="post" action="{{ url_for('main.scadenza_preparazione', prep_id=p.id) }}" data-una-volta class="azioni" style="align-items:flex-end">
     {{ csrf_input() }}<input type="hidden" name="torna" value="{{ url_for('main.preparazione') }}">
     <div class="campo" style="margin:0"><span>Entro quando deve essere pronta <span class="tenue">(poi non si sposta)</span></span>{{ scegli_slot('pronta_entro', slot_prep, vuoto='Scegli giorno e orario') }}</div>

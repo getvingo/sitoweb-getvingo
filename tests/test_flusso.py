@@ -1103,8 +1103,10 @@ class TestDdtGestione(Base):
             self.assertEqual((documento.revisione, len(documento.revisioni)), (1, 1))
             self.assertEqual(documento.movimento.conducente, "Anna Verdi")
         self.arrivo(d)
-        # dal 10/11/2026 ogni mansione interna può correggere un DDT anche dopo l'arrivo; il fornitore no
+        # 22/11/2026: dopo l'arrivo correggono il DDT solo backoffice, resp. commerciale e admin; consegne e fornitore no
         self.entra("autista")
+        self.assertEqual(self.c.get(f"/ddt/{d}/modifica").status_code, 403)
+        self.entra("ufficio")
         self.assertEqual(self.c.get(f"/ddt/{d}/modifica").status_code, 200)
         self.entra("carr")
         self.assertEqual(self.c.post(f"/ddt/{d}/modifica", data=dati).status_code, 403)
@@ -2571,7 +2573,10 @@ class TestConfigurazioneConcessionaria(Base):
             u = Utente.query.filter_by(email="giulia@t.it").one()
             self.assertEqual(u.ruolo, "venditore")
             self.assertTrue(u.interno)
-            self.assertTrue(u.gestione)  # dal 10/11/2026 ogni mansione interna fa tutto (tranne Gestione)
+            # 22/11/2026: il venditore vede tutto ma modifica solo note interne e consegna (Utente.PERMESSI)
+            self.assertFalse(u.gestione)
+            self.assertTrue(u.puo("note_interne") and u.puo("consegnare"))
+            self.assertFalse(u.puo("modificare_auto") or u.puo("fornitori") or u.puo("predisporre"))
         vid = self.abbina()
         self.c.post("/logout")
         self.c.post("/login", data={"email": "giulia@t.it", "password": "vendite12"})
@@ -2887,7 +2892,7 @@ class TestNovita1011(TestLavorazioniStimaESolleciti):
             db.session.expire_all()
             u = Utente.query.filter_by(email="autista@t.it").one()
             self.assertEqual(u.ruolo, "consegne")
-            self.assertTrue(u.interno and u.gestione)
+            self.assertTrue(u.interno and u.puo("predisporre") and not u.gestione)
         scheda = self.c.get("/admin/aziende/concessionaria").get_data(as_text=True)
         for nome in ("Backoffice", "Venditore", "Consegne", "Preparatore", "Responsabile commerciale"):
             self.assertIn(nome, scheda)
@@ -3113,7 +3118,11 @@ class TestModificaDatiAuto(Base):
 
     def test_interni_cambiano_tutto(self):
         vid = self.abbina()
+        # 22/11/2026: i dati dell'auto li modificano backoffice, resp. commerciale e admin; consegne no
         self.entra("autista")
+        self.assertNotIn(f"/veicolo/{vid}/modifica", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
+        self.assertEqual(self.c.get(f"/veicolo/{vid}/modifica").status_code, 403)
+        self.entra("ufficio")
         self.assertIn(f"/veicolo/{vid}/modifica", self.c.get(f"/veicolo/{vid}").get_data(as_text=True))
         self.assertIn('value="Golf"', self.c.get(f"/veicolo/{vid}/modifica").get_data(as_text=True))
         r = self.c.post(f"/veicolo/{vid}/modifica", data=self.dati_auto(vin="WVWZZZ1KZAW000999"))
@@ -4524,3 +4533,50 @@ class TestStatisticheEVediCome(Base):
         self.assertIn("Ritiro in ritardo", home)
         self.assertNotIn("Rinnova il ritiro", home)
         self.assertNotIn("Ritiro scaduto", self.c.get(f"/ddt/{self.ddt()}").get_data(as_text=True))
+
+
+class TestUtenzeEOrari(Base):
+    """22/11/2026 notte: permessi per mansione, un viaggio guidato alla volta, ritiro in orario d'ufficio,
+    calendario del partner, "Solo le mie" per persona."""
+    def test_un_viaggio_guidato_alla_volta(self):
+        from getvingo import servizi
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        with self.app.app_context():
+            io = Utente.query.filter_by(email="admin@t.it").one()
+            with self.assertRaises(servizi.Vietato):
+                servizi.controlla_un_viaggio_alla_volta(io, servizi.GUIDATA)
+            servizi.controlla_un_viaggio_alla_volta(io, "Bisarca")  # la bisarca porta più auto: si può
+
+    def test_ritiro_in_orario_d_ufficio(self):
+        from datetime import datetime
+        from getvingo import servizi
+        with self.app.app_context():
+            sera = datetime(2026, 11, 20, 22, 55)          # venerdì sera, entro 4 ore
+            self.assertEqual(servizi.scadenza_ritiro(sera, 4), datetime(2026, 11, 23, 12, 30))  # lunedì
+            mattina = datetime(2026, 11, 23, 9, 10)
+            self.assertEqual(servizi.scadenza_ritiro(mattina, 4), datetime(2026, 11, 23, 15, 30))  # 9:10–12:30 + 40 min dalle 14:30, alla mezz’ora
+
+    def test_calendario_del_partner(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        self.entra("carr")
+        html = self.c.get("/").get_data(as_text=True)
+        self.assertIn("Calendario della settimana", html)
+        self.assertIn("p-arrivo", html)
+
+    def test_permessi_del_venditore(self):
+        vid = self.abbina()
+        self.c.post("/admin/aziende/concessionaria", data={"azione": "utente", "nome": "Giulia Vendite",
+                                                          "email": "giulia@t.it", "ruolo": "venditore",
+                                                          "password": "vendite12"})
+        self.c.post("/logout")
+        self.c.post("/login", data={"email": "giulia@t.it", "password": "vendite12"})
+        self.assertEqual(self.c.get(f"/veicolo/{vid}").status_code, 200)              # vede
+        self.assertEqual(self.c.get(f"/veicolo/{vid}/modifica").status_code, 403)     # non cambia i dati
+        self.assertEqual(self.c.get("/ddt/multiplo").status_code, 403)
+        self.assertEqual(self.c.get("/analisi").status_code, 403)
+        r = self.c.post(f"/veicolo/{vid}/note", data={"cliente_nome": "Mario Bianchi"})
+        self.assertEqual(r.status_code, 302)                                            # le note sì
+        # "Solo le mie": senza auto sue la Home non mostra le voci degli altri
+        self.assertIn("Nessuna attività urgente", self.c.get("/").get_data(as_text=True))

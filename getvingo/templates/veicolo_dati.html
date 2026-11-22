@@ -66,7 +66,7 @@
 
   <div class="tocco-fondo">
     {% if v.stato not in ('in_viaggio', 'consegnato') and v.lat is not none %}<a class="btn btn-trova pieno" href="{{ url_for('main.trova', veicolo_id=v.id) }}">{{ i('pin') }} Trova l'auto</a>{% endif %}
-    {% if g.utente.interno %}<a class="btn pieno solo-computer" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}
+    {% if g.utente.puo('modificare_auto') %}<a class="btn pieno solo-computer" href="{{ url_for('main.modifica_auto', veicolo_id=v.id) }}">{{ i('matita', 's') }} Modifica dati</a>{% endif %}
   </div>
 </div>
 {% endblock %}
