@@ -489,7 +489,7 @@ def home():
         "home.html", da_fare=da_fare, totale_da_fare=totale_da_fare, solo_mie_fare=mie_fare,
         REPARTI_DA_FARE=REPARTI_DA_FARE, danni=danni, pronte_oggi=pronte_oggi,
         ora=adesso(), data_lunga=dashboard.data_lunga(oggi), sede_id=sede_id,
-        sedi=Sede.query.filter_by(attiva=True, tipo="propria").order_by(Sede.nome).all(),
+        sedi=Sede.query.filter_by(attiva=True, tipo="propria").filter(Sede.sede_legale.isnot(True)).order_by(Sede.nome).all(),
         giornata=dashboard.giornata(sede_id), marche=marche, n_marche=n_marche, n_attivi=len(attivi),
         periodo=periodo, agenda=agende[periodo], conta_agenda={k: len(v) for k, v in agende.items()}, solo_mie=solo_mie,
         calendario=calendario, cal_dal=cal_dal, giorni_brevi=dashboard.GIORNI_BREVI, mesi=dashboard.MESI,

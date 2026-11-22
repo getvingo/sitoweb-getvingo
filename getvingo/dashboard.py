@@ -229,6 +229,8 @@ def piazzali(veicoli):
     for s in Sede.query.filter_by(attiva=True).order_by(Sede.nome).all():
         if s.tipo != "propria" and not (s.tipo == "esposizione" and presenti.get(s.id)):
             continue
+        if s.sede_legale:  # la sede legale è un indirizzo, non un piazzale (scelta dell'utente 22/11/2026)
+            continue
         n = presenti.get(s.id, 0)
         pct = round(100 * n / s.posti) if s.posti else None
         out.append({"sede": s, "n": n, "posti": s.posti, "pct": pct})

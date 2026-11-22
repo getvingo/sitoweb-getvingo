@@ -3582,3 +3582,101 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .y-operativo { display: flex; flex-direction: column; gap: 0; }
 .y-home h2.y-op-t { font: 700 var(--fs-13) var(--font-titoli); text-transform: uppercase; letter-spacing: .06em; color: var(--testo-2); }
 .y-operativo .fare-testa:first-of-type { margin-top: 4px; }
+
+/* =====================================================================================================
+   SISTEMA UNICO (22/11/2026 notte, richiesta dell'utente: "design unico con tutto il resto, vale per tutte le
+   pagine; attenzione ad allineamenti, spazi, font"). Solo forma, spazi e caratteri: i COLORI restano quelli
+   della versione precedente (stati viola/senape/magenta/verde acqua/verde, pulsanti colorati).
+   Misure: spazi 8 · 12 · 16 · 20 · 28 px · raggi 8 (comandi) e 12 (riquadri) · filo 1 px · niente ombre.
+   Testo: titolo pagina 28 · titolo di sezione 17 · testo 14–15 · etichette 11 MAIUSCOLO.
+   ===================================================================================================== */
+:root { --ombra: none; --r: 12px; --r-s: 8px; --r-l: 12px; --bordo-stato: 3px; }
+
+/* impaginazione: con la barra laterale tutte le pagine partono dallo stesso margine, come la Home */
+@media (min-width: 1024px) {
+  body.con-barra main { padding: 28px 32px 48px; max-width: none; margin: 0; }
+  body.con-barra .colonna { max-width: 760px; margin: 0; }
+}
+
+/* titoli e testi */
+h1 { font-size: 28px; line-height: 1.15; letter-spacing: -.01em; }
+.titolo-pagina { margin: 0 0 20px; align-items: flex-end; gap: 16px; }
+.descrizione-pagina { font-size: 14px; margin-top: 6px; line-height: 1.45; }
+h2 { font: 700 17px/1.3 var(--font-titoli); text-transform: none; letter-spacing: 0; color: var(--testo); margin: 28px 0 12px; }
+h2 .icona { width: 18px; height: 18px; color: var(--testo-2); }
+h2 .conteggio, h2 .conta-arancio { font-size: 12px; }
+.sezione-t, .sopratitolo { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); }
+
+/* riquadri: un solo stile */
+.scheda, .voce, .carta-auto, .blocco-fase, .blocco-lavoro, .ddt-sezione, .note-interne, .carta-lavoro, .scheda-danno,
+.ddt-tratta, .info-striscia, .y-box, .y-num, .y-marca { box-shadow: none !important; border-radius: 12px; }
+.scheda, .ddt-sezione, .note-interne, .info-striscia { border: 1px solid var(--bordo); }
+.carta-auto.anagrafica, .ddt-testata { box-shadow: none !important; border-radius: 12px; }
+
+/* pulsanti: stessa forma ovunque, colori di prima */
+.btn { min-height: 44px; border-radius: 8px; box-shadow: none !important; font: 600 14px var(--font-testo); padding: 0 16px; }
+.btn.piccolo { min-height: 36px; padding: 0 12px; font-size: 13px; }
+.btn.pieno { min-height: 48px; }
+.indietro { min-height: 36px; }
+.scorri.come-pulsante { height: 48px; border-radius: 8px; }
+
+/* demo: piccola, allineata al contenuto */
+.demo-barra { display: inline-flex; width: auto; min-height: 32px; padding: 0 12px; margin: 0 0 16px; font-size: 12px; border-radius: 999px; }
+.demo-barra .icona { width: 14px; height: 14px; }
+
+/* barra degli strumenti degli elenchi: tutto alto 44 px, a 8 px di distanza */
+.stock-cerca { gap: 8px !important; margin-bottom: 12px !important; }
+.ricerca input { min-height: 44px !important; border-radius: 8px !important; font-size: 14px; box-shadow: none !important; }
+details.filtri-stock > summary { min-height: 44px !important; border-radius: 8px !important; box-shadow: none !important; font-size: 14px; }
+.barra-modo { margin: 0 0 12px !important; }
+.interruttore, .y-segmenti { border-radius: 10px !important; padding: 3px !important; gap: 2px; background: var(--spento-tenue) !important; box-shadow: none !important; border: 0; }
+.interruttore a, .y-segmenti a { min-height: 34px; border-radius: 8px !important; font-size: 13px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--testo-2); text-decoration: none; }
+.interruttore a.attivo, .y-segmenti a[aria-pressed="true"] { background: var(--carta) !important; color: var(--testo) !important; font-weight: 600; box-shadow: 0 0 0 1px var(--bordo) !important; }
+.stato-filtri { gap: 8px !important; }
+.stato-voce { min-height: 40px !important; border-radius: 10px !important; box-shadow: none !important; }
+
+/* elenchi (Vetture, Lavorazioni, Preparazioni, DDT, Danni): un riquadro, righe a filo, colore dello stato sul bordo sinistro */
+.tabella-stock { border-collapse: separate; border-spacing: 0; background: var(--carta); border: 1px solid var(--bordo); border-radius: 12px; overflow: hidden; }
+.tabella-stock thead th { background: var(--superficie); padding: 10px 12px; font: 700 11px var(--font-titoli); letter-spacing: .06em; border-bottom: 1px solid var(--bordo); }
+.tabella-stock .riga-gruppo th { background: var(--carta); padding: 16px 12px 6px; font: 700 13px var(--font-titoli); color: var(--testo-2); border-top: 1px solid var(--bordo); }
+.riga-stock > td, .riga-stock > td:last-child { border: 0; border-top: 1px solid var(--bordo); border-radius: 0; padding: 12px; }
+.riga-stock > td:first-child { border: 0; border-top: 1px solid var(--bordo); border-left: 3px solid var(--fase, var(--st-sede)); border-radius: 0; padding-left: 12px; }
+.riga-stock:hover > td { background: var(--superficie); }
+
+/* ---- Home: blocco in cima (allerta danni, Da fare, Pronte oggi) ---- */
+.y-allerta { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--carta); border: 1px solid var(--bordo);
+  border-left: 4px solid var(--danno); border-radius: 12px; color: var(--testo); text-decoration: none; }
+.y-allerta:hover { text-decoration: none; background: var(--danno-tenue); }
+.y-allerta > .icona { color: var(--danno); width: 22px; height: 22px; flex: none; }
+.y-allerta > span { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.y-allerta b { color: var(--danno-scuro); font: 700 15px var(--font-titoli); }
+.y-allerta small { color: var(--testo-2); font-size: 13px; }
+.y-allerta em { font-style: normal; font-weight: 600; font-size: 13px; color: var(--danno-scuro); }
+.y-cima { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 1279px) { .y-cima { grid-template-columns: 1fr; } }
+.y-fare { min-width: 640px; }
+.y-fare th:first-child { width: 34%; } .y-fare th:last-child { width: 1%; }
+.y-fascia th { background: var(--carta); padding: 14px 20px 6px !important; font: 700 13px var(--font-titoli); text-transform: none; letter-spacing: 0; border-top: 1px solid var(--bordo); }
+.y-fascia th .icona { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.y-fascia th span { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; font-size: 11px; background: var(--spento-tenue); color: var(--testo-2); }
+.fascia-adesso th { color: var(--in-ritardo-testo); } .fascia-oggi th { color: var(--arancio-testo); } .fascia-prossimi th { color: var(--testo-2); }
+.y-fare tr[data-href] > td:first-child { box-shadow: inset 3px 0 0 var(--bordo-forte); }
+.y-fare tr.y-fare-adesso > td:first-child { box-shadow: inset 3px 0 0 var(--in-ritardo); }
+.y-fare tr.y-fare-oggi > td:first-child { box-shadow: inset 3px 0 0 var(--arancio); }
+.y-etichetta { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.y-et-adesso { background: var(--in-ritardo); color: #fff; } .y-et-oggi { background: var(--arancio-tenue); color: var(--arancio-testo); }
+.y-et-prossimi { background: var(--spento-tenue); color: var(--testo-2); }
+.y-reparto { font: 700 11px var(--font-titoli); letter-spacing: .06em; text-transform: uppercase; color: var(--testo-2); margin-left: 6px; }
+.y-reparto .icona { width: 13px; height: 13px; vertical-align: -2px; }
+.y-fare td small { margin-top: 4px; }
+.y-azione { text-align: right; white-space: nowrap; vertical-align: middle !important; }
+.y-oggi { display: flex; flex-direction: column; gap: 8px; padding: 0 20px 20px; }
+.y-oggi .y-vuoto { padding: 12px 0 !important; }
+.y-bordo-alto { border-top: 1px solid var(--bordo); margin: 0; }
+.y-vuoto .icona { color: var(--ok); vertical-align: -3px; }
+.y-home { gap: 18px; }
+.y-fascia th { text-align: left; }
+.y-fare thead th:last-child { text-align: right; }
+.y-reparto { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.y-fare td:nth-child(2) { line-height: 1.5; }
+.y-fare td small { font-size: 13px !important; color: var(--testo-2); }

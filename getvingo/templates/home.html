@@ -53,59 +53,51 @@
     </div>
   </header>
 
-  {# 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario come nella Home di prima #}
-  <div class="y-operativo panoramica-righe">
-{% if danni %}
-{% set bloccanti = danni|selectattr('veicolo.fase', 'in', ['preparazione', 'pronta'])|list %}
-<a class="riga-avviso-danni" href="{{ url_for('main.danni') }}">
-  <span class="numero-icona">{{ i('attenzione', 's') }}</span>
-  <b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
-  {% set primo = bloccanti[0] if bloccanti else danni[0] %}
-  <span class="tenue">{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</span>
-  {{ i('chevron', 's') }}
-</a>
-{% endif %}
-
-{# Pronte oggi (14/11/2026): solo il programma di oggi (14/11 sera: i ritardi stanno in Da fare, con la loro azione); il mese intero nel Calendario completo #}
-<div class="fare-testa"><h2 class="y-op-t">Pronte oggi{% if pronte_oggi %} <span class="conteggio">{{ pronte_oggi|length }}</span>{% endif %}</h2>
-  <a class="btn piccolo" href="{{ url_for('main.calendario_completo') }}">{{ i('orologio', 's') }} Calendario completo</a></div>
-<div class="oggi-pronte">
-  {% for e in pronte_oggi %}
-  <a class="cal-voce {{ e.tipo }} {{ e.stato }}" href="{{ e.url }}" title="{{ e.v.descrizione }} · {{ e.cosa }}">
-    <span class="cal-ora">{{ e.ora }}</span><b>{{ e.v.descrizione }}</b><small>{{ e.cosa }}</small></a>
-  {% else %}<p class="vuoto">Niente in calendario per oggi.</p>
-  {% endfor %}
-</div>
-{% if pronte_oggi %}<p class="legenda-pronte" style="margin:-8px 0 18px"><span class="lg preparazione">Preparazione</span><span class="lg preparazione-anticipo">Pronta in anticipo</span><span class="lg lavorazione">Fine lavori</span><span class="lg lavorazione-anticipo">Finita in anticipo</span></p>{% endif %}
-
-{# "Da fare" (14/11/2026 sera): solo ciò che chiede un intervento, in tre fasce di urgenza; su ogni riga il reparto,
-   cosa succede e il pulsante dell'azione. "Solo le mie": le voci che toccano a chi guarda (routes._da_fare_home) #}
-<div class="fare-testa"><h2 class="y-op-t">Da fare{% if totale_da_fare.mostrate %} <span class="conta-arancio">{{ totale_da_fare.mostrate }}</span>{% endif %}</h2>
-  <nav class="interruttore filtro-gruppo in-riga" aria-label="Quali voci">
-    <a href="{{ url_for('main.home', mie=1, amie=request.args.get('amie'), periodo=periodo, sede=sede_id) }}" class="{{ 'attivo' if solo_mie_fare }}">{{ i('utente', 's') }} Solo le mie <span class="n">{{ totale_da_fare.mie }}</span></a>
-    <a href="{{ url_for('main.home', mie=0, amie=request.args.get('amie'), periodo=periodo, sede=sede_id) }}" class="{{ 'attivo' if not solo_mie_fare }}">Tutte <span class="n">{{ totale_da_fare.tutte }}</span></a>
-  </nav></div>
-{% if not totale_da_fare.mostrate %}<div class="vuoto">{{ i('check') }}{{ 'Nessuna attività urgente da fare.' }}</div>
-{% else %}
-<table class="tabella-stock tabella-fare">
-  <colgroup><col class="c-auto"><col class="c-cosa"><col class="c-azione"></colgroup>
-  <thead class="nascosto"><tr><th>Auto</th><th>Cosa succede</th><th>Azione</th></tr></thead>
-  {% for chiave, titolo, icona, voci in da_fare if voci %}
-  <tbody class="gruppo-stock fascia-{{ chiave }}">
-    <tr class="riga-gruppo"><th colspan="3" scope="rowgroup">{{ i(icona, 's') }} {{ titolo }} <span class="conteggio">{{ voci|length }}</span></th></tr>
-    {% for x in voci %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
-    <tr class="riga-stock fare-{{ chiave }} reparto-{{ x.reparto }}" data-url="{{ x.url }}">
-      <td class="cella-auto"><div>{{ marchio(x.v) }}<span><a href="{{ x.url }}"><b>{{ x.v.descrizione }}</b></a>
-        <small>{{ badge_condizione(x.v) }}{% if x.v.targa %} <span class="targa-chip">{{ x.v.targa }}</span>{% endif %} <span class="vin">{{ x.v.vin[-8:] }}</span></small></span></div></td>
-      <td class="cella-stato"><span class="fare-riga-testa"><span class="pillola-stato"><i aria-hidden="true"></i>{{ x.etichetta }}</span>
-        <span class="reparto">{{ i(rep[1], 's') }} {{ rep[0] }}</span></span><small>{{ x.testo }}</small></td>
-      <td class="cella-azione">{% if x.azione %}<a class="btn piccolo" href="{{ x.azione[1] }}">{{ x.azione[0] }}</a>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-  {% endfor %}
-</table>
-{% endif %}
+  {# 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario di oggi, con lo stesso disegno del resto #}
+  {% if danni %}{% set bloccanti = danni|selectattr('veicolo.fase', 'in', ['preparazione', 'pronta'])|list %}{% set primo = bloccanti[0] if bloccanti else danni[0] %}
+  <a class="y-allerta" href="{{ url_for('main.danni') }}">{{ i('attenzione') }}
+    <span><b>{{ danni|length }} {{ 'danno da verificare' if danni|length == 1 else 'danni da verificare' }}{% if bloccanti %} · {{ 'blocca' if bloccanti|length == 1 else 'bloccano' }} {{ bloccanti|length }} {{ 'consegna' if bloccanti|length == 1 else 'consegne' }}{% endif %}</b>
+      <small>{{ primo.veicolo.descrizione }} · {{ primo.zona|lower }}{% if danni|length > 1 %} e altri {{ danni|length - 1 }}{% endif %}</small></span>
+    <em>Vedi i danni</em>{{ i('chevron', 's') }}</a>
+  {% endif %}
+  <div class="y-cima">
+    <section class="y-box">
+      <div class="y-box-testa"><div><h2>Da fare</h2><span>Solo ciò che chiede un intervento, dal più urgente</span></div>
+        <div class="y-segmenti" role="group" aria-label="Quali attività">
+          <a href="{{ url_for('main.home', mie=1, amie=request.args.get('amie'), periodo=periodo, sede=sede_id) }}" aria-pressed="{{ 'true' if solo_mie_fare else 'false' }}">Solo le mie · {{ totale_da_fare.mie }}</a>
+          <a href="{{ url_for('main.home', mie=0, amie=request.args.get('amie'), periodo=periodo, sede=sede_id) }}" aria-pressed="{{ 'false' if solo_mie_fare else 'true' }}">Tutte · {{ totale_da_fare.tutte }}</a></div></div>
+      {% if not totale_da_fare.mostrate %}
+      <p class="y-vuoto y-bordo-alto">{{ i('check', 's') }} Nessuna attività urgente{{ ' per te' if solo_mie_fare }}.</p>
+      {% else %}
+      <div class="y-scorre"><table class="y-tab y-fare">
+        <thead><tr><th>Vettura</th><th>Cosa succede</th><th>Azione</th></tr></thead>
+        {% for chiave, titolo, icona, voci in da_fare if voci %}
+        <tbody>
+          <tr class="y-fascia fascia-{{ chiave }}"><th colspan="3">{{ i(icona, 's') }} {{ titolo }} <span>{{ voci|length }}</span></th></tr>
+          {% for x in voci %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
+          <tr data-href="{{ x.url }}" tabindex="0" class="y-fare-{{ chiave }}">
+            <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
+              <small class="y-vin">{{ x.v.impronta|impronta(14) }}<span class="y-mono">{{ x.v.vin[:3] }}…{{ x.v.vin[-6:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
+            <td><span class="y-etichetta y-et-{{ chiave }}">{{ x.etichetta }}</span> <span class="y-reparto">{{ i(rep[1], 's') }} {{ rep[0] }}</span>
+              <small>{{ x.testo }}</small></td>
+            <td class="y-azione">{% if x.azione %}<a class="btn piccolo" href="{{ x.azione[1] }}">{{ x.azione[0] }}</a>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% endfor %}
+      </table></div>
+      {% endif %}
+    </section>
+    <section class="y-box">
+      <div class="y-box-testa"><div><h2>Pronte oggi</h2><span>Preparazioni e fine lavori di oggi</span></div>
+        <a href="{{ url_for('main.calendario_completo') }}">Calendario completo</a></div>
+      <div class="y-oggi">
+        {% for e in pronte_oggi %}
+        <a class="y-ev {{ e.tipo }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
+          <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Fine preparazione' }}{{ ' · in anticipo' if e.stato == 'anticipo' }}</b><span>{{ e.v.descrizione }}</span><small>{{ e.ora }} · {{ e.cosa }}</small></span></a>
+        {% else %}<p class="y-vuoto">Niente in calendario per oggi.</p>{% endfor %}
+      </div>
+    </section>
   </div>
 
   {# sotto: i dati della dashboard #}
