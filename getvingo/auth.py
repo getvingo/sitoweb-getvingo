@@ -57,6 +57,17 @@ def init_app(app):
         g.org_id = None  # l'utente si cerca tra tutte le organizzazioni
         g.utente = Utente.query.filter_by(id=uid, attivo=True).first() if uid else None
         g.gestore_originale = None
+        g.admin_originale = None
+        if session.get("vedi_admin"):
+            # 22/11/2026: l'amministratore guarda il portale come un utente di prova (Gestione → Vedi come…)
+            orig = Utente.query.filter_by(id=session["vedi_admin"], attivo=True).first()
+            if (orig is None or orig.ruolo != "admin" or session.get("vedi_admin_ph") != orig.password_hash[-16:]
+                    or g.utente is None or not g.utente.email.endswith("@prova.getvingo.invalid")
+                    or g.utente.org_id != orig.org_id):
+                session.clear()
+                g.utente = None
+            else:
+                g.admin_originale = orig
         if session.get("gestore_uid"):
             # il gestore è entrato in una concessionaria come "Supporto Getvingo": vale finché resta gestore
             orig = Utente.query.filter_by(id=session["gestore_uid"], attivo=True).first()
@@ -110,6 +121,7 @@ def init_app(app):
     app.jinja_env.globals["gestore"] = lambda: gestore(g.get("utente"))
     # il gestore sta operando dentro una concessionaria (barra "Torna al Pannello Getvingo")
     app.jinja_env.globals["gestore_dentro"] = lambda: g.get("gestore_originale")
+    app.jinja_env.globals["admin_originale"] = lambda: g.get("admin_originale")
 
     @app.after_request
     def intestazioni_sicurezza(risposta):

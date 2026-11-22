@@ -18,7 +18,7 @@
   {{ tocca_adesivo() }}
   <div class="y-tel-testa"><h1>Da fare per te</h1><span>{{ compiti|length }}</span></div>
   {% for c in compiti %}
-  <a class="y-tel-voce" href="{{ c.url }}">{{ logo_marca(c.v.marca, 40) }}
+  <a class="y-tel-voce y-tel-{{ c.tipo }}" href="{{ c.url }}">{{ logo_marca(c.v.marca, 40) }}
     <span class="y-tel-t"><b>{{ c.azione }}</b><span>{{ c.v.descrizione }}{{ ' · ' ~ c.v.colore|lower if c.v.colore }}</span><small>{{ c.dove }}</small></span>{{ i('chevron') }}</a>
   {% else %}
   <p class="y-tel-vuoto">Niente da fare per te adesso. Tocca l'adesivo di un'auto per vedere cosa c'è da fare.</p>
@@ -75,8 +75,8 @@
           {% for x in voci %}{% set rep = REPARTI_DA_FARE[x.reparto] %}
           <tr data-href="{{ x.url }}" tabindex="0" class="y-fare-{{ chiave }}">
             <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
-              <small class="y-vin">{{ x.v.impronta|impronta(14) }}<span class="y-mono">{{ x.v.vin[:3] }}…{{ x.v.vin[-6:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
-            <td><span class="y-etichetta y-et-{{ chiave }}">{{ x.etichetta }}</span> <span class="y-reparto">{{ i(rep[1], 's') }} {{ rep[0] }}</span>
+              <small class="y-vin"><span class="y-mono">…{{ x.v.vin[-8:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
+            <td><span class="y-tipo y-tipo-{{ x.reparto }}{{ ' y-tipo-danno' if 'danno' in x.etichetta|lower }}{{ ' pieno' if chiave == 'adesso' }}">{{ i('attenzione' if 'danno' in x.etichetta|lower else rep[1], 's') }} {{ x.etichetta }}</span>
               <small>{{ x.testo }}</small></td>
             <td class="y-azione">{% if x.azione %}<a class="btn piccolo" href="{{ x.azione[1] }}">{{ x.azione[0] }}</a>{% endif %}</td>
           </tr>
@@ -124,25 +124,6 @@
         {% if giornata.lav.ritardo %}<span class="y-att">{{ giornata.lav.ritardo }} già in ritardo</span>{% endif %}</div></div>
   </div>
 
-  {# 5.2 Stock per marca #}
-  <section class="y-box">
-    <div class="y-box-testa"><div><h2>Stock per marca</h2><span>Colpo d'occhio sulle {{ n_attivi }} vetture in carico · {{ 'le ' ~ marche|length ~ ' marche principali' if n_marche > marche|length else (marche|length ~ (' marca' if marche|length == 1 else ' marche')) }}</span></div>
-      <a class="btn piccolo" href="{{ url_for('main.piazzale') }}">Tutte le {{ n_marche }} {{ 'marca' if n_marche == 1 else 'marche' }}</a></div>
-    <div class="y-box-dentro">
-      <div class="y-marche">
-        {% for r in marche %}
-        <a class="y-marca" href="{{ url_for('main.piazzale', marca=r.marca) }}">
-          <div class="y-marca-testa">{{ logo_marca(r.marca, 40) }}<div><b>{{ r.marca }}</b><small>in carico</small></div><span class="y-marca-n">{{ r.totale }}</span></div>
-          <div class="y-barra sottile" role="img" aria-label="{{ r.marca }}: {{ r.sede }} in sede, {{ r.preparazione }} in preparazione, {{ r.fornitori }} dai fornitori, {{ r.viaggio }} in viaggio">
-            <span class="sede" style="flex:{{ r.sede }} 1 0"></span><span class="prep" style="flex:{{ r.preparazione }} 1 0"></span><span class="forn" style="flex:{{ r.fornitori }} 1 0"></span><span class="viaggio" style="flex:{{ r.viaggio }} 1 0"></span></div>
-          <div class="y-marca-num"><span>In sede <b>{{ r.sede }}</b></span><span>In preparazione <b>{{ r.preparazione }}</b></span><span>Dai fornitori <b>{{ r.fornitori }}</b></span><span>In viaggio <b>{{ r.viaggio }}</b></span></div>
-        </a>
-        {% else %}<p class="tenue">Nessuna vettura in carico.</p>{% endfor %}
-      </div>
-      <div class="y-legenda"><span><i class="sede"></i>In sede</span><span><i class="prep"></i>In preparazione</span><span><i class="forn"></i>Dai fornitori</span><span><i class="viaggio"></i>In viaggio</span></div>
-    </div>
-  </section>
-
   {# 5.3 Movimentazioni e preparazioni (agenda) #}
   <section class="y-box">
     <div class="y-box-testa"><div><h2>Movimentazioni e preparazioni</h2><span>Chi fa cosa, dove e a che punto è{{ ' · solo le tue' if solo_mie }}</span></div>
@@ -161,10 +142,10 @@
       <tbody>
       {% for x in agenda %}
       <tr data-href="{{ x.url }}" tabindex="0">
-        <td class="y-mono">{{ x.at.strftime('%H:%M') if periodo != '7' else (giorni_brevi[x.at.weekday()] ~ ' ' ~ x.at.day ~ ' · ' ~ x.at.strftime('%H:%M')) }}</td>
+        <td><span class="y-mono">{% if x.at.date() != ora.date() or periodo == '7' %}{{ giorni_brevi[x.at.weekday()] }} {{ x.at.day }} · {% endif %}{{ x.at.strftime('%H:%M') }}</span><small>{{ x.quando }}</small></td>
         <td><b>{{ x.attivita }}</b>{% if x.ddt %}<small class="y-mono">DDT {{ x.ddt }}</small>{% endif %}{% if x.nota %}<small class="y-att">{{ x.nota|capitalize }}</small>{% endif %}</td>
         <td><div class="y-auto">{{ logo_marca(x.v.marca, 30) }}<div><b>{{ x.v.descrizione }}</b>
-          <small class="y-vin">{{ x.v.impronta|impronta(14) }}<span class="y-mono">{{ x.v.vin[:3] }}…{{ x.v.vin[-6:] }}</span></small></div></div></td>
+          <small class="y-vin"><span class="y-mono">…{{ x.v.vin[-8:] }}</span>{% if x.v.targa %} · {{ x.v.targa }}{% endif %}</small></div></div></td>
         <td>{% if x.a and x.a != x.da %}{{ x.da or '—' }} <span class="tenue">→</span> {{ x.a }}{% else %}{{ x.da or x.a or '—' }}{% endif %}</td>
         <td>{{ x.chi }}</td>
         <td>{{ stato_att(x.stato) }}</td>
@@ -200,20 +181,7 @@
     </section>
   </div>
 
-  {# 5.6 Fornitori esterni #}
-  <section class="y-box">
-    <div class="y-box-testa"><div><h2>Fornitori esterni</h2><span>Ultimi 30 giorni</span></div></div>
-    <div class="y-scorre"><table class="y-tab y-forn">
-      <thead><tr><th>Fornitore</th><th>Vetture da loro ora</th><th>Lavori finiti</th><th title="Lavori con fine lavori confermata entro la fine prevista">Finiti nei tempi</th><th>Ritardo medio</th><th>In ritardo ora</th></tr></thead>
-      <tbody>
-      {% for f in fornitori %}
-      <tr><td><b>{{ f.nome }}</b></td><td>{{ f.ora }}</td><td>{{ f.finiti }}</td>
-        <td>{% if f.pct is none %}<span class="tenue">—</span>{% else %}<b class="{{ 'y-att' if f.pct < 80 else 'y-ok' }}">{{ f.pct }}%</b>{% endif %}</td>
-        <td class="tenue">{% if f.ritardo_medio is none %}—{% elif f.ritardo_medio == 0 %}nessuno{% else %}{{ ('%.1f'|format(f.ritardo_medio))|replace('.', ',') }} giorni{% endif %}</td>
-        <td>{% if f.ritardo_ora %}<b class="y-att">{{ f.ritardo_ora }}</b>{% else %}0{% endif %}</td></tr>
-      {% else %}<tr><td colspan="6" class="y-vuoto">Nessuna lavorazione dai fornitori negli ultimi 30 giorni.</td></tr>{% endfor %}
-      </tbody></table></div>
-  </section>
+
 </div>
 {% endblock %}
 {% block script %}

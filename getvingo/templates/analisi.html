@@ -1,16 +1,90 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i %}
-{% block titolo %}Report · Getvingo{% endblock %}
+{% block titolo %}Statistiche · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% block classe_pagina %}pagina-analisi{% endblock %}
 {% block contenuto %}
-<div class="titolo-pagina"><div><h1>Report</h1>
-  <p class="descrizione-pagina">Quanto dura ogni fase, dalla vendita alla consegna: dove le auto aspettano, come lavorano i fornitori, quanto durano davvero i viaggi.</p></div></div>
+<div class="titolo-pagina"><div><h1>Statistiche</h1>
+  <p class="descrizione-pagina">I numeri di tutto il lavoro: movimentazioni, stock, consegne, preparazioni, lavorazioni e fornitori, persone, danni e tempi di ogni fase. Il periodo vale per tutto tranne lo stock, che è quello di adesso.</p></div></div>
+{% macro barre(righe, unita='') %}<div class="st-barre">{% for r in righe %}<div class="st-riga"><span class="st-nome">{{ r.nome }}</span><span class="st-barra"><i style="width:{{ r.quota }}%"></i></span><b>{{ r.n }}{{ unita }}</b></div>{% else %}<p class="tenue piccolo">Nessun dato in questo periodo.</p>{% endfor %}</div>{% endmacro %}
+{% macro numero(titolo, n, sotto) %}<div class="y-num"><span class="y-num-t">{{ titolo }}</span><span class="y-num-n">{{ n }}<small>{{ sotto }}</small></span></div>{% endmacro %}
 
 <nav class="interruttore filtro-gruppo in-riga" aria-label="Periodo">
   {% for k, (nome, _) in periodi.items() %}<a href="{{ url_for('main.analisi', periodo=k) }}" class="{{ 'attivo' if a.periodo == k }}" {{ 'aria-current=true' if a.periodo == k }}><span class="nome">{{ nome }}</span></a>{% endfor %}
 </nav>
 
+<nav class="st-indice" aria-label="Sezioni">{% for id, nome in [('movimentazioni', 'Movimentazioni'), ('stock', 'Stock'), ('consegne', 'Consegne'), ('preparazioni', 'Preparazioni'), ('lavorazioni', 'Lavorazioni e fornitori'), ('persone', 'Persone'), ('danni', 'Danni'), ('tempi', 'Tempi delle fasi')] %}<a class="btn piccolo" href="#{{ id }}">{{ nome }}</a>{% endfor %}</nav>
+
+{% set m = s.movimentazioni %}
+<h2 id="movimentazioni">{{ i('camion') }} Movimentazioni</h2>
+<div class="y-tre">{{ numero('DDT emessi', m.ddt, 'documenti di trasporto, ' ~ m.multipli ~ ' multipli') }}{{ numero('Auto spostate', m.auto, 'una riga per auto anche nei DDT multipli') }}{{ numero('Chilometri stimati', m.km, 'somma delle stime dei viaggi') }}</div>
+<div class="st-griglia">
+  <div class="scheda"><h3>DDT per mese</h3>{{ barre(m.per_mese) }}</div>
+  <div class="scheda"><h3>Per causale</h3>{{ barre(m.causale) }}</div>
+  <div class="scheda"><h3>Per modalità di trasporto</h3>{{ barre(m.mezzo) }}</div>
+  <div class="scheda"><h3>Per vettore</h3>{{ barre(m.vettore) }}</div>
+  <div class="scheda"><h3>Destinazioni più usate</h3>{{ barre(m.destinazione) }}</div>
+</div>
+
+{% set st = s.stock %}
+<h2 id="stock">{{ i('auto') }} Stock · adesso</h2>
+<div class="y-tre">{{ numero('In carico', st.totale, 'vetture non ancora consegnate') }}{{ numero('Giacenza media', st.giacenza_media, 'giorni dall\'ingresso in stock') }}{{ numero('Entrate nel periodo', st.entrate, 'auto caricate') }}</div>
+<div class="st-griglia">
+  <div class="scheda"><h3>Per fase</h3>{{ barre(st.fase) }}</div>
+  <div class="scheda"><h3>Per marca</h3>{{ barre(st.marca) }}</div>
+  <div class="scheda"><h3>Per sede</h3>{{ barre(st.sede) }}</div>
+  <div class="scheda"><h3>Da quanto sono in stock</h3>{{ barre(st.eta) }}</div>
+  <div class="scheda"><h3>Nuove e usate</h3>{{ barre(st.condizione) }}<h3 style="margin-top:14px">Vetture e commerciali</h3>{{ barre(st.tipologia) }}</div>
+  <div class="scheda"><h3>Alimentazione</h3>{{ barre(st.alimentazione) }}</div>
+</div>
+
+<h2 id="consegne">{{ i('bandiera') }} Consegne</h2>
+<div class="st-griglia">
+  <div class="scheda"><h3>Consegne per mese · {{ s.consegne.n }} nel periodo</h3>{{ barre(s.consegne.per_mese) }}</div>
+  <div class="scheda"><h3>Per sede di consegna</h3>{{ barre(s.consegne.sede) }}</div>
+</div>
+
+{% set p = s.preparazioni %}
+<h2 id="preparazioni">{{ i('brilla') }} Preparazioni</h2>
+<div class="y-tre">{{ numero('Finite', p.finite, 'preparazioni completate nel periodo') }}{{ numero('Durata media', p.durata, 'da messa in preparazione a pronta') }}{{ numero('Pronte in orario', (p.puntuali_pct ~ '%') if p.puntuali_pct is not none else '—', 'entro l\'orario fissato') }}</div>
+<div class="st-griglia"><div class="scheda"><h3>In corso adesso: {{ p.in_corso }} · {{ p.in_ritardo }} in ritardo</h3>{{ barre(p.attivita) }}</div></div>
+
+<h2 id="lavorazioni">{{ i('chiave') }} Lavorazioni e fornitori</h2>
+<div class="scheda tabella-scorre">
+<table class="tabella-analisi">
+  <thead><tr><th scope="col">Lavorazione</th><th scope="col" class="num-col">Finite</th><th scope="col" class="num-col">Durata media</th><th scope="col" class="num-col">Finite nei tempi</th></tr></thead>
+  <tbody>{% for r in s.lavorazioni.tipi %}<tr><th scope="row">{{ r.nome }}</th><td class="num-col">{{ r.n }}</td><td class="num-col">{{ (r.giorni|string)|replace('.', ',') ~ ' giorni lav.' if r.giorni is not none else '—' }}</td><td class="num-col"><b>{{ r.pct }}%</b></td></tr>
+  {% else %}<tr><td colspan="4" class="tenue">Nessuna lavorazione finita in questo periodo.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<h3 style="margin-top:18px">Fornitori esterni · ultimi 30 giorni</h3>
+<div class="scheda tabella-scorre">
+<table class="tabella-analisi">
+  <thead><tr><th scope="col">Fornitore</th><th scope="col" class="num-col">Auto da loro ora</th><th scope="col" class="num-col">Lavori finiti</th><th scope="col" class="num-col" title="Lavori con fine lavori confermata entro la fine prevista">Finiti nei tempi</th><th scope="col" class="num-col">Ritardo medio</th><th scope="col" class="num-col">In ritardo ora</th></tr></thead>
+  <tbody>{% for f in fornitori_30 %}<tr><th scope="row">{{ f.nome }}</th><td class="num-col">{{ f.ora }}</td><td class="num-col">{{ f.finiti }}</td>
+    <td class="num-col">{% if f.pct is none %}—{% else %}<b style="color:{{ 'var(--in-ritardo-testo)' if f.pct < 80 else 'var(--ok)' }}">{{ f.pct }}%</b>{% endif %}</td>
+    <td class="num-col">{% if f.ritardo_medio is none %}—{% elif f.ritardo_medio == 0 %}nessuno{% else %}{{ ('%.1f'|format(f.ritardo_medio))|replace('.', ',') }} giorni{% endif %}</td>
+    <td class="num-col">{% if f.ritardo_ora %}<b style="color:var(--in-ritardo-testo)">{{ f.ritardo_ora }}</b>{% else %}0{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6" class="tenue">Nessun fornitore.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+<h2 id="persone">{{ i('utente') }} Persone</h2>
+<p class="avviso" style="margin-bottom:12px">{{ i('attenzione') }}<span>Conteggi delle azioni registrate nel periodo, persona per persona. Prima di usarli per valutare il personale serve il parere del consulente del lavoro (art. 4 Statuto dei lavoratori).</span></p>
+<div class="scheda tabella-scorre">
+<table class="tabella-analisi">
+  <thead><tr><th scope="col">Persona</th>{% for k, nome in s.colonne_persone %}<th scope="col" class="num-col">{{ nome }}</th>{% endfor %}<th scope="col" class="num-col">Totale</th></tr></thead>
+  <tbody>{% for r in s.persone %}<tr><th scope="row"><b>{{ r.nome }}</b><small>{{ r.ruolo }}</small></th>{% for k, nome in s.colonne_persone %}<td class="num-col">{{ r.conteggi[k] or '—' }}</td>{% endfor %}<td class="num-col"><b>{{ r.totale }}</b></td></tr>
+  {% else %}<tr><td colspan="12" class="tenue">Nessuna azione registrata in questo periodo.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+{% set dn = s.danni %}
+<h2 id="danni">{{ i('attenzione') }} Danni</h2>
+<div class="y-tre">{{ numero('Segnalati', dn.segnalati, 'nel periodo') }}{{ numero('Risolti', dn.risolti, 'tempo medio ' ~ dn.tempo) }}{{ numero('Aperti adesso', dn.aperti, 'da verificare') }}</div>
+<div class="st-griglia"><div class="scheda"><h3>Per zona dell'auto</h3>{{ barre(dn.zona) }}</div></div>
+
+<h2 id="tempi">{{ i('cronometro') }} Tempi delle fasi</h2>
 {# Il numero più importante: dalla vendita alla consegna #}
 <section class="analisi-eroe">
   {% if a.vendita.n %}
@@ -21,7 +95,7 @@
   {% endif %}
 </section>
 
-<h2>{{ i('cronometro') }} Le fasi, in media</h2>
+<h3>Le fasi, in media</h3>
 <div class="scheda analisi-fasi" role="table" aria-label="Durata media di ogni fase">
   {% for f in a.fasi %}
   <div class="analisi-riga" role="row">
@@ -37,7 +111,7 @@
 <p class="tenue piccolo">Le attese sono il tempo in cui l'auto è ferma senza che nessuno ci lavori: di solito è lì che si recupera di più.
   Tempi in giorni lavorativi da 8 ore (weekend, feste e giorni chiusi non contano); i viaggi in tempo reale.</p>
 
-<h2>{{ i('chiave') }} Partner lavorazioni</h2>
+<h3 style="margin-top:18px">Partner lavorazioni · tempi</h3>
 {% if a.fornitori %}
 <div class="scheda tabella-scorre">
 <table class="tabella-analisi">
@@ -60,7 +134,7 @@
 <div class="vuoto">{{ i('chiave') }}Nessuna lavorazione finita in questo periodo.</div>
 {% endif %}
 
-<h2>{{ i('camion') }} Viaggi per tratta</h2>
+<h3 style="margin-top:18px">Viaggi per tratta</h3>
 {% if a.tratte %}
 <div class="scheda tabella-scorre">
 <table class="tabella-analisi">

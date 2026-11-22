@@ -45,6 +45,15 @@
       <span class="tenue piccolo">Accese: nella pagina della firma compare "Continua senza firma" e il DDT parte e si chiude anche senza firme né timbro e sigla del vettore. Spente: tutto obbligatorio, come nell'uso reale.</span></span>
     <button class="btn">{{ 'Spegni: firme obbligatorie' if facoltative else 'Accendi per i test' }}</button>
   </form>
+  <div class="scheda" style="margin-bottom:14px">
+    <b>Vedi il portale come…</b><br><span class="tenue piccolo">Entri con un utente di prova di quella mansione e vedi esattamente quello che vede lui; la barra in alto ti riporta qui.</span>
+    <div class="azioni" style="gap:8px;margin-top:10px">
+      {% for k in ['backoffice', 'venditore', 'consegne', 'preparatore', 'resp_commerciale', 'fornitore'] %}
+      <form method="post" action="{{ url_for('admin.vedi_come', ruolo=k) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn piccolo">{{ g.utente.RUOLI[k] }}</button></form>
+      {% endfor %}
+    </div>
+  </div>
   <div class="azioni" style="gap:10px">
     <form method="post" action="{{ url_for('admin.carica_prova') }}" data-una-volta
           onsubmit="return confirm('Aggiungere una trentina di vetture di prova in tutti gli stati? Si tolgono con Svuota per un nuovo test.')">

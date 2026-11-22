@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macro.html" import i, badge_veicolo, badge_condizione, icona_fase, marchio, filtro_select, fase_css, legenda, targa %}
+{% from "_macro.html" import i, badge_veicolo, badge_condizione, icona_fase, marchio, filtro_select, fase_css, legenda, targa, logo_marca %}
 {% from "_auto.html" import in_viaggio_da, avanzamento_lavoro %}
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
 {% block titolo %}Vetture · Getvingo{% endblock %}
@@ -9,6 +9,17 @@
 <div class="titolo-pagina"><div><h1>Vetture</h1>
   <p class="descrizione-pagina">Tutte le auto finché non sono consegnate al cliente: in sede, in preparazione, pronte, dai fornitori o in viaggio, con la posizione sulla mappa.</p></div>
   <a class="btn piccolo primario" href="{{ url_for('main.nuova_auto') }}">+ Nuova auto</a></div>
+
+{# 22/11/2026: stock per marca (spostato dalla Home): in carico per marca, con in sede · in preparazione · dai
+   fornitori · in viaggio; toccando una marca si filtra l'elenco #}
+{% if marche %}
+<div class="v-marche" aria-label="Stock per marca">
+  {% for r in marche %}
+  <a class="v-marca {{ 'attivo' if f.marca == r.marca }}" href="{{ url_for('main.piazzale', marca='' if f.marca == r.marca else r.marca) }}">
+    {{ logo_marca(r.marca, 32) }}<span class="v-marca-testo"><b>{{ r.marca }}</b><small>{% set parti = [] %}{% if r.sede %}{% set _ = parti.append(r.sede ~ ' in sede') %}{% endif %}{% if r.preparazione %}{% set _ = parti.append(r.preparazione ~ ' in prep.') %}{% endif %}{% if r.fornitori %}{% set _ = parti.append(r.fornitori ~ ' dai forn.') %}{% endif %}{% if r.viaggio %}{% set _ = parti.append(r.viaggio ~ ' in viaggio') %}{% endif %}{{ parti|join(' · ') }}</small></span><em>{{ r.totale }}</em></a>
+  {% endfor %}
+</div>
+{% endif %}
 
 {# 13/11/2026: una ricerca che capisce tutto (filtra mentre si scrive) e pochi filtri in un pannello chiuso #}
 <form class="stock-cerca">

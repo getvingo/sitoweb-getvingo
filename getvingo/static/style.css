@@ -3520,8 +3520,7 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 
 /* telefono del personale */
 .y-tel { display: flex; flex-direction: column; gap: 0; margin: -16px -16px 0; background: var(--carta); min-height: calc(100vh - 140px); }
-.y-tel .tocca-adesivo { margin: 16px 20px 20px; width: auto; min-height: 120px; border-radius: 18px; background: var(--inchiostro-fisso); color: #fff; }
-.y-tel .tocca-adesivo b { font: 800 22px var(--font-titoli); }
+.y-tel .tocca-adesivo { margin: 16px 20px 20px; width: auto; }
 .y-tel-testa { display: flex; justify-content: space-between; align-items: baseline; padding: 0 20px 8px; }
 .y-tel-testa h1 { margin: 0; font: 800 20px var(--font-titoli); }
 .y-tel-testa span { font-size: 14px; color: var(--testo-2); }
@@ -3536,12 +3535,6 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .y-home h2, .y-home h1 { text-transform: none; letter-spacing: normal; color: var(--testo); }
 .y-box-testa h2 { letter-spacing: 0; }
 .y-cal { grid-template-columns: repeat(7, minmax(128px, 1fr)); min-width: 940px; }
-/* telefono B1: tasto pieno asfalto, icona NFC verde via, testo grande; niente sottotitolo né cerchi */
-.y-tel .tocca-adesivo { border: 0; box-shadow: none; gap: 10px; padding: 20px; animation: none; }
-.y-tel .tocca-adesivo small { display: none; }
-.y-tel .tocca-adesivo .onde-nfc { width: auto; height: auto; background: none; border: 0; box-shadow: none; color: var(--marchio-via); }
-.y-tel .tocca-adesivo .onde-nfc i { display: none; }
-.y-tel .tocca-adesivo .onde-nfc .icona { width: 34px; height: 34px; color: var(--marchio-via); }
 .y-frecce a.y-link { width: auto; height: auto; border: 0; font-weight: 600; font-size: 13px; color: var(--segnale); margin-right: 8px; }
 
 /* =====================================================================================================
@@ -3709,3 +3702,48 @@ input, select, textarea, .campo input, .campo select, .campo textarea, .stato-vo
 .y-cal-scorre .y-cal-g { scroll-snap-align: start; }
 .foglio-firma-piede.con-salta { grid-template-columns: 1fr 2fr; }
 .foglio-firma-piede [data-f-salta] { grid-column: 1 / -1; order: -1; border-style: dashed !important; color: var(--testo-2); }
+
+/* 22/11/2026: ogni tipo di "Da fare" ha il suo colore e la sua icona (viaggio viola, ritiro magenta, lavorazione
+   senape, preparazione verde acqua, consegna verde, danno rosso); "Adesso" pieno, Oggi e Prossimi giorni tenui */
+.y-tipo { --t: var(--st-sede); display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; color: var(--t); background: color-mix(in srgb, var(--t) 12%, var(--carta)); }
+.y-tipo .icona { width: 14px; height: 14px; }
+.y-tipo-viaggi { --t: var(--st-viaggio); } .y-tipo-ritiri { --t: var(--st-ritiro-pieno); } .y-tipo-lavorazioni { --t: var(--st-lavoro-pieno); }
+.y-tipo-preparazione { --t: var(--st-prep-pieno); } .y-tipo-consegna { --t: var(--st-pronta-pieno); } .y-tipo-danno { --t: var(--danno); }
+.y-tipo.pieno { background: var(--t); color: #fff; }
+.y-fare td small { display: block; }
+/* agenda: orario e sotto cosa indica */
+.y-tab td > small { display: block; }
+/* Stock e piazzali e Chi ha fatto cosa: stessa altezza */
+.y-due { align-items: stretch !important; }
+.y-due > .y-box { display: flex; flex-direction: column; }
+.y-due .y-registro { flex: 1; max-height: 420px; overflow-y: auto; }
+/* telefono: il colore del tipo di compito sul bordo e sull'azione */
+.y-tel-voce { border-left: 4px solid transparent; }
+.y-tel-ritiro { border-left-color: var(--st-ritiro); } .y-tel-ritiro .y-tel-t b { color: var(--st-ritiro-pieno); }
+.y-tel-viaggio { border-left-color: var(--st-viaggio); } .y-tel-viaggio .y-tel-t b { color: var(--st-viaggio); }
+.y-tel-preparazione { border-left-color: var(--st-prep); } .y-tel-preparazione .y-tel-t b { color: var(--st-prep-pieno); }
+.y-tel-consegna { border-left-color: var(--st-pronta); } .y-tel-consegna .y-tel-t b { color: var(--st-pronta-pieno); }
+/* Vetture: stock per marca in una striscia che scorre di lato (22/11/2026) */
+.v-marche { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin: 0 0 14px; scrollbar-width: thin; }
+.v-marca { flex: none; display: flex; align-items: center; gap: 12px; min-width: 200px; padding: 10px 14px; background: var(--carta);
+  border: 1px solid var(--bordo); border-radius: var(--raggio, 14px); color: var(--testo); text-decoration: none; }
+.v-marca:hover { border-color: var(--testo-2); text-decoration: none; }
+.v-marca.attivo { border-color: var(--testo); box-shadow: inset 0 0 0 1px var(--testo); }
+.v-marca .y-logo { flex: none; }
+.v-marca .v-marca-testo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.v-marca b { font-size: 14px; }
+.v-marca small { font-size: 11.5px; color: var(--testo-2); white-space: nowrap; }
+.v-marca em { font: 800 20px var(--font-titoli); font-style: normal; }
+/* Statistiche (22/11/2026) */
+.st-indice { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.st-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
+.st-griglia .scheda { padding: 16px 18px; margin: 0; }
+.st-griglia h3 { font: 700 14px var(--font-titoli); margin: 0 0 10px; }
+.st-barre { display: grid; gap: 6px; }
+.st-riga { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.st-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-barra { height: 8px; background: var(--spento-tenue); border-radius: 999px; overflow: hidden; }
+.st-barra i { display: block; height: 100%; background: var(--segnale); border-radius: 999px; }
+.st-riga b { font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+.pagina-analisi h2[id] { scroll-margin-top: 20px; margin-top: 32px; }

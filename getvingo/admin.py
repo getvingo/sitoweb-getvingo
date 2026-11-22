@@ -4,7 +4,7 @@ import io
 import re
 import secrets
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from . import accessi, anagrafica, posta, servizi, uniforma
 from . import vin as vin_mod
@@ -821,6 +821,37 @@ def importa():
             flash(f"Righe con VIN non valido, saltate: {', '.join(map(str, scartati[:30]))}", "errore")
         return redirect(url_for("admin.importa"))
     return render_template("admin/import.html")
+
+
+@bp.route("/vedi-come/<ruolo>", methods=["POST"])
+@ruolo_richiesto("admin")
+def vedi_come(ruolo):
+    """Vedi il portale come una mansione (22/11/2026): entra con un utente di prova di quella mansione (creato la
+    prima volta, "(prova)", senza password nota); la barra in alto riporta all'amministratore."""
+    import secrets
+    from flask import session
+    from .models import Sede
+    if ruolo not in Utente.RUOLI or ruolo == "admin":
+        abort(404)
+    email = f"vedi-{ruolo}-{g.org_id}@prova.getvingo.invalid"
+    u = Utente.query.filter_by(email=email).first()
+    if u is None:
+        sede = None
+        if ruolo == "fornitore":  # il partner lavora per un fornitore: il primo che c'è, o uno di prova
+            sede = next((s for s in Sede.query.filter_by(attiva=True).order_by(Sede.id) if s.esterna), None)
+            if sede is None:
+                sede = Sede(nome="Carrozzeria (prova)", tipo="carrozzeria", indirizzo="Via di prova", comune="Treviso",
+                            provincia="TV", piva="00000000000", codice_fiscale="00000000000", lat=45.70, lon=12.21)
+                db.session.add(sede)
+        u = Utente(nome=f"{Utente.RUOLI[ruolo]} (prova)", email=email, ruolo=ruolo, sede=sede)
+        u.imposta_password(secrets.token_urlsafe(32))
+        db.session.add(u)
+        db.session.commit()
+    admin = g.utente
+    session.clear()
+    session.permanent = True
+    session.update(uid=u.id, ph=u.password_hash[-16:], vedi_admin=admin.id, vedi_admin_ph=admin.password_hash[-16:])
+    return redirect(url_for("main.home"))
 
 
 @bp.route("/firme-facoltative", methods=["POST"])

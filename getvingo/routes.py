@@ -376,9 +376,9 @@ def _da_fare_home(gruppi, attivi):
         mio = m.assegnato_a_id == io
         chi = "" if mio else (f" · lo ritira {m.assegnato_a.nome}" if m.assegnato_a else " · nessuno incaricato")
         persone, ruoli = (m.assegnato_a_id, m.ddt.creato_da_id), ("consegne",)
-        if m.scaduto:
-            aggiungi("ritiri", "adesso", "Ritiro scaduto" + (" (tuo)" if mio else ""), m.veicolo, f"DDT {m.ddt.sigla}: scaduto il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
-                     url, ("Rinnova il ritiro", url), persone, ruoli)
+        if m.oltre_orario:  # 22/11/2026: niente più "scaduto" né rinnovo, solo in ritardo
+            aggiungi("ritiri", "adesso", "Ritiro in ritardo" + (" (tuo)" if mio else ""), m.veicolo, f"DDT {m.ddt.sigla}: andava ritirata entro il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
+                     url, ("Apri il DDT", url), persone, ruoli)
         elif m.ritiro_entro_at and m.ritiro_entro_at <= tra_un_giorno:
             aggiungi("ritiri", "oggi", "Ritiro assegnato a te" if mio else "Da ritirare", m.veicolo, f"DDT {m.ddt.sigla}: entro le {m.ritiro_entro_at:%H:%M del %d/%m} presso "
                      f"{m.da_sede.nome if m.da_sede else '—'}{chi}", url, ("Apri il DDT", url), persone, ruoli)
@@ -503,9 +503,12 @@ def home():
 @ruolo_richiesto("admin")
 def analisi():
     """Tempi dalla vendita alla consegna, fase per fase; fornitori; tratte (stimato e reale)."""
-    from . import analisi as analisi_mod
-    dati = analisi_mod.calcola(request.args.get("periodo", "90"))
-    return render_template("analisi.html", a=dati, periodi=analisi_mod.PERIODI, durata=analisi_mod.durata)
+    from . import analisi as analisi_mod, statistiche, dashboard
+    periodo = request.args.get("periodo", "90")
+    dati = analisi_mod.calcola(periodo)
+    # 22/11/2026: "Statistiche" con dati su tutto; i fornitori esterni (ultimi 30 giorni) spostati qui dalla Home
+    return render_template("analisi.html", a=dati, s=statistiche.calcola(periodo), fornitori_30=dashboard.fornitori_30(),
+                           periodi=analisi_mod.PERIODI, durata=analisi_mod.durata)
 
 
 # 11/11/2026: per il momento la barra della Panoramica è solo "Trova" (auto, DDT, adesivi). La chat con
@@ -962,7 +965,9 @@ def piazzale():
     gruppi += [{"chiave": k, "titolo": t, "icona": ic, "voci": per_zona[k]} for k, t, ic in ZONE_STOCK if k in per_zona]
     auto, piazzali = _dati_mappa(risultati)
     senza_posizione = Sede.query.filter(Sede.attiva.is_(True), Sede.tipo == "propria", Sede.lat.is_(None)).count()
-    return render_template("piazzale.html", gruppi=gruppi, totale=len(risultati), f=f,
+    from . import dashboard  # 22/11/2026: lo stock per marca sta qui (tolto dalla Home)
+    marche, n_marche = dashboard.stock_per_marca(stock, quante=12)
+    return render_template("piazzale.html", gruppi=gruppi, totale=len(risultati), f=f, marche=marche, n_marche=n_marche,
                            opzioni=_filtri_veicoli(stock, f), auto=auto, piazzali=piazzali,
                            senza_posizione=senza_posizione,
                            filtri_attivi=[k for k in CHIAVI_FILTRO if f[k]])
@@ -2639,6 +2644,20 @@ def elimina_veicolo(veicolo_id):
             pass
     flash(f"{nome} eliminata.", "ok")
     return redirect(url_for("main.piazzale"))
+
+
+@bp.route("/vedi-come/torna", methods=["POST"])
+@login_richiesto
+def vedi_come_torna():
+    """Fine di "Vedi il portale come…": si torna all'amministratore."""
+    orig = g.get("admin_originale")
+    if orig is None:
+        return redirect(url_for("main.home"))
+    session.clear()
+    session.permanent = True
+    session.update(uid=orig.id, ph=orig.password_hash[-16:])
+    flash("Sei tornato al tuo account di amministratore.", "ok")
+    return redirect(url_for("admin.indice") + "#test")
 
 
 @bp.route("/vetture/<chiave>")

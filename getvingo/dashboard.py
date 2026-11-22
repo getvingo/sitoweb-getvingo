@@ -65,8 +65,7 @@ def stati_vetture():
     dove = {"in_viaggio": url_for("main.stato_vetture", chiave="in-viaggio"), "lavorazione": url_for("main.lavorazioni"),
             "da_ritirare": url_for("main.stato_vetture", chiave="da-ritirare"), "preparazione": url_for("main.preparazione")}
     righe = [{"chiave": k, "nome": n, "nota": nota, "n": conta[k], "url": dove[k]} for k, n, nota, f in STATI]
-    righe.append({"chiave": "consegnato", "nome": "Consegnate oggi", "nota": f"{len(consegnate)} questo mese",
-                  "n": sum(1 for v in consegnate if dal <= v.consegnato_at < al),
+    righe.append({"chiave": "consegnato", "nome": "Consegnate", "nota": "calendario delle consegne", "n": None,
                   "url": url_for("main.stato_vetture", chiave="consegnate")})
     return righe
 
@@ -122,14 +121,17 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
     for m in movimenti:
         if not tiene(m) or (solo_mie and not _mio_movimento(m, io) and ruolo not in ("consegne",)):
             continue
+        # 22/11/2026: l'orario mostrato è quello vero, con scritto cosa indica (partita, arrivata, entro…)
         if m.stato == "predisposto":
-            quando, stato, att = max(m.ritiro_entro_at, inizio) if m.ritiro_entro_at else inizio, "dafare", "Ritiro da fare"
+            quando, stato, att = m.ritiro_entro_at or m.ddt.emesso_at, "dafare", "Ritiro da fare"
+            etichetta = "in ritardo · andava ritirata entro" if m.oltre_orario else "da ritirare entro"
         elif m.partenza_at and m.partenza_at >= inizio:
             quando, stato, att = m.partenza_at, "fatto" if m.stato == "chiuso" else "corso", _attivita(m)
+            etichetta = f"partita · arrivata alle {m.arrivo_at:%H:%M}" if m.arrivo_at else "partita"
         elif m.stato == "aperto":  # partito prima e ancora in viaggio
-            quando, stato, att = inizio, "corso", "In viaggio da prima"
+            quando, stato, att, etichetta = m.partenza_at, "corso", "In viaggio", "partita"
         else:  # partito prima, arrivato nel periodo
-            quando, stato, att = m.arrivo_at, "fatto", "Arrivo"
+            quando, stato, att, etichetta = m.arrivo_at, "fatto", "Arrivo", "arrivata"
         # viaggio oltre un'ora dopo l'arrivo atteso: si scrive sotto l'attività (come il vecchio "Da fare")
         nota = ""
         ritardo = servizi.viaggio_in_ritardo(m)
@@ -138,7 +140,7 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
             nota = "arrivo in ritardo" + ("" if stimato else " · arrivo non stimabile")
         voci.append({"at": quando, "attivita": att, "ddt": m.ddt.sigla if m.ddt else "", "v": m.veicolo,
                      "da": m.da_sede.nome if m.da_sede else "", "a": m.sede_arrivo_effettiva.nome if m.a_sede else "",
-                     "chi": _chi(m), "stato": stato, "tipo": "movimento", "nota": nota,
+                     "chi": _chi(m), "stato": stato, "tipo": "movimento", "nota": nota, "quando": etichetta,
                      "url": url_for("main.ddt_dettaglio", ddt_id=m.ddt_id)})
     # consegne al cliente confermate (senza DDT verso il cliente: la consegna in sede)
     for v in Veicolo.query.filter(Veicolo.stato == "consegnato", Veicolo.consegnato_at >= inizio,
@@ -148,7 +150,7 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
         if solo_mie and v.venditore_id != io and ruolo not in ("consegne",):
             continue
         voci.append({"at": v.consegnato_at, "attivita": "Consegna al cliente", "ddt": "", "v": v,
-                     "da": v.sede.nome if v.sede else "", "a": "", "chi": "—", "stato": "fatto", "tipo": "consegna",
+                     "da": v.sede.nome if v.sede else "", "a": "", "chi": "—", "stato": "fatto", "tipo": "consegna", "quando": "consegnata",
                      "url": url_for("main.veicolo", veicolo_id=v.id)})
     # preparazioni: l'orario fissato per essere pronta
     for p in Preparazione.query.filter(Preparazione.pronta_entro_at >= inizio, Preparazione.pronta_entro_at < fine).all():
@@ -163,6 +165,7 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
         ultimo = p.fasi[-1].utente.nome if p.fasi and p.fasi[-1].utente else "—"
         voci.append({"at": p.pronta_entro_at, "attivita": f"Preparazione · {passo}", "ddt": "", "v": v,
                      "da": v.sede.nome if v.sede else "", "a": "", "chi": ultimo, "stato": stato, "tipo": "preparazione",
+                     "quando": "pronta entro",
                      "url": url_for("main.veicolo", veicolo_id=v.id) + "#preparazione"})
     voci.sort(key=lambda x: x["at"])
     return voci
@@ -312,26 +315,26 @@ def compiti_telefono():
     out = []
     base = Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id).filter(Ddt.annullato_at.is_(None))
     for m in base.filter(Movimento.stato == "predisposto", Movimento.assegnato_a_id == io).order_by(Movimento.ritiro_entro_at):
-        out.append({"v": m.veicolo, "azione": f"Porta a {m.a_sede.nome}",
+        out.append({"tipo": "ritiro", "v": m.veicolo, "azione": f"Porta a {m.a_sede.nome}",
                     "dove": (f"Ora è a {m.da_sede.nome}" if m.da_sede else "")
                     + (f" · ritiro entro {m.ritiro_entro_at:%d/%m %H:%M}" if m.ritiro_entro_at else ""),
                     "url": url_for("main.tocco_scelta", veicolo_id=m.veicolo_id)})
     for m in base.filter(Movimento.stato == "aperto", Movimento.partenza_utente_id == io).order_by(Movimento.partenza_at):
-        out.append({"v": m.veicolo, "azione": f"Arriva a {m.a_sede.nome}",
+        out.append({"tipo": "viaggio", "v": m.veicolo, "azione": f"Arriva a {m.a_sede.nome}",
                     "dove": f"Partita alle {m.partenza_at:%H:%M} da {m.da_sede.nome if m.da_sede else '—'} · all'arrivo tocca l'adesivo",
                     "url": url_for("main.arrivo_da_tap", ddt_id=m.ddt_id)})
     if ruolo in ("preparatore", "consegne", "admin"):
         for p in (Preparazione.query.filter_by(completata_at=None)
                   .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).limit(10)):
             v = p.veicolo
-            out.append({"v": v, "azione": p.prossima_fase if p.prossima_fase != "Pronta" else "Segna come pronta",
+            out.append({"tipo": "preparazione", "v": v, "azione": p.prossima_fase if p.prossima_fase != "Pronta" else "Segna come pronta",
                         "dove": (f"In {v.sede.nome}" if v.sede else "")
                         + (f" · pronta entro {p.pronta_entro_at:%d/%m alle %H:%M}" if p.pronta_entro_at else ""),
                         "url": url_for("main.tocco_scelta", veicolo_id=v.id)})
     if ruolo in ("consegne", "admin"):
         for v in Veicolo.query.filter(Veicolo.stato == "in_sede").all():
             if v.fase == "pronta" and v.consegna_sede and v.sede_id != v.consegna_sede_id and not v.verso_consegna:
-                out.append({"v": v, "azione": f"Porta a {v.consegna_sede.nome}",
+                out.append({"tipo": "consegna", "v": v, "azione": f"Porta a {v.consegna_sede.nome}",
                             "dove": f"Ora è in {v.sede.nome if v.sede else '—'} · ultimo DDT prima della consegna",
                             "url": url_for("main.tocco_scelta", veicolo_id=v.id)})
     return out[:15]
@@ -358,7 +361,7 @@ def da_ritirare():
     for m in base.filter(Movimento.stato == "predisposto").order_by(Movimento.ritiro_entro_at).all():
         visti.add(m.veicolo_id)
         out.append({"v": m.veicolo, "dove": m.da_sede.nome if m.da_sede else "—", "verso": m.a_sede.nome if m.a_sede else "—",
-                    "ddt": m.ddt, "entro": m.ritiro_entro_at, "scaduto": m.scaduto, "chi": m.assegnato_a.nome if m.assegnato_a else "",
+                    "ddt": m.ddt, "entro": m.ritiro_entro_at, "scaduto": m.oltre_orario, "chi": m.assegnato_a.nome if m.assegnato_a else "",
                     "finita": None, "url": url_for("main.ddt_dettaglio", ddt_id=m.ddt_id)})
     for sede, elenco in servizi.presso_fornitori():
         for v, m in elenco:

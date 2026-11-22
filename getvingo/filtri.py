@@ -95,7 +95,9 @@ def resta(momento, fornitore=False):
 
 
 def iniziali(nome):
-    parti = (nome or "?").split()
+    # 22/11/2026: si salta la punteggiatura in testa alle parole ("Venditore (prova)" → VP, non "V(")
+    parti = [p.lstrip("()[]-_.,'\"") for p in (nome or "?").split()]
+    parti = [p for p in parti if p] or ["?"]
     return "".join(p[0] for p in parti[:2]).upper()
 
 

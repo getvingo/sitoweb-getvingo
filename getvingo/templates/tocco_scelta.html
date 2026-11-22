@@ -39,9 +39,10 @@
 {% if distanza_ritiro is not none %}
 <p class="{{ 'sul-posto' if distanza_ritiro <= raggio else 'lontano' }}">{{ i('pin', 's') }} {% if distanza_ritiro <= raggio %}Sei a {{ distanza_txt(distanza_ritiro) }} da {{ ritiro.da_sede.nome }}{% else %}Sei a {{ distanza_txt(distanza_ritiro) }}: si prende in carico entro {{ raggio }} m{% endif %}</p>
 {% endif %}
-{% if ritiro.scaduto %}
-<p class="avviso errore">{{ i('orologio') }}<span>Il tempo per il ritiro è scaduto: chiedi all'ufficio di rinnovarlo.</span></p>
-{% elif not g.utente.mezzo %}
+{% if ritiro.oltre_orario %}
+<p class="avviso">{{ i('orologio') }}<span>Andava ritirata entro il {{ ritiro.ritiro_entro_at|data('%d/%m alle %H:%M') }}: prendila in carico adesso.</span></p>
+{% endif %}
+{% if not g.utente.mezzo %}
 <a class="btn primario pieno" href="{{ url_for('main.profilo_guida', poi=url_for('main.tocco_scelta', veicolo_id=v.id)) }}">{{ i('firma') }} Completa il profilo di guida per partire</a>
 {% else %}
 <form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=ritiro.ddt.id) }}" class="tocco-fondo" data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>

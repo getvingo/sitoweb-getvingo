@@ -12,7 +12,7 @@
 <div class="titolo-pagina"><div><div class="sopratitolo">Vetture per stato</div><h1>{{ titolo }}</h1><p class="descrizione-pagina">{{ descrizione }}</p></div></div>
 
 {% macro vettura(v) %}<div class="y-auto">{{ logo_marca(v.marca, 30) }}<div><b>{{ v.descrizione }}</b>
-  <small class="y-vin">{{ v.impronta|impronta(14) }}<span class="y-mono">{{ v.vin[:3] }}…{{ v.vin[-6:] }}</span>{% if v.targa %} · {{ v.targa }}{% endif %}</small></div></div>{% endmacro %}
+  <small class="y-vin"><span class="y-mono">…{{ v.vin[-8:] }}</span>{% if v.targa %} · {{ v.targa }}{% endif %}</small></div></div>{% endmacro %}
 
 {% if chiave == 'in-viaggio' %}
 <div class="y-tre">
@@ -45,10 +45,10 @@
 <div class="y-tre">
   <div class="y-num"><span class="y-num-t">Da ritirare</span><span class="y-num-n">{{ righe|length }}<small>{{ 'vettura' if righe|length == 1 else 'vetture' }} pronte da riportare</small></span></div>
   <div class="y-num"><span class="y-num-t">Senza DDT di rientro</span><span class="y-num-n {{ 'y-att' if senza }}">{{ senza|length }}<small>lavoro finito, rientro da predisporre</small></span></div>
-  <div class="y-num"><span class="y-num-t">Ritiro scaduto</span><span class="y-num-n {{ 'y-att' if scaduti }}">{{ scaduti|length }}<small>oltre il tempo di ritiro</small></span></div>
+  <div class="y-num"><span class="y-num-t">In ritardo</span><span class="y-num-n {{ 'y-att' if scaduti }}">{{ scaduti|length }}<small>oltre l'orario di ritiro indicato</small></span></div>
 </div>
 <section class="y-box">
-  <div class="y-box-testa"><div><h2>Da riportare</h2><span>Prima i ritiri scaduti e quelli senza DDT di rientro</span></div></div>
+  <div class="y-box-testa"><div><h2>Da riportare</h2><span>Prima i ritiri in ritardo e quelli senza DDT di rientro</span></div></div>
   <div class="y-scorre"><table class="y-tab">
     <thead><tr><th>Vettura</th><th>Dove si trova</th><th>DDT di ritiro</th><th>Chi la ritira</th><th>Entro</th><th></th></tr></thead>
     <tbody>
@@ -58,8 +58,8 @@
       <td>{{ r.dove }}{% if r.finita %}<small>{{ r.lavorazione }} finita il {{ r.finita.strftime('%d/%m') }}</small>{% endif %}</td>
       <td>{% if r.ddt %}<span class="y-mono">DDT {{ r.ddt.sigla }}</span><small>verso {{ r.verso }}</small>{% else %}<span class="y-etichetta y-et-oggi">DDT da predisporre</span>{% endif %}</td>
       <td>{{ r.chi or '—' }}</td>
-      <td>{% if r.entro %}{% if r.scaduto %}<span class="y-etichetta y-et-adesso">Scaduto</span><small>il {{ r.entro.strftime('%d/%m %H:%M') }}</small>{% else %}<span class="y-mono">{{ r.entro.strftime('%d/%m %H:%M') }}</span>{% endif %}{% else %}—{% endif %}</td>
-      <td class="y-azione"><a class="btn piccolo" href="{{ r.url }}">{{ ('Rinnova il ritiro' if r.scaduto else 'Apri il DDT') if r.ddt else 'Predisponi rientro' }}</a></td>
+      <td>{% if r.entro %}{% if r.scaduto %}<span class="y-etichetta y-et-adesso">In ritardo</span><small>entro il {{ r.entro.strftime('%d/%m %H:%M') }}</small>{% else %}<span class="y-mono">{{ r.entro.strftime('%d/%m %H:%M') }}</span>{% endif %}{% else %}—{% endif %}</td>
+      <td class="y-azione"><a class="btn piccolo" href="{{ r.url }}">{{ 'Apri il DDT' if r.ddt else 'Predisponi rientro' }}</a></td>
     </tr>
     {% else %}<tr><td colspan="6" class="y-vuoto">Nessuna vettura da ritirare.</td></tr>{% endfor %}
     </tbody></table></div>

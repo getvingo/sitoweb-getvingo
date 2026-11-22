@@ -219,7 +219,7 @@
   <div class="corpo">
     <div class="etichetta">DDT {{ predisposto.ddt.sigla }} pronto da ritirare</div>
     <h3>{{ predisposto.da_sede.nome if predisposto.da_sede else '—' }} → {{ predisposto.a_sede.nome }}</h3>
-    <div class="tratta"><span class="scadenza {{ 'scaduta' if predisposto.scaduto }}">{{ 'Scaduto il' if predisposto.scaduto else 'Ritiro entro' }} {{ predisposto.ritiro_entro_at|data('%d/%m %H:%M') }}</span></div>
+    <div class="tratta"><span class="scadenza {{ 'scaduta' if predisposto.oltre_orario }}">{{ 'In ritardo · entro il' if predisposto.oltre_orario else 'Ritiro entro' }} {{ predisposto.ritiro_entro_at|data('%d/%m %H:%M') }}</span></div>
   </div>
   {{ i('chevron') }}
 </a>

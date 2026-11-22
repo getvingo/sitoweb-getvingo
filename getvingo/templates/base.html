@@ -85,7 +85,7 @@
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
     <a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}">{{ i('attenzione') }}<span>Danni</span>{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</a>
     {% if g.utente.ruolo == 'admin' %}<span class="bl-linea" role="separator"></span>
-    <a href="{{ url_for('main.analisi') }}" class="{{ 'attivo' if ep == 'main.analisi' }}">{{ i('cronometro') }}<span>Report</span></a>{% endif %}
+    <a href="{{ url_for('main.analisi') }}" class="{{ 'attivo' if ep == 'main.analisi' }}">{{ i('cronometro') }}<span>Statistiche</span></a>{% endif %}
     {% else %}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
@@ -97,7 +97,7 @@
     <span class="bl-titolo">Vetture per stato</span>
     {% for s in stati_vetture() %}
     <a href="{{ s.url }}" class="bl-stato st-{{ s.chiave }}"><span class="bl-pallino" aria-hidden="true"></span>
-      <span class="bl-stato-t"><b>{{ s.nome }}</b><small>{{ s.nota }}</small></span><span class="bl-n">{{ s.n }}</span></a>
+      <span class="bl-stato-t"><b>{{ s.nome }}</b><small>{{ s.nota }}</small></span><span class="bl-n">{{ s.n if s.n is not none else '' }}</span></a>
     {% endfor %}
   </div>
   {% endif %}
@@ -153,6 +153,13 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <span>{{ i('chiave', 's') }} Sei dentro <b>{{ g.utente.organizzazione.nome }}</b> come Supporto Getvingo{% if not g.utente.organizzazione.attiva %} · <b>accesso sospeso</b>{% endif %}</span>
   <button class="btn piccolo">{{ i('indietro', 's') }} Torna al Pannello Getvingo</button>
+</form>
+{% endif %}
+{% if admin_originale() %}
+<form method="post" action="{{ url_for('main.vedi_come_torna') }}" class="barra-gestore barra-vedi-come">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <span>{{ i('utente', 's') }} Stai vedendo il portale come <b>{{ g.utente.nome }}</b> · le azioni restano registrate a suo nome</span>
+  <button class="btn piccolo">{{ i('indietro', 's') }} Torna amministratore</button>
 </form>
 {% endif %}
 {% block corpo %}

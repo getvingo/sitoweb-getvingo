@@ -64,8 +64,8 @@
 {% endif %}
 
 {% if m.stato == 'predisposto' and not d.annullato_at %}
-<div class="avviso {{ 'errore' if m.scaduto else 'ok' }}" style="font-weight:600">{{ i('orologio') }}
-  <span>{% if m.scaduto %}Tempo di ritiro scaduto il {{ m.ritiro_entro_at|data }}.{% else %}Da ritirare entro il {{ m.ritiro_entro_at|data }}.{% endif %}
+<div class="avviso {{ '' if m.oltre_orario else 'ok' }}" style="font-weight:600">{{ i('orologio') }}
+  <span>{% if m.oltre_orario %}Andava ritirata entro il {{ m.ritiro_entro_at|data }}: in ritardo.{% else %}Da ritirare entro il {{ m.ritiro_entro_at|data }}.{% endif %}
   Predisposto da {{ d.creato_da.nome }}{% if m.assegnato_a %} · lo ritira {{ m.assegnato_a.nome }}{% endif %}.</span></div>
 {% endif %}
 
@@ -202,7 +202,7 @@
   {% endif %}
 </ul>
 
-{% if puo_rinnovare %}
+{% if false %}{# 22/11/2026: il ritiro non scade, niente da rinnovare #}
 <form method="post" action="{{ url_for('main.ddt_rinnova', ddt_id=d.id) }}" class="azioni" style="margin-top:6px">
   {{ csrf_input() }}<input type="hidden" name="ore" value="24">
   <button class="btn piccolo">{{ i('orologio', 's') }} Rinnova ritiro di 24 ore</button>

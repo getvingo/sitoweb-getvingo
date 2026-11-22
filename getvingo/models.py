@@ -580,7 +580,14 @@ class Movimento(PerOrganizzazione, db.Model):
 
     @property
     def scaduto(self):
-        return self.stato == "predisposto" and self.ritiro_entro_at and self.ritiro_entro_at < adesso()
+        """22/11/2026 (scelta dell'utente): il ritiro non scade più. L'orario resta un'indicazione: superarlo non
+        blocca la presa in carico e non c'è niente da rinnovare (vedi oltre_orario)."""
+        return False
+
+    @property
+    def oltre_orario(self):
+        """Ritiro non ancora preso in carico dopo l'orario indicato: solo per segnalarlo."""
+        return self.stato == "predisposto" and bool(self.ritiro_entro_at) and self.ritiro_entro_at < adesso()
 
     @property
     def stima_giorni(self):

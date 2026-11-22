@@ -553,19 +553,16 @@ class TestPredisposto(Base):
             self.assertEqual(m.partenza_utente.email, "autista@t.it")
             self.assertEqual(db.session.get(Ddt, d).creato_da.email, "ufficio@t.it")
 
-    def test_ritiro_scaduto_e_rinnovo(self):
+    def test_ritiro_in_ritardo_si_prende_lo_stesso(self):
+        # 22/11/2026: il ritiro non scade più; oltre l'orario è "in ritardo" ma si prende in carico
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B", azione="predisponi")
         d = self.ddt()
         with self.app.app_context():
             self.mov(d).ritiro_entro_at -= timedelta(days=2)
             db.session.commit()
-        self.entra("autista")
-        self.presa(d, data={"conducente": "Luca", "firma": FIRMA})
-        with self.app.app_context():
-            self.assertEqual(self.mov(d).stato, "predisposto")
-        self.entra("ufficio")
-        self.c.post(f"/ddt/{d}/rinnova", data={"ore": "24"})
+            self.assertTrue(self.mov(d).oltre_orario)
+            self.assertFalse(self.mov(d).scaduto)
         self.entra("autista")
         self.presa(d, data={"conducente": "Luca", "firma": FIRMA})
         with self.app.app_context():
@@ -2973,7 +2970,7 @@ class TestSistemaDesign(Base):
         # "Vetture per stato" in ordine: In viaggio · Dai fornitori · Da ritirare · In preparazione · Consegnate oggi
         home = self.c.get("/").get_data(as_text=True)
         self.assertIn('aria-label="1 da verificare"', home)
-        ordine = [home.index(f"<b>{n}</b>") for n in ("In viaggio", "Dai fornitori", "Da ritirare", "In preparazione", "Consegnate oggi")]
+        ordine = [home.index(f"<b>{n}</b>") for n in ("In viaggio", "Dai fornitori", "Da ritirare", "In preparazione", "Consegnate")]
         self.assertEqual(ordine, sorted(ordine))
 
 
@@ -3793,12 +3790,14 @@ class TestTelefonoEssenziale(Base):
         vid = self.abbina()
         self.parti(vid, "Carrozzeria B")
         self.arrivo(self.ddt())
-        # 22/11/2026, Home B1: da computer calendario a 7 giorni e fornitori degli ultimi 30 giorni;
-        # dal telefono solo "Da fare per te" (niente statistiche né calendario)
+        # 22/11/2026 notte: in Home solo l'essenziale; fornitori esterni in Statistiche, stock per marca in Vetture
         home = self.c.get("/").get_data(as_text=True)
-        for testo in ("Calendario della settimana", "Fornitori esterni", "Carrozzeria B", "Stock per marca",
-                      'class="y-tel solo-telefono"', 'class="y-home solo-computer"'):
+        for testo in ("Calendario della settimana", 'class="y-tel solo-telefono"', 'class="y-home solo-computer"'):
             self.assertIn(testo, home)
+        for testo in ("Fornitori esterni", "Stock per marca"):
+            self.assertNotIn(testo, home)
+        self.assertIn("Carrozzeria B", self.c.get("/analisi").get_data(as_text=True))
+        self.assertIn("Stock per marca", self.c.get("/stock").get_data(as_text=True))
 
     def test_admin_gestisce_gli_account_dal_telefono(self):
         pagina = self.c.get("/admin/aziende").get_data(as_text=True)
@@ -4484,3 +4483,44 @@ class TestFirmeFacoltative(Base):
         self.assertNotIn("Firme facoltative ACCESE", self.c.get("/admin/").get_data(as_text=True))
         self.entra("ufficio")
         self.assertEqual(self.c.post("/admin/firme-facoltative", data={"attive": "1"}).status_code, 403)
+
+
+class TestStatisticheEVediCome(Base):
+    """22/11/2026: Statistiche al posto di Report; Vedi il portale come una mansione; il ritiro non scade più."""
+    def test_statistiche(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        html = self.c.get("/analisi?periodo=30").get_data(as_text=True)
+        for t in ("Statistiche", "Movimentazioni", "Stock · adesso", "Preparazioni", "Lavorazioni e fornitori",
+                  "Persone", "Danni", "Tempi delle fasi", "Fornitori esterni · ultimi 30 giorni"):
+            self.assertIn(t, html)
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertNotIn("Stock per marca", home)       # spostato in Vetture
+        self.assertNotIn("Fornitori esterni", home)     # spostato in Statistiche
+        self.assertIn("v-marche", self.c.get("/stock").get_data(as_text=True))
+
+    def test_vedi_come_e_torna(self):
+        r = self.c.post("/admin/vedi-come/venditore", follow_redirects=True)
+        html = r.get_data(as_text=True)
+        self.assertIn("Stai vedendo il portale come", html)
+        self.assertIn("Venditore (prova)", html)
+        self.assertEqual(self.c.get("/admin/").status_code, 403)   # da venditore niente Gestione
+        self.c.post("/vedi-come/torna")
+        self.assertEqual(self.c.get("/admin/").status_code, 200)
+        r = self.c.post("/admin/vedi-come/fornitore", follow_redirects=True)
+        self.assertIn("Partner lavorazioni (prova)", r.get_data(as_text=True))
+        self.c.post("/vedi-come/torna")
+        self.entra("ufficio")
+        self.assertEqual(self.c.post("/admin/vedi-come/venditore").status_code, 403)
+
+    def test_ritiro_non_scade(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B", azione="predisponi", conducente="", firma="", ore_ritiro="8")
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            m.ritiro_entro_at = adesso() - timedelta(hours=5)
+            db.session.commit()
+        home = self.c.get("/?mie=0").get_data(as_text=True)
+        self.assertIn("Ritiro in ritardo", home)
+        self.assertNotIn("Rinnova il ritiro", home)
+        self.assertNotIn("Ritiro scaduto", self.c.get(f"/ddt/{self.ddt()}").get_data(as_text=True))
