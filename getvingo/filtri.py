@@ -206,9 +206,10 @@ def init_app(app):
     def condizione(v):
         """Etichetta Nuovo / Usato accanto al nome dell'auto, ovunque compaia."""
         c = getattr(v, "condizione", "") or ""
-        if c not in ("nuovo", "usato"):
+        nomi = {"nuovo": "Nuovo", "usato": "Usato", "importato": "Importato"}  # 23/11/2026: anche Importato
+        if c not in nomi:
             return ""
-        return Markup(f'<span class="condizione {c}">{"Nuovo" if c == "nuovo" else "Usato"}</span>')
+        return Markup(f'<span class="condizione {c}">{nomi[c]}</span>')
     app.jinja_env.globals["condizione"] = condizione
 
     @app.context_processor

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, csrf_input %}
+{% from "_auto.html" import carta_auto %}
+{% block titolo %}{{ v.descrizione }} · Getvingo{% endblock %}
+{# 23/11/2026: la scheda dell'auto per il venditore. Dati dell'auto, a che punto è, consegna, cliente e note;
+   niente DDT, spostamenti, lavorazioni o preparazione da gestire. #}
+{% block contenuto %}
+<a class="btn piccolo indietro" href="{{ url_for('main.home') if v.venditore_id == g.utente.id else url_for('main.piazzale', vista='libere') }}">{{ i('indietro', 's') }} Indietro</a>
+{{ carta_auto(v) }}
+
+<section class="y-box vend-scheda">
+  <div class="y-box-testa"><div><h2>A che punto è</h2><span>{{ quando_pronta(v) }}</span></div>
+    {% if v.venditore_id is none %}
+    <form method="post" action="{{ url_for('main.prendi_vettura', veicolo_id=v.id) }}">{{ csrf_input() }}<button class="btn piccolo primario">{{ i('check', 's') }} È mia</button></form>
+    {% elif v.venditore_id == g.utente.id %}
+    <form method="post" action="{{ url_for('main.prendi_vettura', veicolo_id=v.id) }}" onsubmit="return confirm('Lasci libera {{ v.descrizione }}? Potrà prenderla un altro venditore.')">{{ csrf_input() }}
+      <input type="hidden" name="azione" value="lascia"><button class="btn piccolo">Lasciala libera</button></form>
+    {% endif %}</div>
+  <dl class="vend-dati">
+    <div><dt>Consegna</dt><dd>{% if v.consegna_prevista_at %}<b>{{ v.consegna_prevista_at|data('%d/%m/%Y alle %H:%M') }}</b> · {{ v.consegna_sede.nome if v.consegna_sede }}{% else %}da fissare <span class="tenue">(la fissa l'ufficio consegne)</span>{% endif %}</dd></div>
+    {% if v.danni_aperti %}<div><dt>Danni</dt><dd>{% for d in v.danni_aperti %}<a class="badge danno con-icona lampeggia" href="{{ url_for('main.danno', danno_id=d.id) }}">{{ i('attenzione', 's') }}{{ d.zona }}</a> {% endfor %}<span class="tenue">da verificare prima della consegna</span></dd></div>{% endif %}
+  </dl>
+</section>
+
+{% if v.venditore_id == g.utente.id %}
+<section class="y-box vend-scheda">
+  <div class="y-box-testa"><div><h2>Cliente e vendita</h2><span>Solo per la concessionaria, non vanno sul DDT</span></div></div>
+  <form method="post" action="{{ url_for('main.note_interne', veicolo_id=v.id) }}" class="vend-form" data-una-volta>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="venditore_id" value="{{ g.utente.id }}">
+    <div class="griglia-2">
+      <label class="campo"><span>Cliente</span><input name="cliente_nome" value="{{ v.cliente_nome or '' }}" maxlength="200" placeholder="Es. Mario Bianchi"></label>
+      <label class="campo"><span>Venduta il</span><input type="date" name="venduta_il" value="{{ v.venduta_il.isoformat() if v.venduta_il else '' }}" max="{{ adesso().date().isoformat() }}"></label>
+    </div>
+    <label class="campo"><span>Note</span><textarea name="note_interne" rows="3" maxlength="2000">{{ v.note_interne or '' }}</textarea></label>
+    <button class="btn">{{ i('check', 's') }} Salva</button>
+  </form>
+</section>
+{% endif %}
+
+<div class="azioni">
+  <a class="btn" href="{{ url_for('main.dati_auto', veicolo_id=v.id) }}">{{ i('doc', 's') }} Tutti i dati dell'auto</a>
+  <a class="btn solo-telefono" href="{{ url_for('main.trova', veicolo_id=v.id) }}">{{ i('pin', 's') }} Trova l'auto</a>
+  <a class="btn btn-danno-riga" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione', 's') }} Segnala un danno</a>
+</div>
+{% endblock %}

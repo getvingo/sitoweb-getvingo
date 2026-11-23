@@ -164,12 +164,23 @@ class Utente(PerOrganizzazione, db.Model):
         "note_interne": ("backoffice", "venditore", "resp_commerciale"),    # cliente, venditore, venduta il
         "fornitori": ("backoffice", "resp_commerciale"),                    # solleciti, fine prevista
         "orario_preparazione": ("backoffice", "preparatore", "resp_commerciale"),
-        "consegnare": ("backoffice", "venditore", "consegne", "resp_commerciale"),  # sede, targa, consegna
+        "consegnare": ("backoffice", "consegne", "resp_commerciale"),  # sede, targa, consegna (23/11: non il venditore)
         "statistiche": ("resp_commerciale",),                               # senza la sezione Persone
+        "risolvere_danni": ("preparatore",),                                # 23/11/2026: chi ripara verifica il danno
+        "fissare_consegne": ("consegne", "backoffice", "resp_commerciale"),  # 23/11/2026: calendario delle consegne
     }
 
     def puo(self, azione):
         return self.ruolo == "admin" or self.ruolo in self.PERMESSI.get(azione, ())
+
+    @property
+    def venditore(self):
+        """23/11/2026, richiesta dell'utente: il venditore vede solo le sue vetture e quelle libere da vendere,
+        niente movimentazioni né gestione dello stock (DDT, lavorazioni, preparazioni, piazzali)."""
+        return self.ruolo == "venditore"
+
+    def vede_auto(self, v):
+        return not self.venditore or v.venditore_id in (None, self.id)
 
     @property
     def gestione(self):
@@ -286,7 +297,10 @@ class Vettore(PerOrganizzazione, ConIndirizzo, db.Model):
 class Veicolo(PerOrganizzazione, db.Model):
     STATI = {"in_sede": "In sede", "in_viaggio": "In viaggio", "consegnato": "Consegnato"}
     TIPOLOGIE = {"vettura": "Vettura", "commerciale": "Veicolo commerciale"}
-    CONDIZIONI = {"nuovo": "Nuovo", "usato": "Usato"}
+    # 23/11/2026, richiesta dell'utente: anche "importato" (auto d'importazione); usate e importate hanno i km
+    CONDIZIONI = {"nuovo": "Nuovo", "usato": "Usato", "importato": "Importato"}
+    CON_KM = ("usato", "importato")
+    KM_MASSIMI = 2_000_000
     # alimentazione (13/11/2026): come sul libretto (campo P.3), con le ibride distinte
     ALIMENTAZIONI = ("Benzina", "Diesel", "Ibrida benzina", "Ibrida diesel", "Ibrida plug-in", "Elettrica", "GPL", "Metano",
                      "Idrogeno")
@@ -303,7 +317,8 @@ class Veicolo(PerOrganizzazione, db.Model):
     colore = db.Column(db.String(80), default="")
     targa = db.Column(db.String(12), default="")  # facoltativa: le auto nuove di solito non l'hanno
     tipologia = db.Column(db.String(20), nullable=False, default="vettura")
-    condizione = db.Column(db.String(10), default="")  # nuovo / usato: scelto all'ingresso in stock, sempre mostrato
+    condizione = db.Column(db.String(10), default="")  # nuovo / usato / importato: scelto all'ingresso in stock
+    km = db.Column(db.Integer)  # chilometri, obbligatori per usate e importate (23/11/2026)
     stato = db.Column(db.String(20), nullable=False, default="in_sede")
     sede_id = db.Column(db.Integer, db.ForeignKey("sede.id"))
     # Ultima posizione nota (aggiornata a ogni tap e a ogni arrivo)
@@ -328,6 +343,11 @@ class Veicolo(PerOrganizzazione, db.Model):
     sede = db.relationship("Sede", foreign_keys="Veicolo.sede_id")
     venditore = db.relationship("Utente", foreign_keys=[venditore_id])
     consegna_sede = db.relationship("Sede", foreign_keys=[consegna_sede_id])
+
+    @property
+    def km_testo(self):
+        """"45.300 km" (separatore delle migliaia all'italiana), vuoto se non indicati."""
+        return f"{self.km:,} km".replace(",", ".") if self.km is not None else ""
 
     @property
     def descrizione(self):
@@ -488,7 +508,7 @@ class Tag(PerOrganizzazione, db.Model):
 
 class Movimento(PerOrganizzazione, db.Model):
     CAUSALI = [
-        "Spostamento",           # tra sedi e piazzali della concessionaria
+        "Trasferimento interno",  # tra sedi e piazzali della concessionaria (23/11/2026, prima "Spostamento")
         "Invio lavorazione",     # verso carrozzeria, officina, altro fornitore
         "Reso lavorazione",      # dal fornitore indietro alla concessionaria
         "Conto esposizione",     # verso una fiera o uno showroom esterno
@@ -500,7 +520,8 @@ class Movimento(PerOrganizzazione, db.Model):
     ]
     CAUSALI_RIVENDITORE = ("Conto visione", "Vendita")
     # causali dei DDT emessi prima dell'08/11/2026: restano valide sui documenti già fatti
-    CAUSALI_STORICHE = ["Trasferimento tra sedi", "Conto lavorazione", "Conto riparazione", "Rientro da lavorazione"]
+    CAUSALI_STORICHE = ["Trasferimento tra sedi", "Conto lavorazione", "Conto riparazione", "Rientro da lavorazione",
+                        "Spostamento"]  # "Spostamento": DDT interni emessi fino al 23/11/2026
     LAVORAZIONI = [
         "Nessuna (solo trasferimento)",
         "Carrozzeria",
@@ -619,11 +640,16 @@ class Movimento(PerOrganizzazione, db.Model):
         fornitore (8–12, 13–17, senza weekend, feste e giorni chiusi), arrotondata alla mezz'ora per eccesso."""
         if not self.arrivo_at:
             return None
-        chiave = (self.arrivo_at, self.stima_giorni)
+        chiave = (self.arrivo_at, self.stima_giorni, self.lavorazione_completata_at)
         memo = getattr(self, "_prevista_memo", None)
         if memo is None or memo[0] != chiave:
-            from .servizi import fine_lavori_prevista
-            memo = (chiave, fine_lavori_prevista(self.arrivo_at, self.stima_giorni))
+            from .servizi import fini_lavori_della_sede, fine_lavori_prevista
+            fine = None
+            v = self.veicolo
+            if not self.lavorazione_completata_at and v is not None and v.sede_id:
+                # 23/11/2026: mai due fini lavori alla stessa ora nello stesso luogo
+                fine = fini_lavori_della_sede(v.sede_id).get(self.id)
+            memo = (chiave, fine or fine_lavori_prevista(self.arrivo_at, self.stima_giorni))
             self._prevista_memo = memo
         return memo[1]
 

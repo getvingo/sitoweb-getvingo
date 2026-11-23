@@ -3384,7 +3384,7 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
   .bl-pallino { width: 8px; height: 8px; border-radius: 50%; background: var(--testo-2); }
   .st-in_viaggio .bl-pallino { background: var(--st-viaggio); } .st-lavoro .bl-pallino, .st-lavorazione .bl-pallino { background: var(--st-lavoro); }
   .st-da_ritirare .bl-pallino { background: var(--st-ritiro); } .st-preparazione .bl-pallino { background: var(--st-prep); }
-  .st-consegnato .bl-pallino { background: var(--st-consegnata); }
+  .st-consegnato .bl-pallino { background: var(--st-consegnata); } .st-pronta .bl-pallino { background: var(--st-pronta); }
   .bl-stato-t { display: flex; flex-direction: column; min-width: 0; }
   .bl-stato-t b { font-size: 13px; font-weight: 600; }
   .bl-stato-t small { font-size: 12px; color: var(--testo-2); }
@@ -3798,3 +3798,78 @@ fieldset > legend { font: 700 15px/1.3 "Red Hat Display", sans-serif; text-trans
 /* telaio, targa e codici restano in IBM Plex Mono anche con lo stile unico dei campi (22/11/2026) */
 input.input-vin:not([type=checkbox]), input.vin:not([type=checkbox]), input[name=vin]:not([type=checkbox]), input[name=targa]:not([type=checkbox]),
 input[name=codice]:not([type=checkbox]), .na-vin input:not([type=checkbox]) { font-family: var(--mono); letter-spacing: .06em; }
+/* Danno nelle righe (23/11/2026, richiesta dell'utente: "niente doppi colori con due linee attaccate; se c'è un
+   danno solo il pulsante rosso che lampeggia dove è adesso"): la riga tiene solo il colore della fase */
+.riga-stock.con-danno > td:first-child { box-shadow: none; }
+.voce.fase.con-danno { border-left-color: var(--fase); }
+.badge.danno.lampeggia { text-decoration: none; animation: danno-lampeggia 1.4s ease-in-out infinite; }
+@keyframes danno-lampeggia { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .badge.danno.lampeggia { animation: none; } }
+/* Consegne al cliente e pagine del venditore (23/11/2026) */
+.y-ev.p-consegna { background: color-mix(in srgb, var(--st-pronta) 12%, var(--carta)); box-shadow: inset 3px 0 0 var(--st-pronta); }
+.y-ev.p-consegna b { color: var(--st-pronta-pieno, var(--st-pronta)); }
+.y-ev.p-consegna.non-pronta { background: color-mix(in srgb, var(--in-ritardo, #D9480F) 10%, var(--carta)); box-shadow: inset 3px 0 0 var(--in-ritardo, #D9480F); }
+.y-ev.p-consegna.non-pronta b { color: var(--in-ritardo-testo, #B43A0A); }
+.y-ev.p-consegna.fatta { background: var(--riquadro, #EEF0EC); box-shadow: inset 3px 0 0 var(--st-consegnata); opacity: .85; }
+.y-ev.p-consegna.fatta b { color: var(--testo-2); }
+.y-legenda i.p-consegna { background: var(--st-pronta); } .y-legenda i.non-pronta { background: var(--in-ritardo, #D9480F); }
+.y-legenda i.fatta { background: var(--st-consegnata); }
+.cons-riga { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 12px 20px; border-top: 1px solid var(--linea, var(--bordo)); }
+.cons-form { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.cons-form .campo { margin: 0; min-width: 120px; }
+.cons-cambia > summary { list-style: none; } .cons-cambia > summary::-webkit-details-marker { display: none; }
+.cons-cambia[open] { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; width: 100%; }
+.vend-schede { margin: 0 0 12px; display: inline-flex; }
+.vend-cerca { margin: 0 0 16px; } .vend-cerca input { max-width: 520px; }
+.vend-fase { font-weight: 600; }
+.vend-fase.fase-pronta { color: var(--st-pronta-pieno, var(--st-pronta)); }
+.vend-fase.fase-preparazione { color: var(--st-prep-pieno, var(--st-prep)); }
+.vend-fase.fase-lavorazione, .vend-fase.fase-da_ritirare { color: var(--st-lavoro-pieno, var(--st-lavoro)); }
+.vend-azione { text-align: right; white-space: nowrap; }
+.vend-consegna { display: flex; gap: 14px; align-items: baseline; padding: 10px 20px; border-top: 1px solid var(--linea, var(--bordo));
+  color: var(--testo); text-decoration: none; }
+.vend-scheda { margin: 16px 0; }
+.vend-dati { margin: 0; padding: 4px 20px 16px; display: grid; gap: 10px; }
+.vend-dati div { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+.vend-dati dt { font: 700 11px/1.6 "Red Hat Text", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--testo-2); }
+.vend-dati dd { margin: 0; }
+.vend-form { padding: 4px 20px 18px; }
+@media (max-width: 1023px) {
+  .cons-riga { padding: 12px 16px; }
+  .cons-cal .y-cal { grid-template-columns: repeat(6, 72%); }
+  .vend-tab th:nth-child(3), .vend-tab td:nth-child(3) { display: none; }
+}
+
+/* ---- 23/11/2026: Importata e km, etichette nella lista Parco auto ---- */
+.na-nu { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.na-nu button { font-size: var(--fs-17, 17px); gap: 8px; padding: 0 6px; }
+.na-km { margin-top: 10px; }
+.na-km.da-scrivere span { color: var(--segnale); font-weight: 700; }
+.na-km.da-scrivere input { border-color: var(--segnale); box-shadow: 0 0 0 3px var(--segnale-tenue); }
+.na-km.lampeggia { animation: na-km-lampo .5s ease-in-out 2; }
+@keyframes na-km-lampo { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .na-km.lampeggia { animation: none; } }
+.badge.importato { background: #1F4AA8; color: #fff; }
+.carta-auto .badge.importato { background: #fff; color: #1F4AA8; }
+.anagrafica-dati .badge.importato { background: #E6EDFA; color: #1F4AA8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge.importato { background: #9DB7F0; color: var(--notte); } }
+:root[data-theme="dark"] .badge.importato { background: #9DB7F0; color: var(--notte); }
+.condizione.importato { color: #1F4AA8; border-color: #1F4AA8; background: #E6EDFA; }
+.km-auto { display: block; white-space: nowrap; margin-top: 4px; font-size: var(--fs-13); font-weight: 650; color: var(--testo-2); }
+.km-breve { width: 110px; min-height: 36px; padding: 4px 10px; border: 1px solid var(--bordo-forte); border-radius: var(--r-s); font: inherit; }
+/* etichette sotto il nome nella lista: su più righe, mai tagliate ("Comme…"); Commerciale come le altre pillole */
+.cella-auto small.etichette-auto { display: flex; flex-wrap: wrap; gap: 4px; white-space: normal; overflow: visible; margin-top: 3px; }
+.etichette-auto .badge { font-size: 11px; padding: 1px 7px; line-height: 16px; }
+.etichette-auto .badge .icona { width: 12px; height: 12px; }
+.etichette-auto .badge-comm { margin-left: 0; border-radius: var(--r-pillola); padding: 1px 7px; line-height: 16px; vertical-align: 0; }
+.etichette-auto .km-lista { font-size: 11px; font-weight: 650; color: var(--testo-2); line-height: 18px; }
+/* Scheda auto (23/11/2026): una sola barra di azioni sotto "dove si trova", pulsanti della stessa altezza */
+.barra-auto { margin: 0 0 16px; }
+.barra-auto-pulsanti { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.barra-auto-pulsanti > .btn { flex: 1 1 210px; justify-content: center; min-height: 48px; }
+.barra-auto-pulsanti > .barra-auto-simili { flex: none; align-self: center; }
+.barra-auto .btn-predisponi.aperto { background: var(--st-ritiro-pieno); border-color: var(--st-ritiro-pieno); color: #fff; }
+.barra-auto .btn-prepara.aperto { background: var(--prep); border-color: var(--prep); color: #fff; }
+.pannello-azione { margin-top: 10px; }
+.pannello-azione > .scheda { margin: 0; }

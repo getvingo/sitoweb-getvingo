@@ -194,7 +194,9 @@ def aggiungi_colonne():
              # 22/11/2026: posti auto di sedi e piazzali (Home B1)
              ("sede", "posti", "INTEGER"),
              # 22/11/2026: firme facoltative per i test
-             ("organizzazione", "firme_facoltative", "BOOLEAN DEFAULT FALSE")]
+             ("organizzazione", "firme_facoltative", "BOOLEAN DEFAULT FALSE"),
+             # 23/11/2026: chilometri delle auto usate e importate
+             ("veicolo", "km", "INTEGER")]
     for tabella, colonna, tipo in nuove:
         if colonna not in [c["name"] for c in inspect(db.engine).get_columns(tabella)]:
             with db.engine.begin() as conn:

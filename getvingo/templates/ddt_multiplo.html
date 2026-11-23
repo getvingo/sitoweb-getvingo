@@ -9,7 +9,7 @@
 {% if not per_sede %}
 <div class="vuoto">{{ i('auto') }}Non ci sono sedi da cui puoi emettere un DDT.</div>
 {% else %}
-<form method="post" id="form-partenza" data-una-volta>
+<form method="post" id="form-partenza" data-una-volta data-partenza-propria="1">
   {{ csrf_input() }}{{ gps() }}
 
   <h2>1 · Partenza da</h2>
@@ -66,7 +66,7 @@
     {{ campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti,
                        etichetta_conducente="Responsabile dello spostamento") }}
     <p class="tenue piccolo" style="margin:-6px 0 12px">Chi si incarica del trasporto di tutte le auto e firma il DDT, anche se a guidarle sono più persone.</p>
-    {{ firma_dal_vivo('Firma del responsabile dello spostamento', '', timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+    {{ firma_dal_vivo('Firma del responsabile dello spostamento', '', none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   </div>
   <div class="barra-azione">
     <p class="riepilogo" data-riepilogo>scegli prima la destinazione</p>

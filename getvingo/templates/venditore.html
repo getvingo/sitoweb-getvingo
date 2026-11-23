@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, logo_marca, badge_condizione, csrf_input %}
+{% block titolo %}{{ 'Le mie vetture' if vista == 'mie' else 'Libere da vendere' }} · Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{# 23/11/2026, richiesta dell'utente: il venditore vede solo le sue vetture o quelle libere da vendere; niente
+   movimentazioni né gestione dello stock. Per ogni auto: a che punto è e quando sarà pronta, la consegna fissata. #}
+{% macro righe(elenco, libere=False) %}
+<div class="y-scorre"><table class="y-tab vend-tab">
+  <thead><tr><th scope="col">Vettura</th><th scope="col">A che punto è</th><th scope="col">Cliente</th><th scope="col">Consegna</th><th scope="col"></th></tr></thead>
+  <tbody>
+  {% for v in elenco %}
+  <tr data-href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" tabindex="0">
+    <td><div class="y-auto">{{ logo_marca(v.marca, 30) }}<div><b>{{ v.descrizione }}</b>
+      <small class="y-vin"><span class="y-mono">…{{ v.vin[-8:] }}</span>{% if v.versione %} · {{ v.versione }}{% endif %}{% if v.colore %} · {{ v.colore }}{% endif %}</small></div></div></td>
+    <td><span class="vend-fase fase-{{ v.fase }}">{{ quando_pronta(v) }}</span></td>
+    <td>{{ v.cliente_nome or '—' }}</td>
+    <td>{% if v.consegna_prevista_at %}<b>{{ v.consegna_prevista_at|data('%d/%m %H:%M') }}</b><small class="tenue"> · {{ v.consegna_sede.nome if v.consegna_sede }}</small>{% else %}<span class="tenue">da fissare</span>{% endif %}</td>
+    <td class="vend-azione">{% if libere %}
+      <form method="post" action="{{ url_for('main.prendi_vettura', veicolo_id=v.id) }}">{{ csrf_input() }}
+        <input type="hidden" name="torna" value="{{ url_for('main.piazzale', vista='libere') }}">
+        <button class="btn piccolo">{{ i('check', 's') }} È mia</button></form>
+      {% else %}<a class="btn piccolo" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Apri</a>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="y-vuoto">{{ 'Nessuna vettura libera da vendere.' if libere else 'Nessuna vettura a tuo nome: prendi una vettura libera con “È mia”.' }}</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+{% endmacro %}
+
+{% block contenuto %}
+<div class="titolo-pagina"><div>
+  <div class="sopratitolo">{{ g.utente.nome }} · venditore</div>
+  <h1>{{ 'Le mie vetture' if vista == 'mie' else 'Libere da vendere' }}</h1>
+  <p class="descrizione-pagina">{{ 'Le vetture abbinate a te: a che punto sono, quando saranno pronte e quando si consegnano.' if vista == 'mie' else 'Le vetture che nessun venditore ha ancora preso: con “È mia” passano tra le tue.' }}</p>
+</div></div>
+
+<div class="y-segmenti vend-schede" role="group" aria-label="Vetture">
+  <a href="{{ url_for('main.home') }}" aria-pressed="{{ 'true' if vista == 'mie' else 'false' }}">Le mie · {{ mie|length }}</a>
+  <a href="{{ url_for('main.piazzale', vista='libere') }}" aria-pressed="{{ 'true' if vista == 'libere' else 'false' }}">Libere da vendere · {{ libere|length }}</a>
+</div>
+<form class="vend-cerca" method="get" action="{{ url_for('main.home') if vista == 'mie' else url_for('main.piazzale') }}">
+  {% if vista == 'libere' %}<input type="hidden" name="vista" value="libere">{% endif %}
+  <input name="q" value="{{ q }}" placeholder="Cerca: marca, modello, versione, colore, telaio, targa…" aria-label="Cerca">
+</form>
+
+{% if vista == 'mie' %}
+{% if fissate %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Consegne fissate</h2><span>Le prossime consegne ai tuoi clienti</span></div>
+    <a class="btn piccolo" href="{{ url_for('main.consegne') }}">{{ i('bandiera', 's') }} Calendario</a></div>
+  {% for v in fissate %}
+  <a class="vend-consegna" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}"><b class="y-mono">{{ v.consegna_prevista_at|data('%d/%m %H:%M') }}</b>
+    <span>{{ v.descrizione }}{% if v.cliente_nome %} · {{ v.cliente_nome }}{% endif %}</span><small class="tenue">{{ v.consegna_sede.nome if v.consegna_sede }}</small></a>
+  {% endfor %}
+</section>
+{% endif %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Le tue vetture</h2><span>{{ mie|length }} da consegnare</span></div></div>
+  {{ righe(mie) }}
+</section>
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Chi ha fatto cosa</h2><span>Oggi, solo sulle tue vetture</span></div></div>
+  <ol class="y-registro">
+    {% for r in registro %}<li><span class="y-mono">{{ r.at.strftime('%H:%M') }}</span><a href="{{ r.url }}"><b>{{ r.chi }}</b> {{ r.frase }}</a></li>
+    {% else %}<li class="y-vuoto y-una-riga">Ancora niente oggi sulle tue vetture.</li>{% endfor %}
+  </ol>
+</section>
+{% if consegnate %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Consegnate negli ultimi 30 giorni</h2><span>{{ consegnate|length }}</span></div></div>
+  {{ righe(consegnate) }}
+</section>
+{% endif %}
+{% else %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Libere da vendere</h2><span>{{ libere|length }} vetture senza venditore</span></div></div>
+  {{ righe(libere, libere=True) }}
+</section>
+{% endif %}
+{% endblock %}

@@ -109,7 +109,9 @@
 {% macro firma_dal_vivo(titolo, chi='', timbro=none, societa='') %}
 <input type="hidden" name="firma" data-firma-vivo data-titolo="{{ titolo }}" data-chi="{{ chi }}" data-societa="{{ societa }}"
        {% if firme_facoltative() %}data-facoltativa{% endif %}
-       {% if timbro %}data-timbro="{{ timbro }}"{% endif %}>
+       {% if timbro %}data-timbro="{{ timbro }}"{% endif %}
+       {# 23/11/2026: conducente e responsabile firmano su spazio bianco; il timbro sta nel riquadro del mittente #}
+       {% if 'destinatario' not in titolo|lower %}data-bianco{% endif %}>
 {% endmacro %}
 
 {# Timbro della società da solo (22/11/2026): sotto le firme col dito. Immagine ridotta dal telefono (firma.js) #}
@@ -277,7 +279,7 @@
 {% endmacro %}
 
 {# Stato dell'auto in Stock: Nuovo / Usato (al posto di "In sede", che in stock è sempre vero) #}
-{% macro badge_condizione(v) %}{% if v.condizione == 'nuovo' %}<span class="badge nuovo con-icona">{{ i('brilla', 's') }}Nuovo</span>{% elif v.condizione == 'usato' %}<span class="badge usato con-icona">{{ i('contakm', 's') }}Usato</span>{% else %}<span class="badge da-indicare">Nuovo o usato?</span>{% endif %}{% endmacro %}
+{% macro badge_condizione(v) %}{% if v.condizione == 'nuovo' %}<span class="badge nuovo con-icona">{{ i('brilla', 's') }}Nuovo</span>{% elif v.condizione == 'usato' %}<span class="badge usato con-icona">{{ i('contakm', 's') }}Usato</span>{% elif v.condizione == 'importato' %}<span class="badge importato con-icona">{{ i('mondo', 's') }}Importato</span>{% else %}<span class="badge da-indicare">Nuovo, usato o importato?</span>{% endif %}{% endmacro %}
 
 
 {# DDT: prima si apre l'anteprima (da lì si scarica); "Condividi" manda il PDF dal telefono #}

@@ -64,7 +64,7 @@ def calcola(periodo="90"):
         "fase": _conteggio(Counter({V.FASI.get(k, k): n for k, n in fasi.items()})),
         "sede": _conteggio(Counter(v.sede.nome if v.sede else "in viaggio" for v in attive))[:12],
         "marca": _conteggio(Counter(v.marca or "—" for v in attive))[:12],
-        "condizione": _conteggio(Counter({"nuovo": "Nuove", "usato": "Usate"}.get(v.condizione, "Da indicare") for v in attive)),
+        "condizione": _conteggio(Counter({"nuovo": "Nuove", "usato": "Usate", "importato": "Importate"}.get(v.condizione, "Da indicare") for v in attive)),
         "tipologia": _conteggio(Counter("Commerciali" if v.tipologia == "commerciale" else "Vetture" for v in attive)),
         "alimentazione": _conteggio(Counter(v.alimentazione or "Da indicare" for v in attive)),
         "eta": _conteggio(eta, ["meno di 30 giorni", "30–60 giorni", "60–90 giorni", "oltre 90 giorni"]),

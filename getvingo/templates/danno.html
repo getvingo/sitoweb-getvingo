@@ -36,7 +36,7 @@
 
 {% if d.aperto %}
 {{ annulla(annullabile(d.veicolo_id, 'danno', danno_id=d.id), 'Elimina segnalazione (errata)', url_for('main.danni')) }}
-{% if g.utente.interno %}
+{% if g.utente.puo('risolvere_danni') %}
 <h2>Segna come risolto</h2>
 <form method="post" action="{{ url_for('main.risolvi_danno', danno_id=d.id) }}" enctype="multipart/form-data"
       data-foto data-foto-manca="Serve almeno una foto dell'auto riparata.">
@@ -53,6 +53,8 @@
   </div>
   <div class="barra-azione"><button class="btn primario pieno" style="background:var(--ok);border-color:var(--ok)">{{ i('check') }} Danno risolto</button></div>
 </form>
+{% elif g.utente.interno %}
+<p class="avviso info">{{ i('attenzione') }}<span>Il danno lo segna risolto il <b>preparatore</b>, con la foto dell'auto riparata.</span></p>
 {% endif %}
 {% endif %}
 {% endblock %}

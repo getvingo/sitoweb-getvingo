@@ -114,6 +114,8 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
         contatore_tag[0] += 1
         v = Veicolo(vin=vin, marca=marca, modello=modello, versione=versione, colore=colore, sede=sede, stato="in_sede",
                     condizione=condizione, tipologia=tipologia, targa=targa,
+                    # 23/11/2026: usate e importate con i loro km (numeri di prova diversi per auto)
+                    km=(18_400 + 7_350 * (contatore_tag[0] % 9)) if condizione in Veicolo.CON_KM else None,
                     lat=sede.lat + dove[0], lon=sede.lon + dove[1], posizione_at=_indietro(days=20))
         t = nuovo_tag(contatore_tag[0])
         t.veicolo, t.abbinato_at = v, _indietro(days=20)
@@ -155,12 +157,15 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
         prep.creata_at = rientro.arrivo_at
         return prep
 
+    conta_passi = [0]
+
     def passi(prep, quanti, ogni_ore=3):
+        conta_passi[0] += 1  # 23/11/2026: ogni preparazione finisce a un'ora diversa (niente doppioni nel calendario)
         for k in range(quanti):
             servizi.avanza_preparazione(prep, utenti["autista"])
             # mai nel futuro: l'ultimo passo al più 20 minuti fa, gli altri prima (22/11/2026)
             prep.fasi_fatte[-1].at = min(prep.creata_at + timedelta(hours=(k + 1) * ogni_ore),
-                                         adesso() - timedelta(minutes=20 + 40 * (quanti - 1 - k)))
+                                         adesso() - timedelta(minutes=20 + 40 * (quanti - 1 - k) + 13 * conta_passi[0]))
         if prep.completata_at:
             prep.completata_at = prep.fasi_fatte[-1].at
 
@@ -208,7 +213,8 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
                    dove=(-0.00018, 0.00055))
     ducato = auto("ZFA25000002K98765", "Fiat", "Ducato Furgone L2H2", "Bianco", treviso, tipologia="commerciale",
                   dove=(0.00052, 0.00012))
-    sportage = auto("U5YPU81AGRL123987", "Kia", "Sportage HEV", "Verde Experience", treviso, dove=(0.00030, -0.00020))
+    sportage = auto("U5YPU81AGRL123987", "Kia", "Sportage HEV", "Verde Experience", treviso, "importato",
+                    dove=(0.00030, -0.00020))  # 23/11/2026: un'auto d'importazione
     tonale = auto("ZARNAA6V2R7654321", "Alfa Romeo", "Tonale Veloce", "Rosso Alfa", treviso, dove=(-0.00005, -0.00035))
     formentor = auto("VSSZZZKMZRR098765", "Cupra", "Formentor VZ", "Grigio Magnetic", treviso, dove=(0.00015, 0.00030))
 
@@ -265,6 +271,12 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     servizi.imposta_consegna(renegade, utenti["ufficio"], villorba)                          # serve l'ultimo DDT
     pronta_diretta(classe_a, 3)
     servizi.imposta_consegna(classe_a, utenti["ufficio"], treviso)
+    # 23/11/2026: consegne al cliente fissate nel calendario delle consegne
+    from datetime import datetime as _dt, time as _ora
+    classe_a.cliente_nome, classe_a.venditore_id = "Marco Ferri", utenti["venditore"].id
+    classe_a.consegna_prevista_at = _dt.combine(servizi.giorno_lavorativo(1), _ora(10, 0))
+    renegade.cliente_nome, renegade.venditore_id = "Lucia Sartor", utenti["venditore"].id
+    renegade.consegna_prevista_at = _dt.combine(servizi.giorno_lavorativo(2), _ora(15, 30))
     pronta_diretta(troc, 3)                         # già in viaggio con l'ultimo DDT: resta tra le pronte fino alla consegna
     servizi.imposta_consegna(troc, utenti["ufficio"], villorba)
 
@@ -321,7 +333,7 @@ def _popola(treviso, villorba, carrozzeria, officina, detailing, proprio, estern
     danno = servizi.segnala_danno(sportage, utenti["autista"], "Anteriore", "Piccola ammaccatura sul paraurti",
                                   [foto_demo(10)])
     danno.segnalato_at = _indietro(days=5)
-    servizi.risolvi_danno(danno, utenti["ufficio"], "Riparato con levabolli", [foto_demo(11)])
+    servizi.risolvi_danno(danno, utenti["preparatore"], "Riparato con levabolli", [foto_demo(11)])
     if liberi:
         for n in range(5):
             db.session.add(Tag(codice=f"LIBERO{n + 1:02d}"))

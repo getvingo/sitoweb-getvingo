@@ -149,6 +149,7 @@
     var t = campo.dataset.timbro;
     timbroImg.hidden = !t; if (t) timbroImg.src = t;
     foglio.querySelector('[data-f-nota]').textContent = t ? 'Firma sopra il timbro della società.' :
+      campo.hasAttribute('data-bianco') ? 'Firma su spazio bianco: il timbro della società è già nel mittente.' :
       (campo.dataset.societa ? 'Timbro di ' + campo.dataset.societa + ' non ancora caricato: si firma senza.' : '');
     // test (Gestione → Firme facoltative): si può proseguire senza firmare
     foglio.querySelector('[data-f-salta]').hidden = campo.dataset.facoltativa === undefined;

@@ -31,7 +31,7 @@
 </section>
 <form method="post" data-una-volta class="destinazioni">
   {{ csrf_input() }}{{ gps() }}
-  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   {% if preferite %}
   <h3>Le più usate</h3>
   {% for s in preferite %}{{ destinazione(s) }}{% endfor %}
@@ -46,7 +46,7 @@
 {% if v.fase != 'pronta' %}
 <form method="post" data-una-volta class="scheda destinazione-nuova">
   {{ csrf_input() }}
-  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   <h3>{{ i('matita', 's') }} Non è in elenco?</h3>
   <label class="campo"><span>Nome / ragione sociale</span>
     <input name="nuova_destinazione" required minlength="3" maxlength="200" placeholder="Es. Mario Bianchi, Carrozzeria Verdi S.r.l." autocomplete="off"></label>

@@ -293,7 +293,7 @@ def pdf(ddt, invariante=False):
             c.drawString(sx + 17 * mm, ty - i * 4.2 * mm, t)
         c.setFillColor(INCHIOSTRO)
         c.setFont("Helvetica-Bold", 9)
-        c.drawString(sx + 79 * mm, ty, {"nuovo": "Nuovo", "usato": "Usato"}.get(auto.condizione or "", "-"))
+        c.drawString(sx + 79 * mm, ty, {"nuovo": "Nuovo", "usato": "Usato", "importato": "Importato"}.get(auto.condizione or "", "-"))
         _vin(c, sx + 104 * mm, ty, auto.vin, 9.5)
         c.setFillColor(INCHIOSTRO)
         c.setFont("Helvetica-Bold" if auto.targa else "Helvetica", 9.5)
@@ -306,7 +306,7 @@ def pdf(ddt, invariante=False):
     c.setFont("Helvetica", 7.5)
     totale = f"Totale colli: {len(movimenti)}  ·  " if len(movimenti) > 1 else ""
     condizioni = {a.veicolo.condizione for a in movimenti} - {"", None}
-    aspetto = {"nuovo": "nuovo", "usato": "usato"}.get(condizioni.pop(), "nuovo/usato") if len(condizioni) == 1 else "nuovo/usato"
+    aspetto = {"nuovo": "nuovo", "usato": "usato", "importato": "importato"}.get(condizioni.pop(), "nuovo/usato") if len(condizioni) == 1 else "nuovo/usato"
     c.drawString(sx + 3 * mm, y - 4 * mm, f"{totale}Aspetto esteriore dei beni: autoveicolo {aspetto}, "
                                           f"{(m.mezzo or 'in movimento su strada').lower()}")
     y -= 7 * mm + spazio
@@ -341,14 +341,20 @@ def pdf(ddt, invariante=False):
             riga -= 8 * mm
         c.setDash()
     terzi = larg / 3
+    # 23/11/2026, richiesta dell'utente: sotto ogni riquadro chi ha firmato (persona in grassetto) e per quale società.
+    # Mittente = timbro e firma della società (chi ha emesso il DDT); conducente su spazio bianco; destinatario =
+    # chi ha confermato l'arrivo, firmando sopra il timbro della società che riceve.
+    emesso_da = ddt.creato_da.nome if ddt.creato_da else ""
+    ricevuto_da = m.arrivo_utente.nome if m.arrivo_utente and m.arrivo_at else ""
     firme = [
-        ("Firma mittente", ddt.firma_mittente, nome_m, f"{ddt.emesso_at:%d/%m/%Y %H:%M}"),
+        ("Firma mittente", ddt.firma_mittente, emesso_da or nome_m, nome_m if emesso_da else "",
+         f"{ddt.emesso_at:%d/%m/%Y %H:%M}"),
         ("Firma responsabile" if ddt.multiplo else "Firma conducente", m.firma_conducente, m.conducente or "",
-         f"{m.partenza_at:%d/%m/%Y %H:%M}" if m.partenza_at else ""),
-        ("Firma destinatario", m.firma_destinatario, destinatario[0],
-         f"{m.arrivo_at:%d/%m/%Y %H:%M}" if m.arrivo_at else ""),
+         vettore[0] if m.conducente else "", f"{m.partenza_at:%d/%m/%Y %H:%M}" if m.partenza_at else ""),
+        ("Firma destinatario", m.firma_destinatario, ricevuto_da or destinatario[0],
+         destinatario[0] if ricevuto_da else "", f"{m.arrivo_at:%d/%m/%Y %H:%M}" if m.arrivo_at else ""),
     ]
-    for i, (etichetta, dato, chi, quando) in enumerate(firme):
+    for i, (etichetta, dato, chi, societa, quando) in enumerate(firme):
         x = sx + i * terzi + (0 if i == 0 else 2 * mm)
         w = terzi - 2 * mm
         c.setStrokeColor(BORDO)
@@ -361,10 +367,12 @@ def pdf(ddt, invariante=False):
         c.line(x + 3 * mm, fy - 22 * mm, x + w - 3 * mm, fy - 22 * mm)
         c.setFillColor(INCHIOSTRO)
         c.setFont("Helvetica-Bold", 7.5)
-        c.drawString(x + 3 * mm, fy - 25.5 * mm, _righe([chi], "Helvetica-Bold", 7.5, w - 6 * mm)[0] if chi else "")
+        c.drawString(x + 3 * mm, fy - 25.5 * mm,
+                     _righe([("Firmato da " if quando and chi else "") + chi], "Helvetica-Bold", 7.5, w - 6 * mm)[0] if chi else "")
         c.setFillColor(TENUE)
         c.setFont("Helvetica", 7)
-        c.drawString(x + 3 * mm, fy - 28.5 * mm, quando or "In attesa")
+        sotto = " · ".join(p for p in (societa, quando or "In attesa") if p)
+        c.drawString(x + 3 * mm, fy - 28.5 * mm, _righe([sotto], "Helvetica", 7, w - 6 * mm)[0])
 
     fine_pagina()
     c.save()

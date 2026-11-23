@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from flask import g, url_for
 
 from . import servizi
-from .models import Azione, Ddt, Movimento, Preparazione, Sede, Veicolo, adesso
+from .models import Azione, Ddt, Movimento, Preparazione, Sede, Veicolo, adesso, db
 
 GIORNI = ("lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica")
 GIORNI_BREVI = ("lun", "mar", "mer", "gio", "ven", "sab", "dom")
@@ -41,6 +41,8 @@ def attive(sede_id=None):
 def stati_vetture():
     """Barra laterale (ogni pagina da computer): vetture per stato + consegnate oggi e nel mese.
     Conteggi veloci: niente calcolo della fase auto per auto su tutto lo stock."""
+    if g.utente.venditore:
+        return _stati_venditore()
     in_viaggio = Veicolo.query.filter_by(stato="in_viaggio").count()
     # 22/11/2026: gli stessi conteggi delle pagine che si aprono (Lavorazioni, Da ritirare)
     lavorazione = 0
@@ -70,6 +72,22 @@ def stati_vetture():
     return righe
 
 
+def _stati_venditore():
+    """23/11/2026 sera, richiesta dell'utente: per il venditore le vetture per stato contano solo le sue."""
+    io = g.utente.id
+    mie = Veicolo.query.filter(Veicolo.venditore_id == io, Veicolo.stato != "consegnato").all()
+    fasi = [v.fase for v in mie]
+    torna = url_for("main.home")
+    righe = [{"chiave": k, "nome": n, "nota": nota, "n": fasi.count(f), "url": torna} for k, n, nota, f in STATI]
+    righe.append({"chiave": "pronta", "nome": "Pronte", "nota": "pronte per la consegna",
+                  "n": sum(1 for v in mie if v.da_consegnare), "url": torna})
+    inizio_mese = datetime(adesso().year, adesso().month, 1)
+    righe.append({"chiave": "consegnato", "nome": "Consegnate", "nota": "le tue, in questo mese",
+                  "n": Veicolo.query.filter(Veicolo.venditore_id == io, Veicolo.stato == "consegnato",
+                                            Veicolo.consegnato_at >= inizio_mese).count(), "url": torna})
+    return righe
+
+
 # ---------------------------------------------------------------- agenda: movimentazioni e preparazioni
 
 def _attivita(m):
@@ -84,7 +102,7 @@ def _attivita(m):
     if a is not None and a.esterna:
         return "Verso il fornitore"
     if da is not None and a is not None and da.tipo == "propria" and a.tipo == "propria":
-        return "Spostamento"
+        return "Trasferimento interno"
     return "Trasporto"
 
 
@@ -274,8 +292,10 @@ def _frase(a):
 
 def registro_oggi(quante=8):
     dal, _ = _giorno(adesso().date())
-    azioni = (Azione.query.filter(Azione.at >= dal, Azione.ripristinata_at.is_(None))
-              .order_by(Azione.at.desc()).limit(quante).all())
+    q = Azione.query.filter(Azione.at >= dal, Azione.ripristinata_at.is_(None))
+    if g.utente.venditore:  # 23/11/2026 sera: solo le attività sulle sue vetture
+        q = q.filter(Azione.veicolo_id.in_(db.session.query(Veicolo.id).filter(Veicolo.venditore_id == g.utente.id)))
+    azioni = q.order_by(Azione.at.desc()).limit(quante).all()
     return [{"at": a.at, "chi": a.utente.nome if a.utente else "—", "frase": _frase(a),
              "url": url_for("main.veicolo", veicolo_id=a.veicolo_id)} for a in azioni]
 

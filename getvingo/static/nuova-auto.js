@@ -266,6 +266,17 @@
   form.addEventListener('submit', function (e) {
     var chi = e.submitter;
     if (chi && chi.getAttribute('formaction')) return;  // auto già in Getvingo: va dove ha scelto
+    // 23/11/2026: usata o importata senza km → si chiedono i km prima di salvare
+    var km = $('[name=km]');
+    if (chi && (chi.value === 'usato' || chi.value === 'importato') && km && !/\d/.test(km.value) && !mancanti().length) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      setTimeout(function () { delete form.dataset.inviato; });
+      var b = $('[data-km]'); b.classList.add('da-scrivere');
+      b.querySelector('span').innerHTML = 'Scrivi i km dell\'auto ' + (chi.value === 'usato' ? 'usata' : 'importata') + ', poi premi di nuovo';
+      b.scrollIntoView({ behavior: 'smooth', block: 'center' }); km.focus();
+      b.classList.remove('lampeggia'); void b.offsetWidth; b.classList.add('lampeggia');
+      return;
+    }
     if (mancanti().length || !VALIDO.test(campoVin.value.toUpperCase())) {
       e.preventDefault(); e.stopImmediatePropagation();
       setTimeout(function () { delete form.dataset.inviato; });  // "una volta sola": l'invio vero non c'è stato

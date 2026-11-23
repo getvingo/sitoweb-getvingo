@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, logo_marca, csrf_input %}
+{% block titolo %}Consegne · Getvingo{% endblock %}
+{% block larghezza %}largo{% endblock %}
+{# 23/11/2026, richiesta dell'utente: "in consegne serve una sezione con calendario per fissare le consegne al
+   cliente finale". Settimana lunedì–sabato, uno slot di 30 minuti per sede; a sinistra le auto da fissare. #}
+{% set mesi = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'] %}
+{% macro modulo(v, compatto=False) %}
+<form method="post" action="{{ url_for('main.appuntamento_consegna', veicolo_id=v.id) }}" class="cons-form" data-una-volta>
+  {{ csrf_input() }}<input type="hidden" name="torna" value="{{ request.full_path }}">
+  <label class="campo"><span>Giorno</span><input type="date" name="giorno" required min="{{ oggi.isoformat() }}"
+    value="{{ v.consegna_prevista_at.date().isoformat() if v.consegna_prevista_at else '' }}"></label>
+  <label class="campo"><span>Ora</span><select name="ora" required><option value="">—</option>
+    {% for o in orari %}<option value="{{ o.strftime('%H:%M') }}" {{ 'selected' if v.consegna_prevista_at and v.consegna_prevista_at.time() == o }}>{{ o.strftime('%H:%M') }}</option>{% endfor %}</select></label>
+  <label class="campo"><span>Sede</span><select name="sede_id" required>
+    {% for s in sedi %}<option value="{{ s.id }}" {{ 'selected' if s.id == (v.consegna_sede_id or v.sede_id) }}>{{ s.nome }}</option>{% endfor %}</select></label>
+  <button class="btn piccolo primario">{{ i('bandiera', 's') }} {{ 'Sposta' if v.consegna_prevista_at else 'Fissa' }}</button>
+</form>
+{% endmacro %}
+
+{% block contenuto %}
+<div class="titolo-pagina"><div>
+  <h1>Consegne</h1>
+  <p class="descrizione-pagina">{{ 'Il calendario delle consegne al cliente finale: si fissano negli orari d’ufficio, una per sede ogni mezz’ora, dopo che l’auto è pronta.' if modifica else 'Le consegne fissate per i tuoi clienti.' }}</p>
+</div></div>
+
+{% set primo, ultimo = per_giorno[0][0], per_giorno[-1][0] %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Calendario della settimana</h2><span>Lunedì–sabato · ogni consegna con l'ora, il cliente e la sede</span></div>
+    <div class="y-frecce"><a href="{{ url_for('main.consegne', dal=(primo - timedelta(days=7)).isoformat()) }}" aria-label="Settimana precedente">‹</a>
+      <b>{{ primo.day }}{{ ' ' ~ mesi[primo.month - 1] if primo.month != ultimo.month }}–{{ ultimo.day }} {{ mesi[ultimo.month - 1] }}</b>
+      <a href="{{ url_for('main.consegne', dal=(primo + timedelta(days=7)).isoformat()) }}" aria-label="Settimana successiva">›</a></div></div>
+  <div class="y-box-dentro">
+    <div class="y-scorre y-cal-scorre cons-cal"><div class="y-cal">
+      {% for d, auto in per_giorno %}
+      <div class="y-cal-g {{ 'y-oggi-g' if d == oggi }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == oggi else giorni_sett[d.weekday()] }} {{ d.day }}</b><small>{{ auto|length }}</small></div>
+        {% for v in auto %}
+        <a class="y-ev p-consegna{{ ' fatta' if v.stato == 'consegnato' }}{{ ' non-pronta' if v.stato != 'consegnato' and not v.da_consegnare }}" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}#consegna">{{ logo_marca(v.marca, 22) }}
+          <span><b>{{ v.consegna_prevista_at.strftime('%H:%M') }} · {{ 'consegnata' if v.stato == 'consegnato' else ('pronta' if v.da_consegnare else 'non ancora pronta') }}</b><span>{{ v.descrizione }}</span>
+            <small>{{ v.cliente_nome or 'cliente da indicare' }} · {{ v.consegna_sede.nome if v.consegna_sede }}{% if v.venditore %} · {{ v.venditore.nome }}{% endif %}</small></span></a>
+        {% else %}<span class="y-cal-vuoto">Nessuna consegna</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div></div>
+    <div class="y-legenda"><span><i class="p-consegna"></i>Pronta</span><span><i class="non-pronta"></i>Non ancora pronta</span><span><i class="fatta"></i>Consegnata</span></div>
+  </div>
+</section>
+
+{% if modifica %}
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Da fissare · {{ candidati|length }}</h2><span>Auto pronte o in preparazione senza appuntamento: prima le pronte</span></div></div>
+  {% for v in candidati %}
+  <div class="cons-riga">
+    <div class="y-auto">{{ logo_marca(v.marca, 30) }}<div><b>{{ v.descrizione }}</b>
+      <small class="y-vin"><span class="y-mono">…{{ v.vin[-8:] }}</span> · {{ quando_pronta(v) }}{% if v.cliente_nome %} · {{ v.cliente_nome }}{% endif %}{% if v.venditore %} · {{ v.venditore.nome }}{% endif %}</small></div></div>
+    {{ modulo(v) }}
+  </div>
+  {% else %}<p class="y-vuoto">Nessuna auto da fissare.</p>{% endfor %}
+</section>
+{% endif %}
+
+<section class="y-box">
+  <div class="y-box-testa"><div><h2>Prossime consegne · {{ prossime|length }}</h2><span>In ordine di data</span></div></div>
+  {% for v in prossime %}
+  <div class="cons-riga">
+    <div class="y-auto">{{ logo_marca(v.marca, 30) }}<div><b>{{ v.consegna_prevista_at|data('%d/%m %H:%M') }} · {{ v.descrizione }}</b>
+      <small class="y-vin">{{ v.cliente_nome or 'cliente da indicare' }} · {{ v.consegna_sede.nome if v.consegna_sede }} · {{ quando_pronta(v) }}</small></div></div>
+    {% if modifica %}
+    <details class="cons-cambia"><summary class="btn piccolo">Sposta</summary>{{ modulo(v) }}
+      <form method="post" action="{{ url_for('main.appuntamento_consegna', veicolo_id=v.id) }}">{{ csrf_input() }}
+        <input type="hidden" name="torna" value="{{ request.full_path }}"><input type="hidden" name="azione" value="togli">
+        <button class="btn piccolo btn-danno-riga">Togli l'appuntamento</button></form></details>
+    {% endif %}
+  </div>
+  {% else %}<p class="y-vuoto">Nessuna consegna in programma.</p>{% endfor %}
+</section>
+{% endblock %}

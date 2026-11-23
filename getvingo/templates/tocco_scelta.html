@@ -48,7 +48,7 @@
 <form method="post" action="{{ url_for('main.ddt_presa_in_carico', ddt_id=ritiro.ddt.id) }}" class="tocco-fondo" data-una-volta data-gps-obbligatorio {{ 'data-posizione=1' if dopo_tocco }}>
   {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
   <input type="hidden" name="conducente" value="{{ g.utente.nome }}">
-  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+  {{ firma_dal_vivo('Firma del conducente', g.utente.nome, none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
   <p class="avviso errore" data-gps-errore hidden></p>
   {{ scorri('Scorri per prendere in carico e partire', 'magenta', 'Prendi in carico e parti') }}
 </form>
@@ -152,7 +152,7 @@
   <div class="scelte-destinazione">
     {% for s, motivo in proposte %}
     <button type="button" class="scelta-destinazione" data-destinazione="{{ s.id }}" data-nome="{{ s.nome }}" {{ 'data-in-piu hidden' if loop.index > 4 }}
-            data-esterna="{{ 1 if s.esterna else '' }}" data-commercio="{{ 1 if s.tipo in ('concessionario', 'rivenditore') else '' }}">
+            data-esterna="{{ 1 if s.esterna else '' }}" data-commercio="{{ 1 if s.tipo in ('concessionario', 'rivenditore') else '' }}" data-propria="{{ 1 if s.tipo == 'propria' else '' }}">
       <span class="tondo-piccolo">{{ i('chiave' if s.esterna else 'sede', 's') }}</span>
       <span><b>{{ s.nome }}</b><small>{{ s.TIPI[s.tipo] if s.tipo != 'propria' else 'Sede della concessionaria' }}{{ ' · ' ~ s.dove if s.comune }}</small></span>
       <span class="etichetta-dest">{{ motivo }}</span>
@@ -166,7 +166,7 @@
     <form method="post" action="{{ url_for('main.sposta', veicolo_id=v.id) }}" data-una-volta>
       {{ csrf_input() }}<input type="hidden" name="lat"><input type="hidden" name="lon">
       <input type="hidden" name="a_sede_id"><input type="hidden" name="torna" value="{{ url_for('main.tocco_scelta', veicolo_id=v.id) }}">
-      {{ firma_dal_vivo('Firma del conducente', g.utente.nome, timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+      {{ firma_dal_vivo('Firma del conducente', g.utente.nome, none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
       <span class="maniglia" aria-hidden="true"></span>
       <div class="foglio-testa"><h2 id="foglio-titolo">Spostamento</h2><button type="button" class="btn-link" data-chiudi-foglio>✕ Chiudi</button></div>
       {{ tratta(v.sede, none) }}
@@ -216,7 +216,7 @@
           foglio.querySelector('[data-se-esterna]').disabled = !b.dataset.esterna;
           foglio.querySelector('[data-se-commercio]').disabled = !b.dataset.commercio;
           foglio.querySelectorAll('[data-causale]').forEach(function (r) { r.value = b.dataset.destinazione + '|' + r.dataset.causale; r.checked = false; });
-          foglio.querySelector('#foglio-titolo').textContent = b.dataset.esterna ? 'Invio lavorazione' : 'Spostamento';
+          foglio.querySelector('#foglio-titolo').textContent = b.dataset.esterna ? 'Invio lavorazione' : b.dataset.propria ? 'Trasferimento interno' : 'Spostamento';
           if (foglio.showModal) foglio.showModal(); else foglio.setAttribute('open', '');
           if (document.activeElement) document.activeElement.blur();
         });

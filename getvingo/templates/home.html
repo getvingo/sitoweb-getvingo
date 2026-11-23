@@ -23,6 +23,24 @@
   {% else %}
   <p class="y-tel-vuoto">Niente da fare per te adesso. Tocca l'adesivo di un'auto per vedere cosa c'è da fare.</p>
   {% endfor %}
+  {# 23/11/2026: calendario dal telefono, da oggi ai 6 giorni dopo (scorre di lato) #}
+  <section class="y-box cal-partner cal-tel">
+    <div class="y-box-testa"><div><h2>Calendario</h2><span>{{ {('preparazione',): 'Preparazioni', ('preparazione', 'lavorazione'): 'Lavorazioni e preparazioni'}.get(tipi_tel, 'Lavorazioni, preparazioni e consegne') }} · da oggi ai prossimi 6 giorni</span></div></div>
+    <div class="y-box-dentro">
+      <div class="y-scorre y-cal-scorre"><div class="y-cal">
+        {% for d, ev in calendario_tel %}
+        <div class="y-cal-g {{ 'y-oggi-g' if d == ora.date() }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == ora.date() else giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
+          {% for e in ev %}
+          <a class="y-ev {{ 'p-consegna' if e.tipo == 'consegna' else e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
+            <span><b>{{ {'lavorazione': 'Fine lavorazione', 'preparazione': 'Pronta alla consegna', 'consegna': 'Consegna al cliente'}[e.tipo] }}{{ ' · in ritardo' if e.stato == 'ritardo' }}</b><span>{{ e.v.descrizione }}</span>
+              <small>{% if e.tipo == 'consegna' %}{{ e.cosa }}{% elif e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
+          {% else %}<span class="y-cal-vuoto">Niente in programma</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div></div>
+      <div class="y-legenda">{% if 'lavorazione' in tipi_tel %}<span><i class="forn"></i>Fine lavorazione</span>{% endif %}<span><i class="prep"></i>Pronta alla consegna</span>{% if 'consegna' in tipi_tel %}<span><i class="p-consegna"></i>Consegna al cliente</span>{% endif %}</div>
+    </div>
+  </section>
 </section>
 
 {# ======================= COMPUTER: HOME DEI GESTORI ======================= #}
@@ -100,14 +118,14 @@
         {% for d, ev in calendario %}
         <div class="y-cal-g {{ 'y-oggi-g' if d == ora.date() }}"><div class="y-cal-t"><b>{{ 'Oggi' if d == ora.date() else giorni_brevi[d.weekday()] }} {{ d.day }}</b><small>{{ ev|length }}</small></div>
           {% for e in ev %}
-          <a class="y-ev {{ e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
-            <span><b>{{ 'Fine lavorazione' if e.tipo == 'lavorazione' else 'Vettura pronta alla consegna' }}{{ ' · in ritardo' if e.stato == 'ritardo' }}</b><span>{{ e.v.descrizione }}</span>
-              <small>{% if e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
+          <a class="y-ev {{ 'p-consegna' if e.tipo == 'consegna' else e.tipo }}{{ ' ritardo' if e.stato == 'ritardo' }}" href="{{ e.url }}">{{ logo_marca(e.v.marca, 22) }}
+            <span><b>{{ {'lavorazione': 'Fine lavorazione', 'preparazione': 'Vettura pronta alla consegna', 'consegna': 'Consegna al cliente'}[e.tipo] }}{{ ' · in ritardo' if e.stato == 'ritardo' }}</b><span>{{ e.v.descrizione }}</span>
+              <small>{% if e.tipo == 'consegna' %}{{ e.cosa }}{% elif e.tipo == 'lavorazione' %}{{ e.cosa.split(' · ')[1] if ' · ' in e.cosa else e.cosa }}{% else %}{{ e.v.preparazione_attiva.prossima_fase|lower if e.v.preparazione_attiva else 'pronta' }}{% endif %} · {{ e.ora }}</small></span></a>
           {% else %}<span class="y-cal-vuoto">Niente in scadenza</span>{% endfor %}
         </div>
         {% endfor %}
       </div></div>
-      <div class="y-legenda"><span><i class="forn"></i>Fine lavorazione = la vettura sarà pronta dal fornitore</span><span><i class="prep"></i>Vettura pronta alla consegna = finita la preparazione in sede</span></div>
+      <div class="y-legenda"><span><i class="forn"></i>Fine lavorazione = la vettura sarà pronta dal fornitore</span><span><i class="prep"></i>Vettura pronta alla consegna = finita la preparazione in sede</span>{% if g.utente.puo('fissare_consegne') %}<span><i class="p-consegna"></i>Consegna al cliente = appuntamento fissato in Consegne</span>{% endif %}</div>
     </div>
   </section>
 

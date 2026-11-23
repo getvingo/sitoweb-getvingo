@@ -6,7 +6,7 @@
 {# Nuova auto a passi (22/11/2026, proposta approvata dall'utente dal prototipo output/demo-nuova-auto-v1.html,
    analisi in knowledge/analisi-ux-nuova-auto-v1.txt). Un solo modulo, stessi campi e stessi controlli del server;
    cambia solo cosa si vede: VIN (foto, lettura, "È giusto?" o a mano) → Dati (solo i mancanti, a pulsanti) →
-   Nuova / Usata. VIN già in stock con un adesivo: Vedi i dati · Crea DDT · Metti in preparazione. #}
+   Nuova / Usata / Importata (km per usate e importate). VIN già in stock con un adesivo: Vedi i dati · Crea DDT · Metti in preparazione. #}
 {% set ANNO = adesso().year %}
 <form method="post" class="na" id="na" novalidate data-una-volta
       data-passo="vin" data-ha-vin="{{ '1' if form.get('vin') }}" data-sede-posizione="{{ '1' if sede_da_posizione }}"
@@ -194,11 +194,15 @@
         <input name="targa" value="{{ form.get('targa', '') }}" maxlength="12" autocapitalize="characters" class="vin" placeholder="Es. GH123AB"></label>
     </div>
 
+    {# 23/11/2026: usate e importate hanno i km (obbligatori, controllati anche dal server) #}
+    <label class="campo na-km" data-km><span>Km <span class="tenue">· per usate e importate</span></span>
+      <input name="km" value="{{ form.get('km', '') }}" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="Es. 45.300"></label>
     <div class="na-azioni na-salva">
       <button type="button" class="na-manca-ancora" data-manca-ancora hidden>{{ i('attenzione', 's') }} <span></span></button>
       <div class="na-nu">
         <button type="submit" name="condizione" value="nuovo" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('brilla') }} Nuova</button>
         <button type="submit" name="condizione" value="usato" class="usata" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('contakm') }} Usata</button>
+        <button type="submit" name="condizione" value="importato" class="usata" {{ 'disabled' if not tag and not tag_liberi }}>{{ i('mondo') }} Importata</button>
       </div>
     </div>
   </section>

@@ -13,19 +13,53 @@
   {{ carta_auto(v, modificabile=g.utente.puo('modificare_auto')) }}
   {{ info_auto(v) }}
 </div>
-<div class="azioni" style="margin:0 0 16px;align-items:center">
+{% set puo_preparare = g.utente.interno and puo_emettere and v.fase == 'in_sede' and v.sede and v.sede.tipo == 'propria' %}
+{# 23/11/2026, richiesta dell'utente ("sistema la disposizione dei pulsanti"): tutte le azioni in una sola barra sotto
+   la striscia "dove si trova", stessa altezza, una accanto all'altra (Predisponi DDT · Metti in preparazione ·
+   Segnala danno); il modulo scelto si apre sotto la barra a tutta larghezza. Prima erano sparse fra le due colonne. #}
+{% set con_emissione = puo_emettere and not predisposto %}
+{% set btn_danno = v.stato not in ('consegnato', 'in_viaggio') %}
   {% if g.utente.interno and not v.condizione %}
-  <form method="post" action="{{ url_for('main.modifica_dati_auto', veicolo_id=v.id) }}" class="azioni condizione-mancante" data-una-volta>
+  <form method="post" action="{{ url_for('main.modifica_dati_auto', veicolo_id=v.id) }}" class="azioni condizione-mancante" style="margin:0 0 12px" data-una-volta>
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <span class="piccolo" style="font-weight:650">Nuova o usata? <span class="tenue" style="font-weight:500">(si indica una volta sola)</span></span>
+    <span class="piccolo" style="font-weight:650">Nuova, usata o importata? <span class="tenue" style="font-weight:500">(si indica una volta sola; km per usate e importate)</span></span>
+    <input name="km" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="Km" aria-label="Km" class="km-breve">
     <button class="btn piccolo" name="condizione" value="nuovo">Nuova</button>
     <button class="btn piccolo" name="condizione" value="usato">Usata</button>
+    <button class="btn piccolo" name="condizione" value="importato">Importata</button>
   </form>
   {% endif %}
-  {% if g.utente.interno and simili %}<a class="chip" href="{{ url_for('main.cerca', marca=v.marca, modello=v.modello) }}">{{ i('simili') }} {{ simili }} {{ 'simile' if simili == 1 else 'simili' }}</a>{% endif %}
-</div>
+<section class="barra-auto" aria-label="Azioni sull'auto">
+  <div class="barra-auto-pulsanti">
+    {% if con_emissione and v.sede and v.sede.esterna and not g.utente.interno %}<a class="btn primario" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>{% endif %}
+    {% if con_emissione and puo_predisporre %}<button type="button" class="btn btn-predisponi" data-pannello="predisponi" aria-expanded="false" aria-controls="predisponi">{{ i('orologio') }} Predisponi DDT da ritirare</button>{% endif %}
+    {% if con_emissione and puo_preparare %}<button type="button" class="btn btn-prepara" data-pannello="prepara" aria-expanded="false" aria-controls="prepara">{{ i('brilla') }} Metti in preparazione</button>{% endif %}
+    {% if btn_danno %}<a class="btn btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}">{{ i('attenzione') }} Segnala danno</a>{% endif %}
+    {% if g.utente.interno and simili %}<a class="chip barra-auto-simili" href="{{ url_for('main.cerca', marca=v.marca, modello=v.modello) }}">{{ i('simili') }} {{ simili }} {{ 'simile' if simili == 1 else 'simili' }}</a>{% endif %}
+  </div>
+  {% if con_emissione and puo_predisporre %}
+  <div class="pannello-azione" id="predisponi" hidden>
+    <form method="post" action="{{ url_for('main.partenza', veicolo_id=v.id) }}" class="scheda" data-una-volta {{ 'data-partenza-propria=1' if v.sede and v.sede.tipo == 'propria' }}>
+      {{ csrf_input() }}{{ gps() }}
+      <p class="tenue piccolo" style="margin-top:0">Si predispone da ovunque: il DDT nasce subito con il suo numero. La persona incaricata, vicino all'auto, tocca l'adesivo, lo prende in carico, firma e parte.</p>
+      {{ campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti, assegnabili=assegnabili) }}
+      <label class="campo"><span>Da ritirare entro</span>
+        <select name="ore_ritiro">{% for o in ore_ritiro %}<option value="{{ o }}" {{ 'selected' if o == 24 }}>{{ o }} ore</option>{% endfor %}</select></label>
+      <button type="submit" name="azione" value="predisponi" formnovalidate class="btn primario pieno">{{ i('orologio') }} Predisponi DDT</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if con_emissione and puo_preparare %}
+  <div class="pannello-azione" id="prepara" hidden>
+    <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="scheda">
+      {{ csrf_input() }}
+      {{ scelta_orario_prep(slot_prep, slot_auto) }}
+      <button class="btn primario pieno">{{ i('brilla') }} Metti in preparazione</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
 
-{% set puo_preparare = g.utente.interno and puo_emettere and v.fase == 'in_sede' and v.sede and v.sede.tipo == 'propria' %}
 <div class="scheda-colonna">
 <div class="col-principale">
 {% for d in v.danni_aperti %}{{ scheda_danno(d, url_for('main.veicolo', veicolo_id=v.id), mostra_auto=False) }}<div style="height:12px"></div>{% endfor %}
@@ -177,7 +211,7 @@
   <form method="post" action="{{ url_for('main.partenza', veicolo_id=v.id) }}" data-una-volta style="margin-top:14px">
     {{ csrf_input() }}{{ gps() }}
     <input type="hidden" name="a_sede_id" value="{{ v.consegna_sede_id }}">
-    <input type="hidden" name="causale" value="Spostamento">
+    <input type="hidden" name="causale" value="Trasferimento interno">
     <input type="hidden" name="lavorazione" value="Nessuna (solo trasferimento)">
     <p class="avviso info" style="font-weight:500;margin-bottom:12px">{{ i('doc') }}<span><b>Ultimo DDT:</b> porta l'auto da {{ v.sede.nome }} a {{ v.consegna_sede.nome }}. All'arrivo potrai segnarla consegnata.</span></p>
     <div class="griglia-2">
@@ -186,7 +220,7 @@
       <label class="campo"><span>Vettore</span><select name="vettore_id" required>{% for vt in vettori %}<option value="{{ vt.id }}" {{ 'selected' if valori.vettore_id == vt.id }}>{{ vt.nome }}</option>{% endfor %}</select></label>
     </div>
     <label class="campo"><span>Modalità di trasporto</span><select name="mezzo" required><option value="">Come viaggia l'auto…</option>{% for m in MEZZI_TRASPORTO %}<option>{{ m }}</option>{% endfor %}</select></label>
-    {{ firma_dal_vivo('Firma del conducente', '', timbro_di(g.utente), (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
+    {{ firma_dal_vivo('Firma del conducente', '', none, (g.utente.sede.nome if g.utente.sede else g.utente.organizzazione.nome)) }}
     <button type="submit" name="azione" value="parti" class="btn primario pieno">{{ i('doc') }} Emetti l'ultimo DDT e parti</button>
   </form>
   {% elif nella_sede and not v.targa %}
@@ -229,37 +263,7 @@
 </div>
 {% endif %}
 
-{# ---- Emissione: solo dall'account del luogo in cui si trova l'auto ---- #}
-{% elif puo_emettere %}
-<section class="azioni-auto {{ 'con-prepara' if puo_preparare else 'senza-prepara' }}">
-  {# 13/11/2026: da computer niente "Inizia spostamento" (si parte toccando l'adesivo): Predisponi e Metti in
-     preparazione affiancati; aperto, il modulo del DDT prende tutta la riga sotto i due pulsanti #}
-  {% if v.sede and v.sede.esterna and not g.utente.interno %}<a class="btn primario pieno" href="{{ url_for('main.sposta', veicolo_id=v.id) }}">{{ i('ritiro') }} Crea DDT di rientro</a>{% endif %}
-  {% if puo_predisporre %}
-  <details class="predisponi" id="predisponi">
-    <summary class="btn pieno btn-predisponi">{{ i('orologio') }} Predisponi DDT da ritirare</summary>
-    <form method="post" action="{{ url_for('main.partenza', veicolo_id=v.id) }}" class="scheda" data-una-volta>
-      {{ csrf_input() }}{{ gps() }}
-      <p class="tenue piccolo" style="margin-top:0">Si predispone da ovunque: il DDT nasce subito con il suo numero. La persona incaricata, vicino all'auto, tocca l'adesivo, lo prende in carico, firma e parte.</p>
-      {{ campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti, assegnabili=assegnabili) }}
-      <label class="campo"><span>Da ritirare entro</span>
-        <select name="ore_ritiro">{% for o in ore_ritiro %}<option value="{{ o }}" {{ 'selected' if o == 24 }}>{{ o }} ore</option>{% endfor %}</select></label>
-      <button type="submit" name="azione" value="predisponi" formnovalidate class="btn primario pieno">{{ i('orologio') }} Predisponi DDT</button>
-    </form>
-  </details>
-  {% endif %}
-  {% if puo_preparare %}
-  <details class="azione-prepara">
-    <summary class="btn pieno btn-prepara">{{ i('brilla') }} Metti in preparazione</summary>
-    <form method="post" action="{{ url_for('main.avvia_preparazione', veicolo_id=v.id) }}" data-una-volta class="scheda">
-      {{ csrf_input() }}
-      {{ scelta_orario_prep(slot_prep, slot_auto) }}
-      <button class="btn primario pieno">{{ i('brilla') }} Metti in preparazione</button>
-    </form>
-  </details>
-  {% endif %}
-</section>
-
+{# ---- Emissione: i pulsanti stanno nella barra in alto (23/11/2026) ---- #}
 {% elif mov %}
 <a class="voce" href="{{ url_for('main.arrivo_da_tap', ddt_id=mov.ddt.id) }}">
   <span class="tondo in_viaggio">{{ i('camion') }}</span>
@@ -340,9 +344,6 @@
 {% endif %}
 
 
-{% if v.stato not in ('consegnato', 'in_viaggio') %}
-<a class="btn pieno btn-danno" href="{{ url_for('main.nuovo_danno', veicolo_id=v.id) }}" style="margin-top:14px">{{ i('attenzione') }} Segnala danno</a>
-{% endif %}
 
 {# 22/11/2026: trasferimento a un altro dealer Getvingo sotto Segnala danno. Il dealer si cerca per nome (solo quelli
    configurati in Getvingo); l'auto si toglie dallo stock solo dopo il DDT in uscita verso di lui (servizi.ddt_uscita_dealer) #}
@@ -422,7 +423,18 @@
     });
   })();
   // arrivati da "Predisponi il DDT di rientro" (Lavorazioni): il modulo si apre da solo
-  if (location.hash === '#predisponi') { var p = document.getElementById('predisponi'); if (p) { p.open = true; p.scrollIntoView({ block: 'start' }); } }
+  // barra delle azioni (23/11/2026): un pulsante apre il suo modulo sotto la barra, un altro tocco lo chiude
+  document.querySelectorAll('[data-pannello]').forEach(function (b) {
+    b.addEventListener('click', function () { apriPannello(b.dataset.pannello); });
+  });
+  function apriPannello(id, scorri) {
+    document.querySelectorAll('[data-pannello]').forEach(function (b) {
+      var p = document.getElementById(b.dataset.pannello), apri = b.dataset.pannello === id && p.hidden;
+      p.hidden = !apri; b.setAttribute('aria-expanded', String(apri)); b.classList.toggle('aperto', apri);
+      if (apri && scorri) p.scrollIntoView({ block: 'start' });
+    });
+  }
+  if (location.hash === '#predisponi' && document.getElementById('predisponi')) apriPannello('predisponi', true);
 </script>
 {% if v.lat is not none and v.stato != 'consegnato' %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>

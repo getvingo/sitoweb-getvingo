@@ -14,11 +14,15 @@
       <input name="vin" id="vin" value="{{ form.get('vin', '') }}" maxlength="17" minlength="17" pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}" title="17 caratteri: lettere e numeri, senza I, O e Q" required
              autocapitalize="characters" autocomplete="off" spellcheck="false" class="input-vin">
     </label>
-    <span class="etichetta-campo">Nuova o usata</span>
-    <div class="scelta-tipo" role="radiogroup" aria-label="Nuova o usata">
+    <span class="etichetta-campo">Nuova, usata o importata</span>
+    <div class="scelta-tipo" role="radiogroup" aria-label="Nuova, usata o importata">
       <label><input type="radio" name="condizione" value="nuovo" required {{ 'checked' if form.get('condizione') == 'nuovo' }}> {{ i('brilla', 's') }} Nuova</label>
-      <label><input type="radio" name="condizione" value="usato" {{ 'checked' if form.get('condizione') == 'usato' }}> {{ i('orologio', 's') }} Usata</label>
+      <label><input type="radio" name="condizione" value="usato" {{ 'checked' if form.get('condizione') == 'usato' }}> {{ i('contakm', 's') }} Usata</label>
+      <label><input type="radio" name="condizione" value="importato" {{ 'checked' if form.get('condizione') == 'importato' }}> {{ i('mondo', 's') }} Importata</label>
     </div>
+    {# 23/11/2026: km obbligatori per usate e importate #}
+    <label class="campo" data-km-modifica {{ 'hidden' if form.get('condizione') not in ('usato', 'importato') }}><span>Km</span>
+      <input name="km" value="{{ form.get('km', '') }}" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="Es. 45.300"></label>
     <span class="etichetta-campo">Tipo di veicolo</span>
     <div class="scelta-tipo" role="radiogroup" aria-label="Tipologia">
       <label><input type="radio" name="tipologia" value="vettura" {{ 'checked' if form.get('tipologia', 'vettura') == 'vettura' }}> Vettura</label>
@@ -101,4 +105,13 @@
   })();
 </script>
 {% endif %}
+<script>
+  // km solo per usate e importate (23/11/2026)
+  (function () {
+    var km = document.querySelector('[data-km-modifica]'); if (!km) return;
+    document.querySelectorAll('input[name=condizione]').forEach(function (r) {
+      r.addEventListener('change', function () { km.hidden = !(r.checked && r.value !== 'nuovo'); if (!km.hidden) km.querySelector('input').focus(); });
+    });
+  })();
+</script>
 {% endblock %}

@@ -59,6 +59,7 @@
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
 <symbol id="i-piu" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5M11 8v6M8 11h6"/></symbol>
+<symbol id="i-mondo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></symbol>
 <symbol id="i-sole" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></symbol>
 <symbol id="i-barre" viewBox="0 0 24 24"><path d="M4 5v14M7 5v14M10 5v14M14 5v14M16 5v14M20 5v14"/></symbol>
 <symbol id="i-auto" viewBox="0 0 24 24"><path d="M5 16V11l2-5h10l2 5v5M3 16h18v3h-3v-1H6v1H3z"/><circle cx="7.5" cy="13" r="1"/><circle cx="16.5" cy="13" r="1"/></symbol>
@@ -66,7 +67,7 @@
 
 {% set ep = request.endpoint or '' %}
 {# Pagine che dal telefono non servono (12/11/2026 sera): il quadro completo si guarda dal computer #}
-{% set solo_pc = g.utente and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
+{% set solo_pc = g.utente and not g.utente.venditore and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
                   'main.analisi', 'main.nuova_auto', 'main.modifica_auto', 'main.cerca_avanzata', 'main.trasferisci_veicolo')
                   or (ep.startswith('admin.') and ep not in ('admin.utenti', 'admin.aziende', 'admin.gruppo_concessionaria',
                                                             'admin.gruppo_fornitore', 'admin.utente', 'admin.prepara_adesivi'))
@@ -77,13 +78,21 @@
 <aside class="barra-laterale" aria-label="Menu principale">
   <a class="bl-marchio" href="{{ url_for('main.home') }}"><img src="{{ url_for('static', filename='logo-negativo.svg') }}" alt="getvingo"></a>
   <nav class="bl-menu">
-    {% if g.utente.interno %}
+    {% if g.utente.venditore %}
+    {# 23/11/2026: il venditore vede le sue vetture, quelle libere e le sue consegne #}
+    <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home') }}<span>Le mie vetture</span></a>
+    <a href="{{ url_for('main.piazzale', vista='libere') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto') }}<span>Libere da vendere</span></a>
+    <a href="{{ url_for('main.consegne') }}" class="{{ 'attivo' if ep == 'main.consegne' }}">{{ i('bandiera') }}<span>Consegne</span></a>
+    {# 23/11/2026 sera: i DDT delle sue auto vendute e delle movimentazioni fatte da lui #}
+    <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
+    {% elif g.utente.interno %}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home') }}<span>Home</span></a>
-    <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo', 'main.nuova_auto', 'main.modifica_auto') }}">{{ i('auto') }}<span>Vetture</span></a>
+    <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo', 'main.nuova_auto', 'main.modifica_auto') }}">{{ i('auto') }}<span>Parco auto</span></a>
     <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
     <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla') }}<span>Preparazioni</span></a>
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
     <a href="{{ url_for('main.danni') }}" class="{{ 'attivo' if ep in ('main.danni', 'main.nuovo_danno', 'main.danno') }}">{{ i('attenzione') }}<span>Danni</span>{% if danni_aperti_n %}<span class="nav-conta" aria-label="{{ danni_aperti_n }} da verificare">{{ danni_aperti_n }}</span>{% endif %}</a>
+    {% if g.utente.puo('fissare_consegne') %}<a href="{{ url_for('main.consegne') }}" class="{{ 'attivo' if ep == 'main.consegne' }}">{{ i('bandiera') }}<span>Consegne</span></a>{% endif %}
     {% if g.utente.puo('statistiche') %}<span class="bl-linea" role="separator"></span>
     <a href="{{ url_for('main.analisi') }}" class="{{ 'attivo' if ep == 'main.analisi' }}">{{ i('cronometro') }}<span>Statistiche</span></a>{% endif %}
     {% else %}
@@ -118,7 +127,7 @@
     <nav class="nav-alto">
       <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home', 's') }} {{ 'Home' if g.utente.interno else 'Lavorazioni' }}</a>
       {% if g.utente.interno %}
-      <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto', 's') }} Stock</a>
+      <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto', 's') }} Parco auto</a>
       <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave', 's') }} Lavorazioni</a>
       <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla', 's') }} Preparazione</a>
       {% endif %}
@@ -207,9 +216,10 @@
 {% if g.utente %}
 {# Dal telefono tre voci (13/11/2026): Home, Cerca, i tuoi DDT; tutto il resto si fa toccando l'adesivo dell'auto #}
 {% if g.utente.interno %}
-<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat(3, 1fr)">
+<nav class="nav-basso" aria-label="Navigazione" style="grid-template-columns:repeat({{ 4 if g.utente.venditore else 3 }}, 1fr)">
   <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home') }}Home</a>
   <a href="{{ url_for('main.cerca') }}" class="{{ 'attivo' if ep in ('main.cerca', 'main.veicolo', 'main.trova') }}">{{ i('cerca') }}Cerca</a>
+  {% if g.utente.venditore %}<a href="{{ url_for('main.consegne') }}" class="{{ 'attivo' if ep == 'main.consegne' }}">{{ i('bandiera') }}Consegne</a>{% endif %}
   <a href="{{ url_for('main.miei_ddt') }}" class="{{ 'attivo' if ep in ('main.miei_ddt', 'main.ddt_dettaglio') }}">{{ i('doc') }}DDT</a>
 </nav>
 {% endif %}

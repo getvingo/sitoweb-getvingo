@@ -3,7 +3,7 @@ import re
 from collections import Counter
 import time
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as ora_del_giorno, timedelta
 from functools import wraps
 from itertools import groupby
 
@@ -29,6 +29,26 @@ bp = Blueprint("main", __name__)
 
 ORE_RITIRO = [4, 8, 24, 48, 72]
 GIORNI_SETTIMANA = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+
+
+# 23/11/2026, richiesta dell'utente: il venditore "non deve vedere le cose di tutti e le cose legate alla gestione
+# delle movimentazioni e dello stock". Pagine e comandi che non gli servono: rispondono "non disponibile".
+PAGINE_NON_VENDITORE = {
+    "lavorazioni", "lavorazione_completata", "prepara_rientro", "stima_lavorazione", "sollecito", "preparazione",
+    "avvia_preparazione", "elimina_preparazione", "scadenza_preparazione", "sede_consegna", "consegna",
+    "calendario_completo", "tocco_passo", "sposta", "profilo_guida", "arrivo_da_tap", "abbina", "nuova_auto",
+    "modifica_auto", "abbina_esistente", "partenza", "riposiziona", "ddt_multiplo",
+    "ddt_multiplo_raccolta", "api_ddt_multiplo", "ddt_modifica", "ddt_presa_in_carico", "ddt_rinnova", "ddt_arrivo",
+    "ddt_lavorazione", "ddt_lavorazione_completata", "ddt_annulla", "danni", "risolvi_danno",
+    "stato_vetture", "analisi", "trasferisci_veicolo", "elimina_veicolo", "assistente_ddt", "demo_tocco"}
+
+
+@bp.before_request
+def _limiti_del_venditore():
+    u = g.get("utente")
+    if u is not None and u.ruolo == "venditore" and (request.endpoint or "").split(".")[-1] in PAGINE_NON_VENDITORE:
+        abort(403, "Il venditore vede le sue vetture e quelle libere da vendere; movimentazioni, DDT, lavorazioni "
+                   "e preparazioni le gestiscono le altre mansioni.")
 
 
 def serve_permesso(azione, motivo):
@@ -288,6 +308,14 @@ def _eventi_calendario(dal, al, tipi=("preparazione", "lavorazione")):
                 aggiungi(m.lavorazione_completata_at.date(), m.lavorazione_completata_at, "lavorazione", "anticipo", m.veicolo,
                          f"{m.sede_arrivo_effettiva.nome} · finita in anticipo (prevista {m.lavorazione_prevista_at:%d/%m %H:%M})",
                          "finita", url_for("main.veicolo", veicolo_id=m.veicolo_id))
+    if "consegna" in tipi:  # 23/11/2026: appuntamenti di consegna al cliente finale
+        for v in Veicolo.query.filter(Veicolo.consegna_prevista_at.isnot(None), Veicolo.stato != "consegnato"):
+            q = v.consegna_prevista_at
+            rit = q < ora
+            aggiungi(max(q.date(), oggi) if rit else q.date(), q, "consegna", "ritardo" if rit else "previsto", v,
+                     (v.cliente_nome or "cliente da indicare") + (f" · {v.consegna_sede.nome}" if v.consegna_sede else "")
+                     + ("" if v.da_consegnare else " · non ancora pronta"),
+                     q.strftime("%H:%M"), url_for("main.veicolo", veicolo_id=v.id) + "#consegna")
     ordine = {"ritardo": 0, "anticipo": 1, "previsto": 2}
     out.sort(key=lambda e: (e["data"], ordine[e["stato"]], e["tipo"] != "preparazione", e["at"]))
     return out
@@ -457,6 +485,8 @@ def _da_fare_home(gruppi, attivi):
 def home():
     if not g.utente.interno:
         return _home_fornitore()
+    if g.utente.venditore:  # 23/11/2026: le sue vetture, le libere da vendere, le sue consegne
+        return _pagina_venditore("mie")
     # 22/11/2026: Home "Getvingo Yard" B1 (getvingo-dashboard-B1-specifiche.md): da computer la giornata in tre
     # numeri, stock per marca, agenda, calendario, piazzali, registro, fornitori; dal telefono solo "Da fare per te"
     from . import dashboard
@@ -476,8 +506,17 @@ def home():
         # sabato e domenica scorrendo di lato
         cal_dal = oggi - timedelta(days=oggi.weekday()) if oggi.weekday() < 5 else oggi + timedelta(days=7 - oggi.weekday())
     cal_giorni = [cal_dal + timedelta(days=k) for k in range(7)]
-    eventi = _eventi_calendario(cal_giorni[0], cal_giorni[-1])
+    tipi_cal = ("preparazione", "lavorazione") + (("consegna",) if g.utente.puo("fissare_consegne") else ())
+    eventi = _eventi_calendario(cal_giorni[0], cal_giorni[-1], tipi_cal)
     calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
+    # 23/11/2026, richiesta dell'utente: dal telefono il calendario di lavorazioni e preparazioni per chi ne ha
+    # diritto, e per Consegne (e chi fissa le consegne) anche le consegne fissate. Da oggi ai 6 giorni dopo.
+    ruolo = g.utente.ruolo
+    tipi_tel = (("preparazione",) if ruolo == "preparatore" else ("preparazione", "lavorazione")) + \
+        (("consegna",) if g.utente.puo("fissare_consegne") else ())
+    giorni_tel = [oggi + timedelta(days=k) for k in range(7)]
+    eventi_tel = _eventi_calendario(giorni_tel[0], giorni_tel[-1], tipi_tel)
+    calendario_tel = [(d, [e for e in eventi_tel if e["data"] == d]) for d in giorni_tel]
     marche, n_marche = dashboard.stock_per_marca(attivi)
     # 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario come nella Home di prima (avviso danni,
     # Pronte oggi, Da fare per urgenza con il pulsante), sotto i dati della dashboard B1
@@ -505,7 +544,7 @@ def home():
         periodo=periodo, agenda=agende[periodo], conta_agenda={k: len(v) for k, v in agende.items()}, solo_mie=solo_mie,
         calendario=calendario, cal_dal=cal_dal, giorni_brevi=dashboard.GIORNI_BREVI, mesi=dashboard.MESI,
         piazzali=dashboard.piazzali(attivi), registro=dashboard.registro_oggi(), fornitori=dashboard.fornitori_30(),
-        compiti=dashboard.compiti_telefono(), timedelta=timedelta)
+        compiti=dashboard.compiti_telefono(), timedelta=timedelta, calendario_tel=calendario_tel, tipi_tel=tipi_tel)
 
 
 @bp.route("/analisi")
@@ -545,7 +584,8 @@ def api_trova():
         Veicolo.modello.ilike(like), Veicolo.marca.ilike(like), Veicolo.colore.ilike(like),
         (Veicolo.marca + " " + Veicolo.modello).ilike(like)))
     # prima quelle ancora in stock, poi le consegnate
-    auto = sorted(auto.limit(40).all(), key=lambda v: (v.stato == "consegnato", v.marca or "", v.modello or ""))[:8]
+    auto = sorted((v for v in auto.limit(40).all() if g.utente.vede_auto(v)),
+                  key=lambda v: (v.stato == "consegnato", v.marca or "", v.modello or ""))[:8]
     ddt = []
     m = re.fullmatch(r"(?:ddt\s*)?(\d{1,6})(?:\s*/\s*(\d{4}))?", q, re.I)
     if m:
@@ -554,6 +594,8 @@ def api_trova():
             cerca = cerca.filter_by(anno=int(m.group(2)))
         ddt = cerca.order_by(Ddt.anno.desc()).limit(8).all()
     adesivi = Tag.query.filter(Tag.codice.ilike(like)).order_by(Tag.codice).limit(8).all()
+    if g.utente.venditore:  # 23/11/2026: niente DDT né adesivi per il venditore
+        ddt, adesivi = [], []
 
     def voce_auto(v):
         _, stato = v.stato_per(g.utente)
@@ -1001,6 +1043,8 @@ def _dati_mappa(risultati):
 def piazzale():
     """Stock: ogni auto non ancora consegnata al cliente, anche se è in preparazione, da un fornitore,
     pronta o in viaggio (sempre con la sua posizione sulla mappa). Esce dallo stock alla consegna."""
+    if g.utente.venditore:  # 23/11/2026: niente piazzali e zone di stock, solo le sue vetture e quelle libere
+        return _pagina_venditore(request.args.get("vista") if request.args.get("vista") in ("mie", "libere") else "libere")
     stock = Veicolo.query.filter(Veicolo.stato != "consegnato").order_by(Veicolo.marca, Veicolo.modello).all()
     f = {k: request.args.get(k, "").strip() for k in CHIAVI_FILTRO + ("q",)}
     # la sede si sceglie sulla mappa, senza ricaricare: qui non si filtra per sede
@@ -1153,10 +1197,10 @@ def cerca():
             Veicolo.vin.ilike(f"%{vin_mod.normalizza(parola)}%"), Veicolo.vin.ilike(like),
             Veicolo.modello.ilike(like), Veicolo.marca.ilike(like), Veicolo.versione.ilike(like),
             Veicolo.colore.ilike(like), Veicolo.targa.ilike(like)))
-    tutti = base.order_by(Veicolo.marca, Veicolo.modello, Veicolo.id).limit(500).all()
+    tutti = [v for v in base.order_by(Veicolo.marca, Veicolo.modello, Veicolo.id).limit(500).all() if g.utente.vede_auto(v)]
     if request.args.get("parziale"):  # dal telefono, mentre si scrive: solo le auto trovate
         return render_template("_risultati_telefono.html", f=f, risultati=_filtra_veicoli(tutti, f))
-    stock = Veicolo.query.filter(Veicolo.stato != "consegnato").all()
+    stock = [v for v in Veicolo.query.filter(Veicolo.stato != "consegnato").all() if g.utente.vede_auto(v)]
     auto_mappa, luoghi_mappa = _dati_mappa(stock)
     return render_template("cerca.html", f=f, risultati=_filtra_veicoli(tutti, f), auto_mappa=auto_mappa,
                            luoghi_mappa=luoghi_mappa,
@@ -1221,6 +1265,10 @@ def tap(codice):
     if v is not None and _tocco_aggiorna_posizione(v):
         servizi.registra_evento(v, "tocco", g.utente, lat, lon)
         db.session.commit()
+    if g.utente.venditore:  # 23/11/2026: il venditore dal tocco vede la scheda della sua auto (o di una libera)
+        if v is None or not servizi.puo_vedere_veicolo(v, g.utente):
+            abort(403, "Questa auto è di un altro venditore." if v is not None else "Le auto nuove le carica l'ufficio.")
+        return redirect(url_for("main.veicolo", veicolo_id=v.id))
     if _bozza_multiplo().get("raccolta"):
         categoria, messaggio = _aggiungi_a_multiplo(v)
         flash(messaggio, categoria)
@@ -1295,6 +1343,8 @@ def tocco_scelta(veicolo_id):
     """Dopo il tocco su un'auto ferma: dati dell'auto in alto, poi le azioni. Se è in preparazione,
     l'avanzamento: ogni passo si aggiorna solo con un tocco NFC (un tocco = un passo)."""
     v = _veicolo_visibile(veicolo_id)
+    if g.utente.venditore:
+        return redirect(url_for("main.veicolo", veicolo_id=v.id))
     ddt = sorted({m.ddt for m in v.movimenti if m.ddt and not m.ddt.annullato_at and servizi.puo_vedere(m.ddt, g.utente)},
                  key=lambda d: d.emesso_at, reverse=True)
     prep = v.preparazione_attiva
@@ -1379,10 +1429,12 @@ def miei_ddt():
 def _ddt_miei(quanti=15):
     """DDT legati a chi guarda: emessi, presi in carico, assegnati o ricevuti da lui (scheda Cerca dal telefono)."""
     me = g.utente.id
+    legati = [Ddt.creato_da_id == me, Movimento.partenza_utente_id == me,
+              Movimento.assegnato_a_id == me, Movimento.arrivo_utente_id == me]
+    if g.utente.venditore:  # 23/11/2026 sera: anche i DDT delle sue auto vendute
+        legati.append(Movimento.veicolo_id.in_(db.session.query(Veicolo.id).filter(Veicolo.venditore_id == me)))
     movimenti = (Movimento.query.join(Ddt, Movimento.ddt_id == Ddt.id)
-                 .filter(Ddt.annullato_at.is_(None),
-                         or_(Ddt.creato_da_id == me, Movimento.partenza_utente_id == me,
-                             Movimento.assegnato_a_id == me, Movimento.arrivo_utente_id == me))
+                 .filter(Ddt.annullato_at.is_(None), or_(*legati))
                  .order_by(Ddt.emesso_at.desc()).limit(quanti * 3).all())
     visti, elenco = set(), []
     for m in movimenti:
@@ -1599,9 +1651,13 @@ def abbina(codice):
         if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
             veicolo.tipologia = request.form["tipologia"]
         if request.form.get("condizione") not in Veicolo.CONDIZIONI:
-            flash("Indica se l'auto è nuova o usata.", "errore")
+            flash("Indica se l'auto è nuova, usata o importata.", "errore")
+            return render_template("abbina.html", tag=tag, sedi=sedi, form=request.form)
+        if _manca_km(request.form["condizione"]):
+            flash(_manca_km(request.form["condizione"]), "errore")
             return render_template("abbina.html", tag=tag, sedi=sedi, form=request.form)
         veicolo.condizione = request.form["condizione"]
+        veicolo.km = _km() if veicolo.condizione in Veicolo.CON_KM else None
         if _targa_insolita():
             flash(_targa_insolita(), "errore")
             return render_template("abbina.html", tag=tag, sedi=sedi, form=request.form)
@@ -1645,6 +1701,19 @@ def _alimentazione():
     return a if a in Veicolo.ALIMENTAZIONI else ""
 
 
+def _km():
+    """Chilometri dal modulo (23/11/2026): "45.300" o "45 300 km" → 45300; None se vuoto o non valido."""
+    cifre = "".join(ch for ch in request.form.get("km", "") if ch.isdigit())
+    return int(cifre) if cifre and int(cifre) <= Veicolo.KM_MASSIMI else None
+
+
+def _manca_km(condizione):
+    """Usate e importate: i km sono obbligatori."""
+    if condizione in Veicolo.CON_KM and _km() is None:
+        return f"Scrivi i km dell'auto {Veicolo.CONDIZIONI[condizione].lower()}."
+    return None
+
+
 def _targa():
     return "".join(ch for ch in request.form.get("targa", "").upper() if ch.isalnum())[:12]
 
@@ -1675,7 +1744,9 @@ def nuova_auto():
         tag = Tag.query.filter_by(codice=(request.form.get("tag") or "").strip().upper(), veicolo_id=None).first()
         condizione = request.form.get("condizione", "")
         if condizione not in Veicolo.CONDIZIONI:
-            flash("Indica se l'auto è nuova o usata.", "errore")
+            flash("Indica se l'auto è nuova, usata o importata.", "errore")
+        elif _manca_km(condizione):
+            flash(_manca_km(condizione), "errore")
         elif tag is None:
             flash("Scegli l'adesivo NFC da attaccare all'auto: senza adesivo l'auto non entra in stock.", "errore")
         elif not vin_mod.valido(vin):
@@ -1692,6 +1763,7 @@ def nuova_auto():
             db.session.add(v)
             v.sede, v.stato, v.consegnato_at = sede, "in_sede", None
             v.condizione = condizione
+            v.km = _km() if condizione in Veicolo.CON_KM else None
             v.targa = _targa() or v.targa
             if request.form.get("tipologia") in Veicolo.TIPOLOGIE:
                 v.tipologia = request.form["tipologia"]
@@ -1738,7 +1810,7 @@ def modifica_auto(veicolo_id):
 
     if request.method == "GET":
         form = {"sede_id": v.sede_id, "lat": v.lat if v.lat is not None else "",
-                "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "tipologia": v.tipologia, "targa": v.targa or "",
+                "lon": v.lon if v.lon is not None else "", "vin": v.vin, "condizione": v.condizione, "km": v.km if v.km is not None else "", "tipologia": v.tipologia, "targa": v.targa or "",
                 "marca": v.marca or "", "modello": v.modello or "", "versione": v.versione or "",
                 "colore": v.colore or "", "anno": v.anno or "", "alimentazione": v.alimentazione or "", "in_stock_dal": v.creato_at.date().isoformat() if v.creato_at else "",
                 "lavorazione": qui.lavorazione if qui and qui.senza_ddt else "",
@@ -1757,7 +1829,9 @@ def modifica_auto(veicolo_id):
     elif Veicolo.query.filter(Veicolo.vin == vin, Veicolo.id != v.id).first():
         errore = "Questo VIN è già di un'altra auto in Getvingo."
     elif f.get("condizione") not in Veicolo.CONDIZIONI:
-        errore = "Indica se l'auto è nuova o usata."
+        errore = "Indica se l'auto è nuova, usata o importata."
+    elif _manca_km(f["condizione"]):
+        errore = _manca_km(f["condizione"])
     elif not all(pulito.values()) or not _anno_scelto() or not _alimentazione():
         errore = "Marca, modello, versione, anno, alimentazione e colore sono obbligatori."
     elif giorno is None or giorno > adesso().date():
@@ -1785,6 +1859,7 @@ def modifica_auto(veicolo_id):
             flash(str(e), "errore")
             return pagina(f)
     v.vin, v.condizione, v.targa = vin, f["condizione"], _targa()
+    v.km = _km() if v.condizione in Veicolo.CON_KM else None
     if f.get("tipologia") in Veicolo.TIPOLOGIE:
         v.tipologia = f["tipologia"]
     v.marca, v.modello = pulito["marca"], pulito["modello"]
@@ -1807,7 +1882,11 @@ def modifica_dati_auto(veicolo_id):
     v = db.get_or_404(Veicolo, veicolo_id)
     if request.form.get("condizione") in Veicolo.CONDIZIONI:  # nuova o usata: si indica una volta sola
         if not v.condizione:
+            if _manca_km(request.form["condizione"]):
+                flash(_manca_km(request.form["condizione"]), "errore")
+                return redirect(url_for("main.veicolo", veicolo_id=v.id))
             v.condizione = request.form["condizione"]
+            v.km = _km() if v.condizione in Veicolo.CON_KM else None
             db.session.commit()
             flash(f"{v.descrizione}: {Veicolo.CONDIZIONI[v.condizione].lower()}.", "ok")
         return redirect(url_for("main.veicolo", veicolo_id=v.id))
@@ -1957,6 +2036,10 @@ def note_interne(veicolo_id):
     v = _veicolo_visibile(veicolo_id)
     v.cliente_nome = " ".join(request.form.get("cliente_nome", "").split())[:200]
     vid = request.form.get("venditore_id", type=int)
+    if g.utente.venditore:  # 23/11/2026: il venditore scrive le note solo delle sue auto e resta il venditore
+        if v.venditore_id != g.utente.id:
+            abort(403, "Le note le scrive il venditore dell'auto.")
+        vid = g.utente.id
     venditore = db.session.get(Utente, vid) if vid else None
     v.venditore = venditore if venditore is not None and venditore.interno else None
     v.note_interne = request.form.get("note_interne", "").strip()[:2000]
@@ -1998,6 +2081,8 @@ def _lavoro_fatto(v):
 @login_richiesto
 def veicolo(veicolo_id):
     v = _veicolo_visibile(veicolo_id)
+    if g.utente.venditore:  # 23/11/2026: scheda del venditore, senza DDT né azioni di movimentazione
+        return render_template("veicolo_venditore.html", v=v, quando_pronta=_quando_pronta)
     mov = v.movimento_aperto
     ultimo = v.arrivo_qui
     valori = {"conducente": g.utente.nome if g.utente.ruolo != "admin" else "",
@@ -2119,6 +2204,10 @@ def archivio_ddt():
         sid = g.utente.sede_id or -1
         query = query.filter(or_(Movimento.da_sede_id == sid, Movimento.a_sede_id == sid,
                                  Movimento.arrivo_sede_id == sid))
+    elif g.utente.venditore:  # 23/11/2026 sera: le sue auto vendute e le movimentazioni fatte da lui
+        me = g.utente.id
+        query = query.filter(or_(Veicolo.venditore_id == me, Ddt.creato_da_id == me, Movimento.partenza_utente_id == me,
+                                 Movimento.assegnato_a_id == me, Movimento.arrivo_utente_id == me))
     visibili = query  # base per contare gli stati e calcolare le opzioni presenti
     if stato == "annullati":
         query = query.filter(Ddt.annullato_at.isnot(None))
@@ -2795,3 +2884,124 @@ def ripristina_azione(azione_id):
         db.session.rollback()
         flash(str(e), "errore")
     return redirect(request.form.get("torna") or url_for("main.home"))
+
+
+# --------------------------------------------------------------------------------------------------------------
+# Consegne al cliente finale (23/11/2026, richiesta dell'utente) e pagine del venditore
+# --------------------------------------------------------------------------------------------------------------
+GIORNI_SETT = ("lun", "mar", "mer", "gio", "ven", "sab", "dom")
+
+
+def _settimana_da(arg):
+    oggi = adesso().date()
+    try:
+        return date.fromisoformat(arg or "")
+    except ValueError:
+        return oggi - timedelta(days=oggi.weekday()) if oggi.weekday() < 5 else oggi + timedelta(days=7 - oggi.weekday())
+
+
+def _quando_pronta(v):
+    """Per chi vende: a che punto è l'auto e quando sarà pronta, senza i dettagli delle movimentazioni."""
+    if v.stato == "consegnato":
+        return f"consegnata il {v.consegnato_at:%d/%m}" if v.consegnato_at else "consegnata"
+    if v.fase == "pronta" or v.verso_consegna:
+        return "pronta per la consegna"
+    prep = v.preparazione_attiva
+    if prep is not None:
+        return f"in preparazione · pronta entro il {prep.pronta_entro_at:%d/%m alle %H:%M}" if prep.pronta_entro_at else "in preparazione"
+    m = v.arrivo_qui
+    if v.fase in ("lavorazione", "da_ritirare") and m is not None and m.lavorazione_prevista_at:
+        return f"in lavorazione · fine lavori prevista il {m.lavorazione_prevista_at:%d/%m}, poi la preparazione"
+    return {"in_sede": "in stock", "in_viaggio": "in viaggio", "lavorazione": "in lavorazione",
+            "da_ritirare": "in lavorazione"}.get(v.fase, Veicolo.FASI.get(v.fase, ""))
+
+
+@bp.route("/consegne")
+@solo_interni
+def consegne():
+    """Calendario delle consegne al cliente finale: la settimana con gli appuntamenti e le auto da fissare."""
+    if not (g.utente.puo("fissare_consegne") or g.utente.venditore):
+        abort(403, "Le consegne le gestiscono consegne, backoffice, responsabile commerciale e amministratore.")
+    dal = _settimana_da(request.args.get("dal"))
+    giorni = [dal + timedelta(days=k) for k in range(6)]  # lunedì–sabato
+    inizio, fine = datetime.combine(giorni[0], ora_del_giorno(0)), datetime.combine(giorni[-1] + timedelta(days=1), ora_del_giorno(0))
+    fissate = [v for v in Veicolo.query.filter(Veicolo.consegna_prevista_at >= inizio, Veicolo.consegna_prevista_at < fine)
+               .order_by(Veicolo.consegna_prevista_at) if g.utente.vede_auto(v) and (not g.utente.venditore or v.venditore_id == g.utente.id)]
+    per_giorno = [(d, [v for v in fissate if v.consegna_prevista_at.date() == d]) for d in giorni]
+    candidati = [v for v in Veicolo.query.filter(Veicolo.stato != "consegnato", Veicolo.consegna_prevista_at.is_(None))
+                 if (v.da_consegnare or v.preparazione_attiva is not None)
+                 and (not g.utente.venditore or v.venditore_id == g.utente.id)]
+    candidati.sort(key=lambda v: (not v.da_consegnare, v.preparazione_attiva.pronta_entro_at if v.preparazione_attiva and v.preparazione_attiva.pronta_entro_at else adesso() + timedelta(days=999)))
+    prossime = [v for v in Veicolo.query.filter(Veicolo.stato != "consegnato", Veicolo.consegna_prevista_at >= adesso())
+                .order_by(Veicolo.consegna_prevista_at).limit(30) if not g.utente.venditore or v.venditore_id == g.utente.id]
+    sedi = [s for s in Sede.query.filter_by(tipo="propria", attiva=True).order_by(Sede.nome) if not s.sede_legale]
+    return render_template("consegne.html", per_giorno=per_giorno, dal=dal, candidati=candidati, prossime=prossime,
+                           sedi=sedi, orari=servizi.ORARI_CONSEGNA, giorni_sett=GIORNI_SETT, oggi=adesso().date(),
+                           quando_pronta=_quando_pronta, timedelta=timedelta,
+                           modifica=g.utente.puo("fissare_consegne"))
+
+
+@bp.route("/veicolo/<int:veicolo_id>/consegna/appuntamento", methods=["POST"])
+@solo_interni
+def appuntamento_consegna(veicolo_id):
+    v = _veicolo_visibile(veicolo_id)
+    vai = request.form.get("torna") or url_for("main.consegne")
+    try:
+        if request.form.get("azione") == "togli":
+            servizi.togli_consegna(v, g.utente)
+            msg = f"{v.descrizione}: appuntamento di consegna tolto."
+        else:
+            try:
+                quando = datetime.combine(date.fromisoformat(request.form.get("giorno", "")),
+                                          ora_del_giorno.fromisoformat(request.form.get("ora", "")))
+            except ValueError:
+                quando = None
+            sede = db.session.get(Sede, request.form.get("sede_id", type=int)) if request.form.get("sede_id") else None
+            servizi.fissa_consegna(v, g.utente, quando, sede)
+            msg = f"{v.descrizione}: consegna fissata il {quando:%d/%m alle %H:%M} a {v.consegna_sede.nome}."
+        db.session.commit()
+        flash(msg, "ok")
+    except Vietato as e:
+        db.session.rollback()
+        flash(str(e), "errore")
+    return redirect(vai)
+
+
+def _pagina_venditore(vista):
+    """Home e Vetture del venditore (23/11/2026): le sue vetture e quelle libere da vendere, con a che punto sono
+    e quando saranno pronte; le consegne fissate per i suoi clienti. Niente DDT, piazzali, lavorazioni."""
+    io = g.utente.id
+    attive = Veicolo.query.filter(Veicolo.stato != "consegnato").order_by(Veicolo.marca, Veicolo.modello).all()
+    mie = [v for v in attive if v.venditore_id == io]
+    libere = [v for v in attive if v.venditore_id is None]
+    q = request.args.get("q", "").strip().lower()
+    if q:
+        def trova(v):
+            testo = " ".join(str(x) for x in (v.marca, v.modello, v.versione, v.colore, v.alimentazione, v.anno, v.vin, v.targa) if x).lower()
+            return all(p in testo for p in q.split())
+        mie, libere = [v for v in mie if trova(v)], [v for v in libere if trova(v)]
+    consegnate = (Veicolo.query.filter(Veicolo.venditore_id == io, Veicolo.stato == "consegnato",
+                                       Veicolo.consegnato_at >= adesso() - timedelta(days=30))
+                  .order_by(Veicolo.consegnato_at.desc()).all())
+    fissate = sorted((v for v in mie if v.consegna_prevista_at), key=lambda v: v.consegna_prevista_at)
+    from . import dashboard
+    return render_template("venditore.html", vista=vista, mie=mie, libere=libere, consegnate=consegnate, fissate=fissate,
+                           registro=dashboard.registro_oggi() if vista == "mie" else [],
+                           q=request.args.get("q", ""), quando_pronta=_quando_pronta)
+
+
+@bp.route("/veicolo/<int:veicolo_id>/venditore", methods=["POST"])
+@solo_interni
+def prendi_vettura(veicolo_id):
+    """Il venditore prende un'auto libera ("è mia") o la lascia libera; l'ufficio usa le note interne."""
+    v = _veicolo_visibile(veicolo_id)
+    if not g.utente.venditore:
+        abort(403)
+    if request.form.get("azione") == "lascia" and v.venditore_id == g.utente.id:
+        v.venditore_id = None
+        flash(f"{v.descrizione} è di nuovo libera da vendere.", "ok")
+    elif v.venditore_id is None:
+        v.venditore_id = g.utente.id
+        flash(f"{v.descrizione} ora è tra le tue vetture.", "ok")
+    db.session.commit()
+    return redirect(request.form.get("torna") or url_for("main.veicolo", veicolo_id=v.id))

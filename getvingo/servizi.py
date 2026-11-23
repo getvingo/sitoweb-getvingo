@@ -6,7 +6,7 @@ import math
 from datetime import date, datetime, time, timedelta
 from itertools import groupby
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from flask import g
 
@@ -97,7 +97,8 @@ def firma_vettore(vt):
 
 
 def timbro_di(utente):
-    """Timbro della società di chi firma come conducente: il fornitore per i suoi utenti, sennò la concessionaria."""
+    """Timbro della società di chi firma come conducente: il fornitore per i suoi utenti, sennò la concessionaria.
+    23/11/2026: non più sotto la firma del conducente, che firma su spazio bianco (il timbro sta nel mittente)."""
     if utente is not None and utente.sede_id:
         return utente.sede.timbro if utente.sede else None
     a = Azienda.query.first()
@@ -126,7 +127,10 @@ def registra_evento(veicolo, tipo, utente, lat, lon, ddt=None):
 
 def account_del_luogo(sede, utente):
     """True se l'utente "appartiene" a quel luogo: le sedi proprie sono della
-    concessionaria (personale interno), quelle esterne del loro fornitore."""
+    concessionaria (personale interno), quelle esterne del loro fornitore.
+    23/11/2026: il venditore non sposta auto (niente DDT, arrivi, ritiri)."""
+    if utente.ruolo == "venditore":
+        return False
     if sede is None or not sede.esterna:
         return utente.interno
     return utente.sede_id is not None and utente.sede_id == sede.id
@@ -136,10 +140,12 @@ def mittente(mov):
     """(ragione sociale, indirizzo, piva, firma) di chi emette il DDT: la concessionaria
     se l'auto parte da una sede propria, altrimenti il fornitore da cui parte."""
     sede = mov.da_sede
+    # 23/11/2026, richiesta dell'utente: timbro e firma vanno nel riquadro del mittente (firma timbrata; se manca,
+    # almeno il timbro). Nei trasferimenti interni il mittente resta la concessionaria.
     if sede is not None and sede.esterna:
-        return sede.nome, sede.indirizzo_completo, sede.piva, sede.firma
+        return sede.nome, sede.indirizzo_completo, sede.piva, sede.firma or sede.timbro
     a = Azienda.query.first()
-    return (a.ragione_sociale, a.indirizzo_completo, a.piva, a.firma) if a else ("", "", "", None)
+    return (a.ragione_sociale, a.indirizzo_completo, a.piva, a.firma or a.timbro) if a else ("", "", "", None)
 
 
 def rientro_sul_posto(veicolo, utente):
@@ -252,6 +258,7 @@ def crea_movimento(veicolo, dati, utente, firma_conducente=None, lat=None, lon=N
     # si confrontano gli oggetti, non gli id: l'id si aggiorna solo al salvataggio
     if veicolo.sede is not None and dati["a_sede_id"] == veicolo.sede.id:
         raise Vietato("La destinazione è il luogo in cui l'auto si trova già.")
+    dati = _rendi_interno(dati, veicolo.sede)
     if verso_il_cliente(dati["a_sede_id"], dati.get("causale")):
         controlla_targa_consegna(veicolo)
     if predisponi_ore and lavorazione_in_corso(veicolo):
@@ -355,6 +362,7 @@ def crea_ddt_multiplo(veicoli, dati, utente, firma_conducente=None, lat=None, lo
                           "da ritirare oppure la bolla la emette un altro account.")
     if origine is not None and dati["a_sede_id"] == origine.id:
         raise Vietato("La destinazione è il luogo in cui le auto si trovano già.")
+    dati = _rendi_interno(dati, origine)
     if verso_il_cliente(dati["a_sede_id"], dati.get("causale")):
         for v in veicoli:
             controlla_targa_consegna(v)
@@ -522,7 +530,7 @@ def tag_dell_auto(v):
 
 
 CAMPI_TRASFERIMENTO = ("vin", "marca", "modello", "versione", "alimentazione", "anno", "colore", "targa",
-                       "tipologia", "condizione")
+                       "tipologia", "condizione", "km")
 
 
 def _piva_pulita(piva):
@@ -657,7 +665,24 @@ def causale_per(da_sede, a_sede):
         return "Reso esposizione"
     if da_sede is not None and da_sede.tipo in Sede.COMMERCIO:
         return "Reso"
-    return "Spostamento"
+    return TRASFERIMENTO_INTERNO
+
+
+TRASFERIMENTO_INTERNO = "Trasferimento interno"
+
+
+def e_trasferimento_interno(da_sede, a_sede):
+    """Tra sedi e piazzali della stessa concessionaria (23/11/2026, richiesta dell'utente)."""
+    return da_sede is not None and a_sede is not None and da_sede.tipo == "propria" and a_sede.tipo == "propria"
+
+
+def _rendi_interno(dati, da_sede):
+    """Movimento tra sedi o piazzali della concessionaria: causale "Trasferimento interno" e nessuna lavorazione
+    da descrivere (23/11/2026). Il mittente resta la concessionaria (vedi mittente)."""
+    a_sede = db.session.get(Sede, dati.get("a_sede_id") or 0)
+    if e_trasferimento_interno(da_sede, a_sede):
+        dati["causale"], dati["lavorazione"], dati["lavorazione_note"] = TRASFERIMENTO_INTERNO, Movimento.NESSUNA, ""
+    return dati
 
 
 def destinazioni_rapide(veicolo, utente):
@@ -980,7 +1005,7 @@ def puo_modificare(ddt, utente):
 
 def puo_vedere_veicolo(veicolo, utente):
     if utente.interno:
-        return True
+        return utente.vede_auto(veicolo)  # il venditore: solo le sue e quelle libere
     if utente.sede_id is None:
         return False
     if veicolo.sede is not None and veicolo.sede.id == utente.sede_id and veicolo.stato == "in_sede":
@@ -989,6 +1014,11 @@ def puo_vedere_veicolo(veicolo, utente):
 
 
 def puo_vedere(ddt, utente):
+    if utente.ruolo == "venditore":
+        # 23/11/2026 sera, richiesta dell'utente: solo i DDT delle sue auto vendute o delle movimentazioni fatte da lui
+        return any(x.veicolo is not None and x.veicolo.venditore_id == utente.id
+                   or utente.id in (x.partenza_utente_id, x.assegnato_a_id, x.arrivo_utente_id)
+                   for x in (ddt.movimenti or [ddt.movimento])) or ddt.creato_da_id == utente.id
     if utente.interno:
         return True
     m = ddt.movimento
@@ -1116,7 +1146,9 @@ def imposta_consegna(v, utente, sede):
     if sede is None or sede.tipo != "propria" or not sede.attiva:
         raise Vietato("Scegli una sede della concessionaria.")
     # anche l'id subito: chi controlla la sede nella stessa operazione (es. consegna) lo trova già
-    v.consegna_sede, v.consegna_sede_id, v.consegna_prevista_at = sede, sede.id, None
+    if v.consegna_sede_id != sede.id:  # 23/11/2026: l'appuntamento resta se la sede non cambia
+        v.consegna_prevista_at = None
+    v.consegna_sede, v.consegna_sede_id = sede, sede.id
 
 
 def verso_il_cliente(a_sede_id, causale):
@@ -1417,6 +1449,42 @@ def _slot_del_giorno(giorno, chiusi=None):
     return slot
 
 
+ORARI_CONSEGNA = [time(h, m) for h in range(8, 19) for m in (0, 30) if time(8, 30) <= time(h, m) < time(12, 30)
+                  or time(14, 30) <= time(h, m) < time(18, 30)]
+
+
+def fissa_consegna(v, utente, quando, sede=None):
+    """Appuntamento di consegna al cliente finale (23/11/2026, richiesta dell'utente: "in consegne serve una
+    sezione con calendario per fissare le consegne al cliente finale"; prima la consegna si fissava in un altro
+    portale). Slot di 30 minuti negli orari d'ufficio dei giorni lavorativi, uno per sede alla volta; l'auto deve
+    essere pronta prima dell'appuntamento."""
+    if not utente.puo("fissare_consegne"):
+        raise Vietato("Le consegne le fissano consegne, backoffice, responsabile commerciale e amministratore.")
+    if v.stato == "consegnato":
+        raise Vietato("L'auto è già stata consegnata.")
+    if quando is None or quando <= adesso():
+        raise Vietato("Scegli un giorno e un'ora che devono ancora venire.")
+    if not e_uno_slot(quando):
+        raise Vietato("La consegna si fissa nei giorni lavorativi, dalle 8:30 alle 12:30 o dalle 14:30 alle 18:30, ogni mezz'ora.")
+    sede = sede or v.consegna_sede
+    if sede is None or sede.tipo != "propria" or not sede.attiva or sede.sede_legale:
+        raise Vietato("Indica la sede in cui si consegna l'auto.")
+    prep = v.preparazione_attiva
+    if prep is not None and prep.pronta_entro_at and prep.pronta_entro_at > quando:
+        raise Vietato(f"L'auto sarà pronta solo il {prep.pronta_entro_at:%d/%m alle %H:%M}: scegli un orario dopo.")
+    occupato = (Veicolo.query.filter(Veicolo.id != v.id, Veicolo.stato != "consegnato", Veicolo.consegna_prevista_at == quando,
+                                     Veicolo.consegna_sede_id == sede.id).first())
+    if occupato is not None:
+        raise Vietato(f"Alle {quando:%H:%M} del {quando:%d/%m} a {sede.nome} c'è già la consegna di {occupato.descrizione}.")
+    v.consegna_sede, v.consegna_sede_id, v.consegna_prevista_at = sede, sede.id, quando
+
+
+def togli_consegna(v, utente):
+    if not utente.puo("fissare_consegne"):
+        raise Vietato("Le consegne le gestiscono consegne, backoffice, responsabile commerciale e amministratore.")
+    v.consegna_prevista_at = None
+
+
 def e_uno_slot(momento):
     """True se è l'inizio di uno slot di 30 minuti in un giorno lavorativo: lun–ven 8:30–12:30 e
     14:30–18:30 (8 slot la mattina e 8 il pomeriggio), feste e giorni chiusi esclusi."""
@@ -1428,9 +1496,12 @@ FUORI_SLOT = ("La preparazione dura 30 minuti e si fissa solo in uno slot: lun�
 
 
 def slot_occupati_preparazione(escludi=None):
-    """Slot già presi dalle preparazioni in corso: {inizio dello slot: preparazione}."""
+    """Slot già presi: {inizio dello slot: preparazione}. 23/11/2026, richiesta dell'utente ("non devono esserci
+    più fine preparazioni nello stesso orario"): oltre a quelle in corso anche le preparazioni finite in anticipo
+    tengono il loro slot ancora da venire, così nel calendario due auto non hanno mai la stessa ora prevista."""
     return {p.pronta_entro_at: p for p in Preparazione.query.filter(
-        Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at.isnot(None)) if p is not escludi}
+        Preparazione.pronta_entro_at.isnot(None),
+        or_(Preparazione.completata_at.is_(None), Preparazione.pronta_entro_at >= adesso())) if p is not escludi}
 
 
 def primo_slot_libero(da, escludi=None):
@@ -1562,6 +1633,44 @@ def fine_lavori_prevista(arrivo, giorni):
     if t.minute % 30 or t.second:
         t = t.replace(second=0, microsecond=0) + timedelta(minutes=30 - t.minute % 30)
     return t
+
+
+def _mezzora_dopo(t, chiusi):
+    """La mezz'ora successiva in cui il fornitore lavora (una fine lavori non cade mai a inizio giornata)."""
+    c = t + timedelta(minutes=30)
+    primo = _primo_momento_lavorativo(c - timedelta(minutes=30), chiusi)
+    if primo > t:  # t era fuori orario o a fine fascia: la fine successiva è mezz'ora dopo l'inizio della fascia
+        c = primo + timedelta(minutes=30)
+    return c
+
+
+def fini_lavori_della_sede(sede_id):
+    """Fine prevista di ogni lavorazione aperta presso un fornitore: {id movimento: fine}.
+    23/11/2026, richiesta dell'utente ("non devono esserci più fine lavorazioni nello stesso orario e nello
+    stesso posto"): nello stesso luogo due lavorazioni non finiscono mai alla stessa ora; chi è arrivato prima
+    tiene l'orario calcolato, le altre slittano alla mezz'ora lavorativa successiva libera."""
+    from sqlalchemy import func as _f
+    movimenti = (Movimento.query.join(Veicolo, Movimento.veicolo_id == Veicolo.id)
+                 .filter(Veicolo.sede_id == sede_id, Movimento.stato == "chiuso", Movimento.arrivo_at.isnot(None),
+                         Movimento.lavorazione_completata_at.is_(None),
+                         _f.coalesce(Movimento.arrivo_sede_id, Movimento.a_sede_id) == sede_id)
+                 .order_by(Movimento.arrivo_at, Movimento.id).all())
+    aperte = [m for m in movimenti if m.con_lavorazione and m.veicolo.arrivo_qui is m]
+    firma = tuple((m.id, m.arrivo_at, m.stima_giorni) for m in aperte)
+    memo = g.setdefault("_fini_lavori", {}) if g else {}
+    if memo.get(sede_id, (None,))[0] == firma:
+        return memo[sede_id][1]
+    fini, usate = {}, set()
+    if aperte:
+        chiusi = giorni_chiusi(aperte[0].arrivo_at.date(), adesso().date() + timedelta(days=400))
+        for m in aperte:
+            t = fine_lavori_prevista(m.arrivo_at, m.stima_giorni)
+            while t in usate:
+                t = _mezzora_dopo(t, chiusi)
+            usate.add(t)
+            fini[m.id] = t
+    memo[sede_id] = (firma, fini)
+    return fini
 
 
 def scadenza_ritiro(da, ore):
@@ -1772,6 +1881,8 @@ def risolvi_danno(danno, utente, nota="", foto=()):
     """foto: nomi dei file (già salvati) che mostrano il danno riparato. Almeno una è obbligatoria."""
     if not utente.interno:
         raise Vietato("Solo la concessionaria può chiudere una segnalazione di danno.")
+    if not utente.puo("risolvere_danni"):  # 23/11/2026, richiesta dell'utente: non chi consegna, il preparatore
+        raise Vietato("Il danno lo segna risolto il preparatore (o l'amministratore), con la foto dell'auto riparata.")
     if not danno.aperto:
         raise Vietato("Il danno è già stato chiuso.")
     if not foto:
@@ -1937,6 +2048,8 @@ def motivo_no_preparazione(v, utente):
     """Perché l'auto non può entrare in preparazione (None = può)."""
     if not utente.interno:
         return "Solo la concessionaria può mettere un'auto in preparazione."
+    if utente.ruolo == "venditore":
+        return "La preparazione la gestiscono preparatore e ufficio."
     if v.stato != "in_sede" or v.sede is None or v.sede.tipo != "propria":
         return "L'auto deve trovarsi in una sede della concessionaria."
     if v.fase in ("preparazione", "pronta"):

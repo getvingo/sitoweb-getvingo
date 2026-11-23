@@ -2,11 +2,11 @@
 {% from "_macro.html" import i, badge_veicolo, badge_condizione, icona_fase, marchio, filtro_select, fase_css, legenda, targa, logo_marca %}
 {% from "_auto.html" import in_viaggio_da, avanzamento_lavoro %}
 {% block head %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
-{% block titolo %}Vetture · Getvingo{% endblock %}
+{% block titolo %}Parco auto · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {% macro dettaglio_riga(v) %}{% set f = v.fase %}{% if f == 'preparazione' and v.preparazione_attiva %}{% set p = v.preparazione_attiva %}Attività {{ p.fasi|length + 1 }} di {{ p.FASI|length }} · {{ p.prossima_fase }}{% if p.pronta_entro_at and p.pronta_entro_at < adesso() %} · in ritardo{% endif %}{% elif f in ('lavorazione', 'da_ritirare') and v.arrivo_qui %}{% set m = v.arrivo_qui %}{{ v.sede.nome }}{% if m.con_lavorazione %} · {{ m.lavorazione }}{% endif %}{% if f == 'da_ritirare' %} · {{ 'DDT di rientro pronto' if v.movimento_predisposto else 'manca il DDT di rientro' }}{% elif m.giorni_ritardo %} · in ritardo di {{ m.giorni_ritardo }} gg{% endif %}{% elif f == 'in_viaggio' and v.movimento_aperto %}{% set m = v.movimento_aperto %}{{ m.da_sede.nome if m.da_sede else '—' }} → {{ m.a_sede.nome }}{% if v.verso_consegna %} · ultimo DDT, poi consegna{% endif %}{% elif f == 'pronta' %}{% if v.consegna_sede %}Consegna a {{ v.consegna_sede.nome }}{% if v.sede_id != v.consegna_sede_id %} · serve l'ultimo DDT{% endif %}{% else %}Sede di consegna da indicare{% endif %}{% if not v.targa %} · senza targa{% endif %}{% endif %}{% endmacro %}
 {% block contenuto %}
-<div class="titolo-pagina"><div><h1>Vetture</h1>
+<div class="titolo-pagina"><div><h1>Parco auto</h1>
   <p class="descrizione-pagina">Tutte le auto finché non sono consegnate al cliente: in sede, in preparazione, pronte, dai fornitori o in viaggio, con la posizione sulla mappa.</p></div>
   <a class="btn piccolo primario" href="{{ url_for('main.nuova_auto') }}">+ Nuova auto</a></div>
 
@@ -71,10 +71,10 @@
         data-cerca="{{ [v.marca, v.modello, v.versione, v.colore, v.alimentazione, v.anno, v.vin, v.targa, v.tag.codice if v.tag else '', v.sede.nome if v.sede else '', etichetta]|select|join(' ')|lower }}">
       <td class="cella-auto"><div>{{ marchio(v) }}
         <span><a href="{{ url_for('main.veicolo', veicolo_id=v.id) }}" title="{{ v.descrizione }}{{ ' · ' ~ v.versione if v.versione }}"><b>{{ v.descrizione }}</b></a>
-          <small>{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %}<span class="badge-comm">{{ i('camion', 's') }} Commerciale</span>{% endif %}</small></span></div></td>
+          <small class="etichette-auto">{{ badge_condizione(v) }}{% if v.tipologia == 'commerciale' %}<span class="badge-comm">{{ i('camion', 's') }} Commerciale</span>{% endif %}{% if v.km is not none %}<span class="km-lista">{{ v.km_testo }}</span>{% endif %}</small></span></div></td>
       <td class="cella-telaio">{% if v.targa %}<span class="targa-chip">{{ v.targa }}</span>{% endif %}<span class="vin">{{ v.vin[-8:] }}</span></td>
       <td class="cella-stato"><div class="stato-in-linea"><span class="pillola-stato"><i aria-hidden="true"></i>{{ etichetta }}</span>
-        {% if v.danni_aperti %}<span class="badge danno con-icona">{{ i('attenzione', 's') }}Danno</span>{% endif %}
+        {% if v.danni_aperti %}<a class="badge danno con-icona lampeggia" href="{{ url_for('main.danno', danno_id=v.danni_aperti[0].id, torna=url_for('main.piazzale')) }}">{{ i('attenzione', 's') }}Danno</a>{% endif %}
         {% if dett %}<small class="{{ 'testo-ritardo' if 'ritardo' in dett }}">{{ dett }}</small>{% endif %}</div></td>
       <td class="cella-da">{% if k != 'in_sede' %}{{ (v.stato_dal|da_tempo)|replace('da ', '') }}{% endif %}</td>
       <td class="cella-mappa">{% if v.lat is not none %}<button type="button" class="btn-icona" data-sulla-mappa="{{ v.id }}" title="Mostra sulla mappa" aria-label="Mostra {{ v.descrizione }} sulla mappa">{{ i('pin', 's') }}</button>{% endif %}</td>

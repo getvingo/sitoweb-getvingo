@@ -24,7 +24,8 @@
     <div><dt>Alimentazione</dt><dd>{{ v.alimentazione or '—' }}</dd></div>
     <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
     <div><dt>Tipo</dt><dd>{% if v.tipologia == 'commerciale' %}<span class="badge-comm" style="margin:0">{{ i('camion', 's') }} Veicolo commerciale</span>{% else %}Vettura{% endif %}</dd></div>
-    <div><dt>Nuova o usata</dt><dd>{{ badge_condizione(v) }}</dd></div>
+    <div><dt>Condizione</dt><dd>{{ badge_condizione(v) }}</dd></div>
+    {% if v.km is not none %}<div><dt>Km</dt><dd>{{ v.km_testo }}</dd></div>{% endif %}
     <div><dt>Adesivo NFC</dt><dd>{{ v.tag.codice if v.tag else 'nessuno' }}</dd></div>
   </dl>
 

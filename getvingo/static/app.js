@@ -40,7 +40,7 @@
   var causale = document.getElementById('causale');
   var riepilogo = document.querySelector('[data-riepilogo]');
   var toccata = false;
-  var SUGGERITE = { propria: 'Spostamento', carrozzeria: 'Invio lavorazione', officina: 'Invio lavorazione',
+  var SUGGERITE = { propria: 'Trasferimento interno', carrozzeria: 'Invio lavorazione', officina: 'Invio lavorazione',
                     altro: 'Invio lavorazione', allestitore: 'Invio lavorazione', esposizione: 'Conto esposizione',
                     concessionario: 'Conto visione', rivenditore: 'Conto visione', cliente: 'Consegna a cliente' };
   if (causale) causale.addEventListener('change', function () { toccata = true; });
@@ -53,7 +53,19 @@
       riepilogo.textContent = opt && opt.value ? 'verso ' + opt.text : 'scegli prima la destinazione';
     }
   }
-  if (dest) { dest.addEventListener('change', function () { aggiorna(true); }); aggiorna(false); }
+  if (dest) { dest.addEventListener('change', function () { aggiorna(true); interno(); }); aggiorna(false); }
+
+  // 23/11/2026: tra sedi e piazzali della concessionaria è un trasferimento interno: la lavorazione non si chiede
+  // (il server mette comunque causale "Trasferimento interno" e lavorazione "Nessuna")
+  function interno() {
+    var lavSel = document.getElementById('lavorazione'); if (!dest || !lavSel) return;
+    var form = dest.closest('form'), opt = dest.options[dest.selectedIndex];
+    var si = !!(form && form.dataset.partenzaPropria && opt && opt.dataset.tipo === 'propria');
+    var noteC = document.getElementById('lavorazione-note');
+    [lavSel.closest('label'), noteC && noteC.closest('label')].forEach(function (l) { if (l) l.hidden = si; });
+    if (si) { lavSel.value = 'Nessuna (solo trasferimento)'; if (causale) causale.value = 'Trasferimento interno'; if (noteC) { noteC.value = ''; noteC.required = false; } }
+  }
+  interno();
 
   // dettagli della lavorazione: obbligatori, tranne per il solo trasferimento
   var lav = document.getElementById('lavorazione'), note = document.getElementById('lavorazione-note');

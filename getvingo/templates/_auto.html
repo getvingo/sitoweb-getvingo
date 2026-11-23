@@ -24,7 +24,7 @@
     <div><dt>Targa</dt><dd>{% if v.targa %}<span class="targa">{{ v.targa }}</span>{% else %}<span class="tenue">Senza targa</span>{% endif %}</dd></div>
     <div><dt>Colore</dt><dd>{{ v.colore or '—' }}</dd></div>
     <div><dt>{{ 'Alimentazione · anno' if v.alimentazione else 'Anno' }}</dt><dd>{% if v.alimentazione %}{{ v.alimentazione }}{% if v.anno %} · {{ v.anno }}{% endif %}{% else %}{{ v.anno or '—' }}{% endif %}</dd></div>
-    <div><dt>Condizione</dt><dd>{{ badge_condizione(v) or '—' }}</dd></div>
+    <div><dt>Condizione</dt><dd>{{ badge_condizione(v) or '—' }}{% if v.km is not none %}<span class="km-auto">{{ v.km_testo }}</span>{% endif %}</dd></div>
     <div><dt>Adesivo</dt><dd>{% if v.tag %}{{ i('nfc', 's') }} {{ v.tag.codice }}{% else %}<span class="tenue">non abbinato</span>{% endif %}</dd></div>
   </dl>
 </section>

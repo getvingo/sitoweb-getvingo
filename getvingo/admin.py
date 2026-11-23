@@ -807,6 +807,11 @@ def importa():
                 veicolo.condizione = "nuovo"
             elif cond in ("usato", "usata", "u"):
                 veicolo.condizione = "usato"
+            elif cond in ("importato", "importata", "import", "i"):
+                veicolo.condizione = "importato"
+            km = "".join(ch for ch in (riga.get("km") or riga.get("chilometri") or "") if ch.isdigit())
+            if km and int(km) <= Veicolo.KM_MASSIMI:  # 23/11/2026: colonna facoltativa dei km
+                veicolo.km = int(km)
             tipo = (riga.get("tipologia") or riga.get("tipo") or "").lower()
             if tipo.startswith("comm") or tipo in ("n1", "furgone", "veicolo commerciale"):
                 veicolo.tipologia = "commerciale"

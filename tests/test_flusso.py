@@ -382,7 +382,7 @@ class TestSpostamentoColTocco(Base):
         d = self.ddt()
         with self.app.app_context():
             self.assertEqual((self.mov(d).causale, self.mov(d).lavorazione),
-                             ("Spostamento", Movimento.NESSUNA))
+                             ("Trasferimento interno", Movimento.NESSUNA))
         self.arrivo(d)
         with self.app.app_context():
             self.assertEqual(self.mov(d).stato, "chiuso")
@@ -860,7 +860,8 @@ class TestDanni(Base):
         # negli elenchi solo i dati: le foto si vedono aprendo il danno
         self.assertNotIn(f"/foto/{nome}", self.c.get("/danni").get_data(as_text=True))
         self.assertIn(f"/foto/{nome}", self.c.get("/danno/1").get_data(as_text=True))
-        # per chiuderlo serve la foto della riparazione
+        # 23/11/2026: lo verifica il preparatore (o l'amministratore); per chiuderlo serve la foto della riparazione
+        self.entra("admin")
         self.c.post("/danno/1/risolvi", data={"nota": "era già presente"})
         self.assertIn('aria-label="1 da verificare"', self.c.get("/").get_data(as_text=True))
         self.c.post("/danno/1/risolvi", data={"nota": "era già presente", "foto": [(io.BytesIO(JPEG), "ok.jpg")]},
@@ -964,7 +965,7 @@ class TestPiazzaleMappa(Base):
 
 class TestStockEDati(Base):
     def test_nuova_auto_solo_con_adesivo(self):
-        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "targa": "gh 123 ab", "condizione": "usato",
+        dati = {"vin": VIN, "marca": "Volkswagen", "modello": "Golf", "targa": "gh 123 ab", "condizione": "usato", "km": "30000",
                 "colore": "Bianco", "versione": "1.5 eTSI Life", "anno": "2024", "alimentazione": "Benzina",
                 "tipologia": "commerciale", "sede_id": self._id(Sede, nome="Sede A")}
         self.c.post("/piazzale/nuova", data=dati)  # senza adesivo non entra in stock
@@ -1247,7 +1248,7 @@ class TestPiuClienti(Base):
         self.assertNotIn("Golf", html)
         self.assertNotIn("<b>Sede A</b>", self.c.get("/admin/sedi").get_data(as_text=True))
         # stesso VIN ammesso in un'altra concessionaria, e il suo primo DDT è il n. 1
-        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "Volkswagen", "modello": "Polo", "colore": "Blu", "condizione": "usato", "versione": "1.5 eTSI Life", "anno": "2024", "alimentazione": "Benzina",
+        r = self.c.post("/abbina/ZZZZ9999", data={"vin": VIN, "marca": "Volkswagen", "modello": "Polo", "colore": "Blu", "condizione": "usato", "km": "30000", "versione": "1.5 eTSI Life", "anno": "2024", "alimentazione": "Benzina",
                                                  "sede_id": self._id2(Sede, nome="Sede Altra")})
         self.assertEqual(r.status_code, 302)
         with self.app.app_context():
@@ -2022,7 +2023,7 @@ class TestNuovoUsato(Base):
         self.c.post("/piazzale/nuova", data=dati)  # senza nuova/usata non entra
         with self.app.app_context():
             self.assertEqual(Veicolo.query.count(), 0)
-        self.c.post("/piazzale/nuova", data=dict(dati, condizione="usato"))
+        self.c.post("/piazzale/nuova", data=dict(dati, condizione="usato", km="30000"))
         with self.app.app_context():
             vid = Veicolo.query.one().id
         self.assertIn("badge usato", self.c.get("/stock").get_data(as_text=True))          # al posto di "In sede"
@@ -2046,7 +2047,7 @@ class TestDemo(unittest.TestCase):
             self.assertEqual(fasi, {"in_sede", "in_viaggio", "da_ritirare", "lavorazione", "preparazione", "pronta",
                                     "consegnato"})
             self.assertTrue(any(d.multiplo for d in Ddt.query))
-            self.assertEqual({v.condizione for v in Veicolo.query}, {"nuovo", "usato"})
+            self.assertEqual({v.condizione for v in Veicolo.query}, {"nuovo", "usato", "importato"})
 
 
 class TestPagineDemoPulite(unittest.TestCase):
@@ -2065,7 +2066,11 @@ class TestPagineDemoPulite(unittest.TestCase):
             c.post("/login", data={"email": f"{ruolo}@demo.it", "password": "demo"})
             home = c.get("/").get_data(as_text=True)
             pagine = ["/", "/ddt", "/password"] + (["/stock", "/lavorazioni", "/preparazione", "/danni"]
-                                                  if ruolo not in ("carrozzeria", "officina") else [])
+                                                  if ruolo not in ("carrozzeria", "officina", "venditore") else [])
+            if ruolo == "venditore":  # 23/11/2026: niente movimentazioni né gestione dello stock
+                pagine += ["/stock", "/consegne"]
+                for vietata in ("/lavorazioni", "/preparazione", "/danni"):
+                    self.assertEqual(c.get(vietata).status_code, 403, vietata)
             pagine += sorted(set(re.findall(r'href="(/veicolo/\d+)"', home)))[:8]
             pagine += sorted(set(re.findall(r'href="(/ddt/\d+)"', c.get("/ddt").get_data(as_text=True))))[:8]
             for p in pagine:
@@ -2573,25 +2578,26 @@ class TestConfigurazioneConcessionaria(Base):
             u = Utente.query.filter_by(email="giulia@t.it").one()
             self.assertEqual(u.ruolo, "venditore")
             self.assertTrue(u.interno)
-            # 22/11/2026: il venditore vede tutto ma modifica solo note interne e consegna (Utente.PERMESSI)
+            # 23/11/2026: il venditore scrive le note interne (delle sue auto); consegne e sede di consegna no
             self.assertFalse(u.gestione)
-            self.assertTrue(u.puo("note_interne") and u.puo("consegnare"))
+            self.assertTrue(u.puo("note_interne"))
+            self.assertFalse(u.puo("consegnare") or u.puo("fissare_consegne") or u.puo("risolvere_danni"))
             self.assertFalse(u.puo("modificare_auto") or u.puo("fornitori") or u.puo("predisporre"))
         vid = self.abbina()
         self.c.post("/logout")
         self.c.post("/login", data={"email": "giulia@t.it", "password": "vendite12"})
-        for pagina in ("/", "/stock", "/preparazione", "/lavorazioni", "/ddt", f"/veicolo/{vid}"):
+        for pagina in ("/", "/stock", "/ddt", "/consegne", f"/veicolo/{vid}"):
             self.assertEqual(self.c.get(pagina).status_code, 200, pagina)
         self.assertEqual(self.c.get("/admin/").status_code, 403)
-        # sposta le auto di persona: profilo di guida (il vettore è già quello della concessionaria) e partenza
-        self.c.post("/profilo-guida", data={"mezzo": "Su strada (guidata)", "firma": FIRMA})
-        self.c.post("/t/ABCD2345", data=POS)
+        # 23/11/2026: niente movimentazioni né gestione dello stock: non sposta auto e non predispone DDT
+        for pagina in ("/preparazione", "/lavorazioni", "/danni", "/profilo-guida"):
+            self.assertEqual(self.c.get(pagina).status_code, 403, pagina)
         r = self.c.post(f"/veicolo/{vid}/sposta", data={"a_sede_id": self._id(Sede, nome="Carrozzeria B")})
-        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.status_code, 403)
+        r = self.c.post(f"/veicolo/{vid}/partenza", data=self.dati("Carrozzeria B"))
+        self.assertEqual(r.status_code, 403)
         with self.app.app_context():
-            m = Movimento.query.order_by(Movimento.id.desc()).first()
-            self.assertEqual(m.conducente, "Giulia Vendite")
-            self.assertTrue(m.vettore.proprio)
+            self.assertEqual(Movimento.query.count(), 0)
 
 
 class TestAnagraficaEDDT(Base):
@@ -2659,7 +2665,7 @@ class TestAnagraficaEDDT(Base):
             self.assertEqual(servizi.causale_per(carr, a), "Reso lavorazione")
             self.assertEqual(servizi.causale_per(a, expo), "Conto esposizione")
             self.assertEqual(servizi.causale_per(expo, a), "Reso esposizione")
-            self.assertEqual(servizi.causale_per(a, a), "Spostamento")
+            self.assertEqual(servizi.causale_per(a, a), "Trasferimento interno")
             self.assertEqual(servizi.causale_per(a, cli), "Consegna a cliente")
             self.assertFalse(expo.esterna)  # l'esposizione non è una lavorazione: niente lavorazione da indicare
 
@@ -3111,7 +3117,7 @@ class TestCorreggiPosizione(Base):
 class TestModificaDatiAuto(Base):
     """Un solo "Modifica dati": gli stessi campi dell'ingresso in stock, per tutto il personale interno."""
     def dati_auto(self, **extra):
-        d = {"vin": VIN, "condizione": "usato", "tipologia": "commerciale", "targa": "GH123AB", "marca": "Volkswagen",
+        d = {"vin": VIN, "condizione": "usato", "km": "30000", "tipologia": "commerciale", "targa": "GH123AB", "marca": "Volkswagen",
              "modello": "Polo", "versione": "1.0 TSI  Life", "colore": "Nero", "anno": "2024", "alimentazione": "Benzina", "in_stock_dal": "2026-10-01"}
         d.update(extra)
         return d
@@ -4576,7 +4582,98 @@ class TestUtenzeEOrari(Base):
         self.assertEqual(self.c.get(f"/veicolo/{vid}/modifica").status_code, 403)     # non cambia i dati
         self.assertEqual(self.c.get("/ddt/multiplo").status_code, 403)
         self.assertEqual(self.c.get("/analisi").status_code, 403)
+        # 23/11/2026: le note le scrive solo sulle sue auto; prima la prende con "È mia"
+        self.assertEqual(self.c.post(f"/veicolo/{vid}/note", data={"cliente_nome": "Mario Bianchi"}).status_code, 403)
+        self.c.post(f"/veicolo/{vid}/venditore")
         r = self.c.post(f"/veicolo/{vid}/note", data={"cliente_nome": "Mario Bianchi"})
-        self.assertEqual(r.status_code, 302)                                            # le note sì
-        # "Solo le mie": senza auto sue la Home non mostra le voci degli altri
-        self.assertIn("Nessuna attività urgente", self.c.get("/").get_data(as_text=True))
+        self.assertEqual(r.status_code, 302)
+        # la sua pagina: niente riquadri di movimentazioni, chi ha fatto cosa solo sulle sue vetture
+        home = self.c.get("/").get_data(as_text=True)
+        self.assertNotIn("Movimentazioni di oggi", home)
+        self.assertIn("solo sulle tue vetture", home)
+
+
+class TestRichieste23Novembre(Base):
+    """23/11/2026: Importata e km, trasferimento interno, firme nel DDT, orari senza doppioni, venditore."""
+
+    def _abbina(self, **extra):
+        dati = {"vin": "wvwzzz1kzaw000123", "marca": "Volkswagen", "modello": "Golf", "colore": "Bianco",
+                "versione": "1.5 eTSI Life", "anno": "2024", "alimentazione": "Benzina",
+                "sede_id": self._id(Sede, nome="Sede A"), "lat": "45.66", "lon": "12.24"}
+        dati.update(extra)
+        return self.c.post("/abbina/ABCD2345", data=dati)
+
+    def test_usata_e_importata_vogliono_i_km(self):
+        r = self._abbina(condizione="usato")
+        self.assertIn("km", r.get_data(as_text=True))
+        with self.app.app_context():
+            self.assertIsNone(Veicolo.query.filter_by(vin=VIN).first())
+        r = self._abbina(condizione="importato", km="45.300")
+        self.assertEqual(r.status_code, 302)
+        with self.app.app_context():
+            v = Veicolo.query.filter_by(vin=VIN).one()
+            self.assertEqual((v.condizione, v.km, v.km_testo), ("importato", 45300, "45.300 km"))
+
+    def test_nuova_senza_km(self):
+        self._abbina(condizione="nuovo", km="1200")
+        with self.app.app_context():
+            v = Veicolo.query.filter_by(vin=VIN).one()
+            self.assertEqual((v.condizione, v.km), ("nuovo", None))
+
+    def test_trasferimento_interno_senza_lavorazione(self):
+        vid = self.abbina()
+        with self.app.app_context():
+            db.session.add(Sede(nome="Piazzale P", tipo="propria", lat=45.01, lon=12.01))
+            db.session.commit()
+        self.parti(vid, "Piazzale P", causale="Invio lavorazione", lavorazione="Carrozzeria")
+        with self.app.app_context():
+            m = self.mov(self.ddt())
+            self.assertEqual((m.causale, m.lavorazione, m.lavorazione_note),
+                             ("Trasferimento interno", Movimento.NESSUNA, ""))
+            self.assertEqual(servizi.dati_ddt(m.ddt)[0][0], "Test S.r.l.")  # il mittente resta la concessionaria
+
+    def test_pdf_indica_chi_ha_firmato(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        self.entra("carr")
+        self.arrivo(d)
+        from getvingo import ddt as ddt_mod
+        with self.app.app_context():
+            dati = ddt_mod.pdf(db.session.get(Ddt, d))
+        self.assertTrue(dati.startswith(b"%PDF"))
+        r = self.c.get(f"/ddt/{d}")
+        self.assertIn("Firmato da Carr", r.get_data(as_text=True))
+
+    def test_fine_lavori_mai_alla_stessa_ora_nello_stesso_posto(self):
+        with self.app.app_context():
+            sede = Sede.query.filter_by(nome="Carrozzeria B").one()
+            arrivo = datetime(2026, 11, 23, 9, 0)
+            movs = []
+            for k in range(3):
+                v = Veicolo(vin=f"WVWZZZ1KZAW00012{k}", marca="VW", modello="Golf", sede=sede, stato="in_sede")
+                m = Movimento(veicolo=v, da_sede=sede, a_sede=sede, causale="Invio lavorazione", stato="chiuso",
+                              lavorazione="Carrozzeria", lavorazione_note="x", arrivo_at=arrivo, vettore_id=1)
+                db.session.add_all([v, m])
+                movs.append(m)
+            db.session.commit()
+            fini = [m.lavorazione_prevista_at for m in movs]
+            self.assertEqual(len(set(fini)), 3)
+            self.assertEqual(fini[0], servizi.fine_lavori_prevista(arrivo, movs[0].stima_giorni))
+
+    def test_venditore_vede_solo_i_ddt_delle_sue_auto(self):
+        vid = self.abbina()
+        self.parti(vid, "Carrozzeria B")
+        d = self.ddt()
+        with self.app.app_context():
+            u = Utente(nome="Vendi", email="vendi@t.it", ruolo="venditore")
+            u.imposta_password("pw")
+            db.session.add(u)
+            db.session.commit()
+        self.entra("vendi")
+        self.assertEqual(self.c.get(f"/ddt/{d}").status_code, 403)
+        with self.app.app_context():
+            db.session.get(Veicolo, vid).venditore_id = Utente.query.filter_by(email="vendi@t.it").one().id
+            db.session.commit()
+        self.assertEqual(self.c.get(f"/ddt/{d}").status_code, 200)
+        self.assertEqual(self.c.get("/ddt").status_code, 200)

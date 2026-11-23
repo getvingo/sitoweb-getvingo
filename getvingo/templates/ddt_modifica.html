@@ -7,7 +7,7 @@
 </div>
 <p class="tenue piccolo">Veicolo, numero e data di emissione non si possono cambiare. Ogni modifica viene registrata
   con il tuo nome come revisione {{ d.revisione + 1 }} e compare nel PDF.</p>
-<form method="post" data-una-volta>
+<form method="post" data-una-volta {{ 'data-partenza-propria=1' if d.movimento.da_sede and d.movimento.da_sede.tipo == 'propria' }}>
   {{ csrf_input() }}
   <div class="scheda">
     {{ campi_movimento(valori, gruppi_sedi, causali, lavorazioni, vettori, nomi_utenti) }}
