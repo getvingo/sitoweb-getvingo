@@ -3971,6 +3971,10 @@ class TestCalendarioPanoramica(Base):
         self.assertIn("Calendario della settimana", home)  # 22/11/2026: Home B1
         self.assertIn("/calendario", home)
         cal = self.c.get("/calendario").get_data(as_text=True)  # il mese intero: preparazioni e lavorazioni insieme
+        # 24/11/2026: a fine mese la fine lavori (5 giorni lavorativi) cade nel mese dopo: si guarda anche quello
+        oggi = adesso().date()
+        dopo = f"{oggi.year + (oggi.month == 12)}-{oggi.month % 12 + 1:02d}"
+        cal += self.c.get(f"/calendario?mese={dopo}").get_data(as_text=True)
         self.assertIn('class="cal-voce lavorazione previsto', cal)
         self.assertIn("fine lavori", cal)
 
