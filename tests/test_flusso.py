@@ -2523,8 +2523,8 @@ class TestConfigurazioneConcessionaria(Base):
 
     def test_adesivi_progressivi_con_sigla(self):
         self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst", **INDIRIZZO, **FISCALI})
-        for _ in range(5):  # 21/11/2026: "Forza: crea un codice a mano" ne crea uno alla volta
-            self.c.post("/admin/tag")
+        for n in range(6):  # 24/11/2026: i codici nascono al primo tocco del link unico (il primo prende ABCD2345, già libero)
+            self.c.get(f"/t?uid=04A23B1C5D6E8{n}")
         with self.app.app_context():
             codici = sorted(t.codice for t in Tag.query if t.codice.startswith("TST-"))
             self.assertEqual(codici, ["TST-0001", "TST-0002", "TST-0003", "TST-0004", "TST-0005"])
@@ -4148,35 +4148,27 @@ class TestLinkUnicoAdesivi(Base):
         self.assertIn("/t?uid=", self.c.get("/admin/tag").get_data(as_text=True))
 
 
-class TestPreparaAdesivi(Base):
-    """21/11/2026: l'amministratore prepara gli adesivi da Android (Web NFC): primo codice libero per ogni adesivo."""
-    def prenota(self, seriale):
-        return self.c.post("/admin/adesivi/prenota", json={"seriale": seriale})
+class TestUnSoloModoPerGliAdesivi(Base):
+    """24/11/2026, scelta dell'utente: gli adesivi si preparano solo col link unico (via Prepara adesivi e Forza)."""
+    def tocca(self, seriale):
+        return self.c.get(f"/t?uid={seriale}")
 
-    def test_pagina_solo_admin_e_aperta_dal_telefono(self):
-        html = self.c.get("/admin/adesivi/prepara").get_data(as_text=True)
-        self.assertIn("Prepara adesivi", html)
-        self.assertNotIn("Questa pagina si usa dal computer", html)
-        self.assertIn("Prepara adesivi NFC", self.c.get("/profilo").get_data(as_text=True))
-        self.entra("ufficio")
-        self.assertEqual(self.c.get("/admin/adesivi/prepara").status_code, 403)
-        self.assertNotIn("Prepara adesivi NFC", self.c.get("/profilo").get_data(as_text=True))
+    def test_niente_prepara_adesivi_ne_forza(self):
+        self.assertEqual(self.c.get("/admin/adesivi/prepara").status_code, 404)
+        self.assertEqual(self.c.post("/admin/adesivi/prenota", json={"seriale": "04A23B1C5D6E80"}).status_code, 404)
+        self.assertEqual(self.c.post("/admin/tag").status_code, 405)
+        self.assertNotIn("Prepara adesivi", self.c.get("/profilo").get_data(as_text=True))
+        html = self.c.get("/admin/tag").get_data(as_text=True)
+        self.assertIn("Come preparare gli adesivi", html)
+        self.assertIn("UID mirror", html)
+        self.assertNotIn("Forza", html)
 
-    def test_primo_codice_libero_e_stesso_codice_se_si_riprova(self):
-        d1 = self.prenota("04:a2:3b:1c:5d:6e:80").get_json()
-        d2 = self.prenota("04:a2:3b:1c:5d:6e:81").get_json()
-        self.assertTrue(d1["nuovo"])
-        self.assertNotEqual(d1["codice"], d2["codice"])
-        self.assertTrue(d1["link"].endswith("/t/" + d1["codice"]))
-        # scrittura fallita e adesivo riappoggiato: stesso codice, nessun numero bruciato
-        d3 = self.prenota("04A23B1C5D6E80").get_json()
-        self.assertEqual(d3["codice"], d1["codice"])
-        self.assertFalse(d3["nuovo"])
-        # l'adesivo preparato funziona anche col link unico (numero di serie salvato)
-        self.assertTrue(self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"].endswith("/t/" + d1["codice"]))
-
-    def test_senza_numero_di_serie_rifiutato(self):
-        self.assertEqual(self.prenota("").status_code, 400)
+    def test_link_ufficiale_fuori_dal_computer_locale(self):
+        from getvingo import admin
+        with self.app.test_request_context(base_url="https://getvingo.onrender.com"):
+            self.assertEqual(admin._base_adesivi(), ("https://getvingo.com", False))
+        with self.app.test_request_context(base_url="http://127.0.0.1:5050"):
+            self.assertEqual(admin._base_adesivi(), ("http://127.0.0.1:5050", True))
 
     def test_usa_prima_i_codici_gia_creati(self):
         with self.app.app_context():
@@ -4184,13 +4176,13 @@ class TestPreparaAdesivi(Base):
             org.sigla = "TEST"
             db.session.add_all([Tag(codice="TEST-0002"), Tag(codice="TEST-0001"), Tag(codice="TEST-0010")])
             db.session.commit()
-        codici = [self.prenota(f"04A23B1C5D6E8{n}").get_json()["codice"] for n in range(5)]
+        codici = [self.tocca(f"04A23B1C5D6E8{n}").headers["Location"].rsplit("/", 1)[1] for n in range(5)]
         # prima i liberi con la sigla dal più basso, poi gli altri liberi, poi i nuovi dopo il più alto
         self.assertEqual(codici, ["TEST-0001", "TEST-0002", "TEST-0010", "ABCD2345", "TEST-0011"])
 
 
 class TestRegistroAdesivi(Base):
-    """21/11/2026: registro degli adesivi (chi li ha preparati e abbinati) e "Forza: crea un codice a mano"."""
+    """21/11/2026: registro degli adesivi (chi li ha registrati e abbinati)."""
     def test_primo_abbinamento_registrato_e_codice_non_riusato(self):
         vid = self.abbina()
         with self.app.app_context():
@@ -4200,30 +4192,18 @@ class TestRegistroAdesivi(Base):
             v.tag.veicolo = None  # come alla consegna: l'adesivo si stacca ma resta sull'auto
             db.session.commit()
         # un adesivo nuovo non prende mai il codice di uno rimasto su un'auto consegnata
-        d = self.c.post("/admin/adesivi/prenota", json={"seriale": "04A23B1C5D6E80"}).get_json()
-        self.assertNotEqual(d["codice"], "ABCD2345")
+        codice = self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"].rsplit("/", 1)[1]
+        self.assertNotEqual(codice, "ABCD2345")
         html = self.c.get("/admin/tag?vista=consegnate").get_data(as_text=True)
         self.assertIn("ABCD2345", html)
         self.assertIn(VIN, html)
 
-    def test_registro_mostra_chi_ha_preparato(self):
-        d = self.c.post("/admin/adesivi/prenota", json={"seriale": "04A23B1C5D6E80"}).get_json()
+    def test_registro_mostra_chi_ha_registrato(self):
+        codice = self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"].rsplit("/", 1)[1]
         html = self.c.get("/admin/tag").get_data(as_text=True)
-        self.assertIn(d["codice"], html)
-        self.assertIn("Preparato dal telefono", html)
-        self.assertNotIn("Crea codici", html)
-
-    def test_forza_crea_un_solo_codice_col_link(self):
-        with self.app.app_context():
-            prima = Tag.query.count()
-        r = self.c.post("/admin/tag", follow_redirects=True)
-        html = r.get_data(as_text=True)
-        with self.app.app_context():
-            self.assertEqual(Tag.query.count(), prima + 1)
-            t = Tag.query.filter_by(origine="manuale").one()
-        self.assertIn(f"/t/{t.codice}", html)
-        self.entra("ufficio")
-        self.assertEqual(self.c.post("/admin/tag").status_code, 403)
+        self.assertIn(codice, html)
+        self.assertIn("Link unico, registrato al primo tocco", html)
+        self.assertIn("Admin", html)
 
 
 class TestTrasferimentoDealer(TestPiuClienti):

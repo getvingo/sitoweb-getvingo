@@ -3880,3 +3880,8 @@ input[name=codice]:not([type=checkbox]), .na-vin input:not([type=checkbox]) { fo
 .barra-auto .btn-prepara.aperto { background: var(--prep); border-color: var(--prep); color: #fff; }
 .pannello-azione { margin-top: 10px; }
 .pannello-azione > .scheda { margin: 0; }
+
+/* 24/11/2026: Gestione → Adesivi NFC, un solo modo (link unico) */
+.adesivi-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--bordo); border-radius: 10px; background: var(--fondo-pagina); }
+.adesivi-link code { font: 600 15px "IBM Plex Mono", monospace; word-break: break-all; flex: 1 1 240px; }
+.adesivi-passi { margin: 12px 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
