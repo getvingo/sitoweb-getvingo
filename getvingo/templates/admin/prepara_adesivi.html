@@ -66,6 +66,11 @@
     lettore.scan().then(function () {
       avvia.classList.add('in-ascolto');
       stato('Appoggia un adesivo', 'Tieni il retro del telefono fermo sull’adesivo finché vibra');
+      // 24/11/2026: prima un adesivo sentito ma non leggibile lasciava la pagina ferma senza messaggi
+      lettore.onreadingerror = function () {
+        if (occupato) return;
+        stato('Adesivo non leggibile', 'Il telefono lo sente ma non riesce a leggerlo: deve essere NTAG213/215/216 (NDEF). Riappoggialo al centro, fermo, o prova un altro adesivo');
+      };
       lettore.onreading = function (e) {
         var seriale = (e.serialNumber || '').replace(/:/g, '');
         // la scrittura fa rileggere lo stesso adesivo: per 3 secondi quello appena fatto non conta
@@ -94,7 +99,15 @@
             });
           })
           .catch(function (err) {
-            stato('Non sono riuscito a scriverlo', (err && err.message && err.name !== 'NetworkError' ? err.message + ' · ' : '') + 'Riappoggia lo stesso adesivo per riprovare');
+            // 24/11/2026: il motivo detto chiaro (adesivo bloccato in sola lettura, telefono spostato, rete)
+            var n = err && err.name, perche;
+            if (n === 'NotAllowedError') perche = 'L’adesivo è bloccato in sola lettura: non si può riscrivere, usane un altro';
+            else if (n === 'NotSupportedError') perche = 'Questo adesivo non accetta link (serve NTAG213/215/216)';
+            else if (n === 'NetworkError') perche = 'Il telefono si è staccato dall’adesivo durante la scrittura: tienilo fermo più a lungo';
+            else if (err instanceof TypeError) perche = 'Portale non raggiungibile: controlla la connessione';
+            else perche = (err && err.message) || 'Errore sconosciuto';
+            stato('Non sono riuscito a scriverlo', perche + ' · Riappoggia lo stesso adesivo per riprovare');
+            riga('—', 'non scritto: ' + perche + (n ? ' (' + n + ')' : ''), false);
           })
           .then(function () { occupato = false; });
       };
