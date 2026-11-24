@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macro.html" import i, logo_marca, badge_condizione, csrf_input %}
-{% block titolo %}{{ 'Le mie vetture' if vista == 'mie' else 'Libere da vendere' }} · Getvingo{% endblock %}
+{% block titolo %}{{ 'Le mie vetture' if vista == 'mie' else 'Vetture libere' }} · Getvingo{% endblock %}
 {% block larghezza %}largo{% endblock %}
 {# 23/11/2026, richiesta dell'utente: il venditore vede solo le sue vetture o quelle libere da vendere; niente
    movimentazioni né gestione dello stock. Per ogni auto: a che punto è e quando sarà pronta, la consegna fissata. #}
@@ -22,7 +22,7 @@
       {% else %}<a class="btn piccolo" href="{{ url_for('main.veicolo', veicolo_id=v.id) }}">Apri</a>{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="5" class="y-vuoto">{{ 'Nessuna vettura libera da vendere.' if libere else 'Nessuna vettura a tuo nome: prendi una vettura libera con “È mia”.' }}</td></tr>
+  <tr><td colspan="5" class="y-vuoto">{{ 'Nessuna vettura libera.' if libere else 'Nessuna vettura a tuo nome: prendi una vettura libera con “È mia”.' }}</td></tr>
   {% endfor %}
   </tbody></table></div>
 {% endmacro %}
@@ -30,14 +30,12 @@
 {% block contenuto %}
 <div class="titolo-pagina"><div>
   <div class="sopratitolo">{{ g.utente.nome }} · venditore</div>
-  <h1>{{ 'Le mie vetture' if vista == 'mie' else 'Libere da vendere' }}</h1>
+  <h1>{{ 'Le mie vetture' if vista == 'mie' else 'Vetture libere' }}</h1>
   <p class="descrizione-pagina">{{ 'Le vetture abbinate a te: a che punto sono, quando saranno pronte e quando si consegnano.' if vista == 'mie' else 'Le vetture che nessun venditore ha ancora preso: con “È mia” passano tra le tue.' }}</p>
 </div></div>
 
-<div class="y-segmenti vend-schede" role="group" aria-label="Vetture">
-  <a href="{{ url_for('main.home') }}" aria-pressed="{{ 'true' if vista == 'mie' else 'false' }}">Le mie · {{ mie|length }}</a>
-  <a href="{{ url_for('main.piazzale', vista='libere') }}" aria-pressed="{{ 'true' if vista == 'libere' else 'false' }}">Libere da vendere · {{ libere|length }}</a>
-</div>
+{# 24/11/2026: niente selettore Le mie / Libere: le vetture libere si aprono dal menu a sinistra #}
+<div class="vend-pagina">
 <form class="vend-cerca" method="get" action="{{ url_for('main.home') if vista == 'mie' else url_for('main.piazzale') }}">
   {% if vista == 'libere' %}<input type="hidden" name="vista" value="libere">{% endif %}
   <input name="q" value="{{ q }}" placeholder="Cerca: marca, modello, versione, colore, telaio, targa…" aria-label="Cerca">
@@ -73,8 +71,9 @@
 {% endif %}
 {% else %}
 <section class="y-box">
-  <div class="y-box-testa"><div><h2>Libere da vendere</h2><span>{{ libere|length }} vetture senza venditore</span></div></div>
+  <div class="y-box-testa"><div><h2>Vetture libere</h2><span>{{ libere|length }} vetture senza venditore</span></div></div>
   {{ righe(libere, libere=True) }}
 </section>
 {% endif %}
+</div>
 {% endblock %}

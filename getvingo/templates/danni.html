@@ -6,7 +6,7 @@
 {% block contenuto %}
 <div class="titolo-pagina"><div><h1>Danni</h1>
   <p class="descrizione-pagina">Danni trovati in piazzale o all'arrivo. Finché un danno è aperto l’auto non può essere segnata pronta né consegnata.
-    Per segnalarne uno tocca l'adesivo dell'auto (o aprila da Parco auto) e premi “Segnala danno”.</p></div></div>
+    Per segnalarne uno tocca l'adesivo dell'auto (o aprila da Vetture in stock) e premi “Segnala danno”.</p></div></div>
 {{ pillole([
   ('aperti', 'Da verificare', url_for('main.danni'), aperti|length, 'attenzione'),
   ('risolti', 'Risolti', url_for('main.danni', vista='risolti'), risolti|length, 'check'),

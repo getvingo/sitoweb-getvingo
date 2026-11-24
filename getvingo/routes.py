@@ -382,8 +382,12 @@ def _da_fare_home(gruppi, attivi):
     def aggiungi(reparto, fascia, etichetta, v, testo, url, azione=None, persone=(), ruoli=(), permesso=None):
         if permesso and azione and g.utente.interno and not g.utente.puo(permesso):
             azione = ("Apri la scheda", url)  # 22/11/2026: chi non può farlo vede la voce, non il comando
+        # 22/11/2026: "mia" per persona. 24/11/2026, richiesta dell'utente: anche per mansione quando il lavoro non
+        # è ancora di una persona precisa (persone vuote): preparatore → preparazioni, consegne → ritiri senza
+        # incaricato, auto da spostare e consegne da fissare, backoffice → lavorazioni e consegne
+        incaricati = [p for p in persone if p]
         x = {"reparto": reparto, "fascia": fascia, "etichetta": etichetta, "v": v, "testo": testo, "url": url,
-             "azione": azione, "mia": io in persone or (v.venditore_id == io)}  # 22/11/2026: solo per persona, non per mansione
+             "azione": azione, "mia": io in incaricati or (v.venditore_id == io) or (not incaricati and ruolo in ruoli)}
         if v.id not in voci or ordine_fascia[fascia] < ordine_fascia[voci[v.id]["fascia"]]:
             voci[v.id] = x
 
@@ -411,7 +415,7 @@ def _da_fare_home(gruppi, attivi):
         url = url_for("main.ddt_dettaglio", ddt_id=m.ddt.id)
         mio = m.assegnato_a_id == io
         chi = "" if mio else (f" · lo ritira {m.assegnato_a.nome}" if m.assegnato_a else " · nessuno incaricato")
-        persone, ruoli = (m.assegnato_a_id, m.ddt.creato_da_id), ("consegne",)
+        persone, ruoli = ((m.assegnato_a_id,) if m.assegnato_a_id else ()), ("consegne", "backoffice")
         if m.oltre_orario:  # 22/11/2026: niente più "scaduto" né rinnovo, solo in ritardo
             aggiungi("ritiri", "adesso", "Ritiro in ritardo" + (" (tuo)" if mio else ""), m.veicolo, f"DDT {m.ddt.sigla}: andava ritirata entro il {m.ritiro_entro_at:%d/%m alle %H:%M}{chi}",
                      url, ("Apri il DDT", url), persone, ruoli)
@@ -428,8 +432,7 @@ def _da_fare_home(gruppi, attivi):
             m = v.arrivo_qui
             aggiungi("lavorazioni", "oggi", "Finita, manca il rientro", v,
                      f"{m.lavorazione if m else 'Lavorazione'} finita presso {v.sede.nome}: prepara il DDT di rientro", url,
-                     ("Predisponi rientro", url + "#predisponi"), permesso="predisporre", persone=(m.ddt.creato_da_id,) if m and m.ddt else (),
-                     ruoli=("backoffice", "resp_commerciale"))
+                     ("Predisponi rientro", url + "#predisponi"), permesso="predisporre", ruoli=("backoffice", "resp_commerciale"))
         elif v.fase == "lavorazione" and v.arrivo_qui and v.arrivo_qui.con_lavorazione and v.arrivo_qui.giorni_ritardo:
             m = v.arrivo_qui
             rit, s = m.giorni_ritardo, m.ultimo_sollecito
@@ -438,23 +441,46 @@ def _da_fare_home(gruppi, attivi):
                      f"{m.lavorazione} presso {v.sede.nome}: in ritardo di {rit} {'giorno' if rit == 1 else 'giorni'} "
                      f"(fine prevista {m.lavorazione_prevista_at:%d/%m})" + (" · sollecitata, in attesa di risposta" if in_attesa else ""),
                      url, ("Vedi il sollecito" if in_attesa else f"Sollecita {v.sede.nome}", url), permesso="fornitori",
-                     persone=(m.ddt.creato_da_id,) if m.ddt else (), ruoli=("backoffice", "resp_commerciale"))
+                     ruoli=("backoffice", "resp_commerciale"))
     # preparazioni che chiedono qualcosa: bloccate, in ritardo, senza orario
     for prep in Preparazione.query.filter_by(completata_at=None).order_by(Preparazione.creata_at):
         v, url = prep.veicolo, url_for("main.veicolo", veicolo_id=prep.veicolo_id)
         ruoli = ("preparatore",)
-        fatte_da = tuple(f.utente_id for f in prep.fasi)
         if servizi.bloccata_da_danni(prep):
             d = v.danni_aperti[0]
             aggiungi("preparazione", "adesso", "Bloccata da un danno", v, f"Ferma prima di “{prep.prossima_fase}”: {d.zona.lower()} da verificare",
-                     url, ("Verifica il danno", url_for("main.danno", danno_id=d.id, torna=url_for("main.home"))), persone=fatte_da)
+                     url, ("Verifica il danno", url_for("main.danno", danno_id=d.id, torna=url_for("main.home"))), ruoli=ruoli)
         elif prep.pronta_entro_at and prep.pronta_entro_at < ora:
             aggiungi("preparazione", "adesso", "In ritardo", v,
                      f"Doveva essere pronta il {prep.pronta_entro_at:%d/%m alle %H:%M} · ora: {prep.prossima_fase}", url,
-                     ("Apri la preparazione", url + "#preparazione"), persone=fatte_da)
+                     ("Apri la preparazione", url + "#preparazione"), ruoli=ruoli)
         elif not prep.pronta_entro_at:
             aggiungi("preparazione", "prossimi", "Orario da fissare", v, f"Non è in calendario · ora: {prep.prossima_fase}", url,
-                     ("Fissa l'orario", url_for("main.preparazione")), persone=fatte_da, permesso="orario_preparazione")
+                     ("Fissa l'orario", url_for("main.preparazione")), ruoli=ruoli + ("backoffice",), permesso="orario_preparazione")
+    # 24/11/2026, richiesta dell'utente: le consegne da fissare e quelle fissate che chiedono qualcosa
+    da_fissare = url_for("main.consegne") + "#da-fissare"
+    ruoli_cons = ("consegne", "backoffice", "resp_commerciale")
+    for v in attivi:
+        q = v.consegna_prevista_at
+        url = url_for("main.veicolo", veicolo_id=v.id) + "#consegna"
+        if q and q < ora:
+            aggiungi("consegna", "adesso", "Consegna da confermare", v,
+                     f"Fissata il {q:%d/%m alle %H:%M}" + (f" a {v.consegna_sede.nome}" if v.consegna_sede else "")
+                     + (f" con {v.cliente_nome}" if v.cliente_nome else "") + ": non risulta consegnata", url,
+                     ("Apri la consegna", url), ruoli=ruoli_cons)
+        elif q and not v.da_consegnare and q <= tra_un_giorno:
+            aggiungi("consegna", "oggi", "Non ancora pronta", v,
+                     f"Consegna fissata il {q:%d/%m alle %H:%M}, ma la vettura non è pronta: {_quando_pronta(v)}",
+                     url, ("Apri la scheda", url), ruoli=ruoli_cons + ("preparatore",))
+        elif not q and v.da_consegnare and not v.verso_consegna:
+            aggiungi("consegna", "oggi", "Consegna da fissare", v,
+                     "Pronta: fissa giorno e ora della consegna" + (f" con {v.cliente_nome}" if v.cliente_nome else " con il cliente")
+                     + (f" · poi va portata a {v.consegna_sede.nome}" if v.consegna_sede and v.sede_id != v.consegna_sede_id else ""),
+                     da_fissare, ("Fissa la consegna", da_fissare), ruoli=ruoli_cons, permesso="fissare_consegne")
+        elif not q and v.preparazione_attiva is not None and (v.cliente_nome or v.venditore_id):
+            aggiungi("consegna", "prossimi", "Consegna da fissare", v,
+                     f"In preparazione, {_quando_pronta(v)}" + (f" · cliente {v.cliente_nome}" if v.cliente_nome else ""),
+                     da_fissare, ("Fissa la consegna", da_fissare), ruoli=ruoli_cons, permesso="fissare_consegne")
     # auto pronte: cosa manca per consegnarle
     for v in gruppi["pronta"]:
         url = url_for("main.veicolo", veicolo_id=v.id) + "#consegna"
@@ -465,7 +491,9 @@ def _da_fare_home(gruppi, attivi):
             aggiungi("consegna", "prossimi", "Sede da indicare", v, "Pronta: indica in quale sede si consegna", url,
                      ("Indica la sede di consegna", url), ruoli=ruoli, permesso="consegnare")
         elif v.sede_id != v.consegna_sede_id:
-            aggiungi("consegna", "oggi", "Da spostare", v, f"Pronta a {v.sede.nome}, si consegna a {v.consegna_sede.nome}", url,
+            q = v.consegna_prevista_at  # 24/11/2026: con la consegna entro un giorno lo spostamento diventa urgente
+            aggiungi("consegna", "adesso" if q and q <= tra_un_giorno else "oggi", "Da spostare", v,
+                     f"Pronta a {v.sede.nome}, si consegna a {v.consegna_sede.nome}" + (f" il {q:%d/%m alle %H:%M}" if q else ""), url,
                      ("Crea l'ultimo DDT", url), ruoli=ruoli)
         elif not v.targa:
             aggiungi("consegna", "prossimi", "Senza targa", v, "Pronta nella sede di consegna: manca la targa", url,
@@ -507,15 +535,16 @@ def home():
         cal_dal = oggi - timedelta(days=oggi.weekday()) if oggi.weekday() < 5 else oggi + timedelta(days=7 - oggi.weekday())
     cal_giorni = [cal_dal + timedelta(days=k) for k in range(7)]
     tipi_cal = ("preparazione", "lavorazione") + (("consegna",) if g.utente.puo("fissare_consegne") else ())
-    eventi = _eventi_calendario(cal_giorni[0], cal_giorni[-1], tipi_cal)
+    # 24/11/2026 (controllo doppioni): i ritardi stanno solo in "Da fare", come dal telefono
+    eventi = [e for e in _eventi_calendario(cal_giorni[0], cal_giorni[-1], tipi_cal) if e["stato"] != "ritardo"]
     calendario = [(d, [e for e in eventi if e["data"] == d]) for d in cal_giorni]
     # 23/11/2026, richiesta dell'utente: dal telefono il calendario di lavorazioni e preparazioni per chi ne ha
     # diritto, e per Consegne (e chi fissa le consegne) anche le consegne fissate. Da oggi ai 6 giorni dopo.
     ruolo = g.utente.ruolo
-    tipi_tel = (("preparazione",) if ruolo == "preparatore" else ("preparazione", "lavorazione")) + \
+    tipi_tel = ("preparazione", "lavorazione") + \
         (("consegna",) if g.utente.puo("fissare_consegne") else ())
     giorni_tel = [oggi + timedelta(days=k) for k in range(7)]
-    eventi_tel = _eventi_calendario(giorni_tel[0], giorni_tel[-1], tipi_tel)
+    eventi_tel = [e for e in _eventi_calendario(giorni_tel[0], giorni_tel[-1], tipi_tel) if e["stato"] != "ritardo"]
     calendario_tel = [(d, [e for e in eventi_tel if e["data"] == d]) for d in giorni_tel]
     marche, n_marche = dashboard.stock_per_marca(attivi)
     # 22/11/2026 notte (scelta dell'utente): in cima urgenze e calendario come nella Home di prima (avviso danni,
@@ -2999,7 +3028,7 @@ def prendi_vettura(veicolo_id):
         abort(403)
     if request.form.get("azione") == "lascia" and v.venditore_id == g.utente.id:
         v.venditore_id = None
-        flash(f"{v.descrizione} è di nuovo libera da vendere.", "ok")
+        flash(f"{v.descrizione} è di nuovo tra le vetture libere.", "ok")
     elif v.venditore_id is None:
         v.venditore_id = g.utente.id
         flash(f"{v.descrizione} ora è tra le tue vetture.", "ok")

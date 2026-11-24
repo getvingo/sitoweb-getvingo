@@ -3510,6 +3510,8 @@ html.con-foglio-firma, html.con-foglio-firma body { overflow: hidden; }
 .y-riempi { height: 6px; background: var(--riquadro); border-radius: 999px; overflow: hidden; }
 .y-riempi span { display: block; height: 100%; background: var(--inchiostro-fisso); border-radius: 999px; }
 .y-riempi span.att { background: var(--attenzione); }
+/* 24/11/2026: nel tema scuro la parte piena era asfalto su fondo chiaro e sembrava al contrario */
+@media (prefers-color-scheme: dark) { .y-riempi { background: var(--asfalto-3); } .y-riempi span:not(.att) { background: var(--testo); } }
 .y-registro { list-style: none; margin: 0; padding: 0; }
 .y-registro li { display: grid; grid-template-columns: 48px 1fr; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--linea); font-size: 14px; }
 .y-registro li > span { font-size: 12.5px; color: var(--testo-2); }
@@ -3820,15 +3822,20 @@ input[name=codice]:not([type=checkbox]), .na-vin input:not([type=checkbox]) { fo
 .cons-form .campo { margin: 0; min-width: 120px; }
 .cons-cambia > summary { list-style: none; } .cons-cambia > summary::-webkit-details-marker { display: none; }
 .cons-cambia[open] { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; width: 100%; }
-.vend-schede { margin: 0 0 12px; display: inline-flex; }
-.vend-cerca { margin: 0 0 16px; } .vend-cerca input { max-width: 520px; }
+/* 24/11/2026: home del venditore, riquadri staccati e stesso passo (16 px) tra ricerca e sezioni */
+.vend-pagina { display: flex; flex-direction: column; gap: 16px; }
+.vend-pagina > .y-box { margin: 0; }
+.vend-cerca { margin: 0; } .vend-cerca input { max-width: 520px; }
 .vend-fase { font-weight: 600; }
 .vend-fase.fase-pronta { color: var(--st-pronta-pieno, var(--st-pronta)); }
 .vend-fase.fase-preparazione { color: var(--st-prep-pieno, var(--st-prep)); }
 .vend-fase.fase-lavorazione, .vend-fase.fase-da_ritirare { color: var(--st-lavoro-pieno, var(--st-lavoro)); }
 .vend-azione { text-align: right; white-space: nowrap; }
-.vend-consegna { display: flex; gap: 14px; align-items: baseline; padding: 10px 20px; border-top: 1px solid var(--linea, var(--bordo));
-  color: var(--testo); text-decoration: none; }
+.vend-tab td { vertical-align: middle; }
+.vend-consegna { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 12px 20px;
+  border-top: 1px solid var(--linea, var(--bordo)); color: var(--testo); text-decoration: none; font-size: 14px; }
+.vend-consegna b.y-mono { font-size: 14px; }
+.vend-consegna:hover { background: var(--fondo-pagina); text-decoration: none; }
 .vend-scheda { margin: 16px 0; }
 .vend-dati { margin: 0; padding: 4px 20px 16px; display: grid; gap: 10px; }
 .vend-dati div { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }

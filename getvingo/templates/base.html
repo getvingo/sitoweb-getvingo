@@ -81,13 +81,13 @@
     {% if g.utente.venditore %}
     {# 23/11/2026: il venditore vede le sue vetture, quelle libere e le sue consegne #}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep == 'main.home' }}">{{ i('home') }}<span>Le mie vetture</span></a>
-    <a href="{{ url_for('main.piazzale', vista='libere') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto') }}<span>Libere da vendere</span></a>
+    <a href="{{ url_for('main.piazzale', vista='libere') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto') }}<span>Vetture libere</span></a>
     <a href="{{ url_for('main.consegne') }}" class="{{ 'attivo' if ep == 'main.consegne' }}">{{ i('bandiera') }}<span>Consegne</span></a>
     {# 23/11/2026 sera: i DDT delle sue auto vendute e delle movimentazioni fatte da lui #}
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
     {% elif g.utente.interno %}
     <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home') }}<span>Home</span></a>
-    <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo', 'main.nuova_auto', 'main.modifica_auto') }}">{{ i('auto') }}<span>Parco auto</span></a>
+    <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo', 'main.nuova_auto', 'main.modifica_auto') }}">{{ i('auto') }}<span>Vetture in stock</span></a>
     <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave') }}<span>Lavorazioni</span></a>
     <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla') }}<span>Preparazioni</span></a>
     <a href="{{ url_for('main.archivio_ddt') }}" class="{{ 'attivo' if ep.startswith('main.ddt') or ep == 'main.archivio_ddt' }}">{{ i('doc') }}<span>DDT</span></a>
@@ -127,7 +127,7 @@
     <nav class="nav-alto">
       <a href="{{ url_for('main.home') }}" class="{{ 'attivo' if ep in ('main.home', 'main.calendario_completo') }}">{{ i('home', 's') }} {{ 'Home' if g.utente.interno else 'Lavorazioni' }}</a>
       {% if g.utente.interno %}
-      <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto', 's') }} Parco auto</a>
+      <a href="{{ url_for('main.piazzale') }}" class="{{ 'attivo' if ep in ('main.piazzale', 'main.cerca', 'main.veicolo') }}">{{ i('auto', 's') }} Vetture in stock</a>
       <a href="{{ url_for('main.lavorazioni') }}" class="{{ 'attivo' if ep == 'main.lavorazioni' }}">{{ i('chiave', 's') }} Lavorazioni</a>
       <a href="{{ url_for('main.preparazione') }}" class="{{ 'attivo' if ep == 'main.preparazione' }}">{{ i('brilla', 's') }} Preparazione</a>
       {% endif %}

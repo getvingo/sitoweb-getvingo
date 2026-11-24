@@ -21,7 +21,9 @@ STATI = (("in_viaggio", "In viaggio", "su strada con DDT aperto", "in_viaggio"),
          ("da_ritirare", "Da ritirare", "DDT da ritirare o lavoro finito", "da_ritirare"),
          ("preparazione", "In preparazione", "in preparazione in sede", "preparazione"))
 # Home gestori completa: amministratore e responsabile commerciale; gli altri partono da "Solo le mie"
-RUOLI_TUTTO = ("admin",)  # 22/11/2026: "Solo le mie" di base per tutte le mansioni; "Tutte" di base solo all'amministratore
+# 22/11/2026: "Solo le mie" di base per tutte le mansioni; "Tutte" di base solo all'amministratore.
+# 24/11/2026, richiesta dell'utente: anche il preparatore parte da "Tutte" (vede tutte le movimentazioni e preparazioni)
+RUOLI_TUTTO = ("admin", "preparatore")
 
 
 def _giorno(d):
@@ -144,6 +146,8 @@ def agenda(dal, al, sede_id=None, solo_mie=False):
     visti = set()
     for m in movimenti:
         if not tiene(m) or (solo_mie and not _mio_movimento(m, io)) or m.ddt_id in visti:
+            continue
+        if m.stato == "predisposto" and m.oltre_orario:  # 24/11/2026: i ritiri in ritardo stanno in "Da fare"
             continue
         visti.add(m.ddt_id)
         altre = max(0, len(m.ddt.movimenti) - 1) if m.ddt and m.ddt.multiplo else 0
@@ -352,8 +356,10 @@ def compiti_telefono():
                     "dove": f"Partita alle {m.partenza_at:%H:%M} da {m.da_sede.nome if m.da_sede else '—'} · all'arrivo tocca l'adesivo",
                     "url": url_for("main.arrivo_da_tap", ddt_id=m.ddt_id)})
     if ruolo in ("preparatore", "consegne", "admin"):
-        for p in (Preparazione.query.filter_by(completata_at=None)
-                  .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at).limit(10)):
+        # 24/11/2026, richiesta dell'utente: il preparatore vede tutte le auto da preparare (niente limite)
+        prep = (Preparazione.query.filter_by(completata_at=None)
+                .order_by(Preparazione.pronta_entro_at.is_(None), Preparazione.pronta_entro_at))
+        for p in (prep if ruolo == "preparatore" else prep.limit(10)):
             v = p.veicolo
             out.append({"tipo": "preparazione", "v": v, "azione": p.prossima_fase if p.prossima_fase != "Pronta" else "Segna come pronta",
                         "dove": (f"In {v.sede.nome}" if v.sede else "")
@@ -365,7 +371,7 @@ def compiti_telefono():
                 out.append({"tipo": "consegna", "v": v, "azione": f"Porta a {v.consegna_sede.nome}",
                             "dove": f"Ora è in {v.sede.nome if v.sede else '—'} · ultimo DDT prima della consegna",
                             "url": url_for("main.tocco_scelta", veicolo_id=v.id)})
-    return out[:15]
+    return out if ruolo == "preparatore" else out[:15]
 
 
 # ---------------------------------------------------------------- pagine dedicate della barra laterale (22/11/2026)
