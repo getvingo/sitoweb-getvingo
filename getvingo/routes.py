@@ -1240,7 +1240,8 @@ def pulisci_uid(testo):
     """Numero di serie dell'adesivo dal link unico (UID mirror NTAG21x: 14 cifre esadecimali in coda al link,
     a volte seguite da "x" e dal contatore) o dal Web NFC ("04:a2:3b:…"). Vuoto se non è un numero di serie."""
     pulito = re.sub(r"[^0-9A-F]", "", (testo or "").upper().split("X")[0])
-    return pulito if 8 <= len(pulito) <= 20 else ""
+    # 24/11/2026: un segnaposto (00000000000000, FFFF…) non è un numero di serie: tutti gli adesivi sarebbero uguali
+    return pulito if 8 <= len(pulito) <= 20 and len(set(pulito)) > 1 else ""
 
 
 @bp.route("/t", methods=["GET"])
@@ -1252,8 +1253,11 @@ def tap_unico():
     della concessionaria, diventa un adesivo nuovo col codice progressivo (SIGLA-0001…) e apre "Nuova auto".
     Da lì si prosegue come con i link /t/<codice> (posizione, abbinamento, scheda dell'auto)."""
     uid = pulisci_uid(request.args.get("uid"))
+    if not uid:  # 24/11/2026: numero di serie messo dall'app in un altro punto del link (14 cifre esadecimali)
+        m = re.search(r"(?<![0-9A-Fa-f])([0-9A-Fa-f]{14})(?![0-9A-Fa-f])", request.query_string.decode("latin-1"))
+        uid = pulisci_uid(m.group(1)) if m else ""
     if not uid:  # adesivo scritto senza UID mirror: pagina che lo spiega (non la 404 generica, che confonde)
-        return render_template("adesivo_senza_uid.html"), 404
+        return render_template("adesivo_senza_uid.html", link_letto=request.url), 404
     tag = Tag.query.filter_by(uid=uid).execution_options(tutte_le_organizzazioni=True).first()
     if tag is not None and tag.org_id != g.org_id:
         abort(403, "Questo adesivo è registrato da un'altra concessionaria.")

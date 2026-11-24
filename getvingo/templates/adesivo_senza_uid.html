@@ -2,16 +2,54 @@
 {% from "_macro.html" import i %}
 {% block titolo %}Adesivo da completare · Getvingo{% endblock %}
 {% block contenuto %}
-{# Link unico /t?uid= arrivato senza numero di serie (21/11/2026): l'adesivo è scritto senza UID mirror #}
+{# Link unico /t?uid= arrivato senza numero di serie (21/11/2026): l'adesivo è scritto senza UID mirror.
+   24/11/2026: si vede il link arrivato e, da Android con Chrome, il numero di serie si legge col telefono #}
 <div class="arrivo-hero" style="margin-top:12px">
   <span class="tondo in_viaggio">{{ i('nfc') }}</span>
   <h1>Adesivo da completare</h1>
   <p class="tenue">L'adesivo ha il link giusto ma non aggiunge il suo numero di serie, quindi Getvingo non sa quale adesivo è.</p>
 </div>
-<div class="scheda pila">
-  <p><b>Va riscritto con l'opzione “UID mirror”</b> (adesivi NTAG213, NTAG215 o NTAG216), oppure ordinato già scritto così dal fornitore.</p>
-  <p class="tenue piccolo">Le istruzioni sono da computer in Gestione → Adesivi NFC.
-    Intanto puoi usare un link diverso per ogni adesivo (…/t/{{ g.utente.organizzazione.sigla or 'SIGLA' }}-0001), sempre da Gestione → Adesivi NFC.</p>
-  <p><a class="btn primario" href="{{ url_for('main.home') }}">{{ i('home', 's') }} Torna alla Home</a></p>
+<div class="scheda pila" id="leggi-seriale" hidden>
+  <p><b>Da questo telefono si può aprire lo stesso</b></p>
+  <button type="button" class="btn primario" id="leggi-seriale-btn">{{ i('nfc', 's') }} Leggi il numero di serie</button>
+  <p class="tenue piccolo" id="leggi-seriale-testo">Tocca il pulsante e riappoggia il telefono sull'adesivo.</p>
 </div>
+<div class="scheda pila">
+  <p><b>Per sistemarlo va riscritto con “Add UID mirror” attivo</b>, così funziona da ogni telefono, iPhone compresi:</p>
+  <ol class="adesivi-passi">
+    <li>Controlla che sia un adesivo <b>NTAG213, NTAG215 o NTAG216</b> (TagWriter → Read: “IC type”). Gli altri tipi non possono aggiungere il numero di serie.</li>
+    <li>In TagWriter: Write tags → New dataset → Link, incolla <code>{{ config.SITO_URL }}/t?uid=</code> e attiva <b>Add UID mirror</b> (non “Counter”).</li>
+    <li>Write e appoggia l'adesivo. Se dice che è bloccato in sola lettura, va cambiato.</li>
+  </ol>
+  <details><summary class="tenue piccolo">Link arrivato da questo adesivo</summary><p><code style="word-break:break-all">{{ link_letto }}</code></p>
+    <p class="tenue piccolo">Con UID mirror attivo dopo <code>uid=</code> ci sono 14 cifre e lettere (es. 04A23B1C5D6E80), diverse per ogni adesivo.</p></details>
+  <p><a class="btn" href="{{ url_for('main.home') }}">{{ i('home', 's') }} Torna alla Home</a></p>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+(function () {
+  if (!('NDEFReader' in window)) return;  // solo Android con Chrome: iPhone non legge l'NFC dai siti
+  var box = document.getElementById('leggi-seriale'), btn = document.getElementById('leggi-seriale-btn'),
+      testo = document.getElementById('leggi-seriale-testo');
+  box.hidden = false;
+  btn.addEventListener('click', function () {
+    var lettore = new NDEFReader();
+    lettore.scan().then(function () {
+      testo.textContent = 'Appoggia il retro del telefono sull’adesivo…';
+      lettore.onreading = function (e) {
+        var s = (e.serialNumber || '').replace(/:/g, '');
+        if (!s) { testo.textContent = 'Numero di serie non letto: riappoggialo.'; return; }
+        if (navigator.vibrate) navigator.vibrate(60);
+        location.href = '{{ url_for("main.tap_unico") }}?uid=' + encodeURIComponent(s);
+      };
+      lettore.onreadingerror = function () { testo.textContent = 'Adesivo non letto: riappoggialo fermo al centro.'; };
+    }).catch(function (err) {
+      testo.textContent = err && err.name === 'NotAllowedError'
+        ? 'Consenti a Getvingo di usare l’NFC (lucchetto accanto all’indirizzo → Autorizzazioni) e riprova.'
+        : 'Attiva l’NFC nelle impostazioni del telefono e riprova.';
+    });
+  });
+})();
+</script>
 {% endblock %}

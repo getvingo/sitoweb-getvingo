@@ -4139,6 +4139,15 @@ class TestLinkUnicoAdesivi(Base):
         self.assertIn("Adesivo da completare", html)
         self.assertIn("UID mirror", html)
         self.assertNotIn("eliminati", html)
+        self.assertIn("Leggi il numero di serie", html)  # 24/11/2026: da Android si apre lo stesso
+        # un segnaposto di zeri non è un numero di serie
+        self.assertEqual(self.c.get("/t?uid=00000000000000").status_code, 404)
+
+    def test_numero_di_serie_altrove_nel_link(self):
+        r = self.c.get("/t?uid=&x=04A23B1C5D6E80")
+        self.assertEqual(r.status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(Tag.query.filter_by(uid="04A23B1C5D6E80").count(), 1)
 
     def test_fornitore_non_registra_adesivi_nuovi(self):
         self.entra("carr")
