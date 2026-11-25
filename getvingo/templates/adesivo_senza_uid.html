@@ -15,14 +15,14 @@
   <p class="tenue piccolo" id="leggi-seriale-testo">Tocca il pulsante e riappoggia il telefono sull'adesivo.</p>
 </div>
 <div class="scheda pila">
-  <p><b>Per sistemarlo va riscritto con “Add UID mirror” attivo</b>, così funziona da ogni telefono, iPhone compresi:</p>
+  <p><b>Per sistemarlo va riscritto</b>, così funziona da ogni telefono, iPhone compresi:</p>
   <ol class="adesivi-passi">
-    <li>Controlla che sia un adesivo <b>NTAG213, NTAG215 o NTAG216</b> (TagWriter → Read: “IC type”). Gli altri tipi non possono aggiungere il numero di serie.</li>
-    <li>In TagWriter: Write tags → New dataset → Link, incolla <code>{{ config.SITO_URL }}/t?uid=</code> e attiva <b>Add UID mirror</b> (non “Counter”).</li>
-    <li>Write e appoggia l'adesivo. Se dice che è bloccato in sola lettura, va cambiato.</li>
+    <li>Da un <b>telefono Android con Chrome</b> apri Gestione → Adesivi NFC → <b>Scrivi adesivi</b> (o Il mio profilo → Scrivi adesivi NFC).</li>
+    <li>Appoggia l'adesivo: Getvingo ci scrive il link con il suo numero di serie.</li>
   </ol>
+  {% if g.utente and g.utente.ruolo == 'admin' %}<p><a class="btn" href="{{ url_for('admin.scrivi_adesivi') }}">{{ i('nfc', 's') }} Scrivi adesivi</a></p>{% endif %}
   <details><summary class="tenue piccolo">Link arrivato da questo adesivo</summary><p><code style="word-break:break-all">{{ link_letto }}</code></p>
-    <p class="tenue piccolo">Con UID mirror attivo dopo <code>uid=</code> ci sono 14 cifre e lettere (es. 04A23B1C5D6E80), diverse per ogni adesivo.</p></details>
+    <p class="tenue piccolo">Scritto bene, dopo <code>uid=</code> ci sono 14 cifre e lettere (es. 04A23B1C5D6E80), diverse per ogni adesivo.</p></details>
   <p><a class="btn" href="{{ url_for('main.home') }}">{{ i('home', 's') }} Torna alla Home</a></p>
 </div>
 {% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "_macro.html" import i, indietro %}
+{% block titolo %}Scrivi adesivi · Getvingo{% endblock %}
+{% block contenuto %}
+{# 25/11/2026, richiesta dell'utente: senza UID mirror né app. Da Android con Chrome (Web NFC) il telefono legge
+   il numero di serie del chip e ci scrive il link unico già completo: {{ base }}/t?uid=<numero di serie> #}
+<div class="titolo-pagina"><div>{{ indietro(url_for('admin.tag')) }}<div class="sopratitolo">Gestione · Adesivi NFC</div><h1>Scrivi adesivi</h1>
+  <p class="descrizione">Appoggia gli adesivi uno dopo l'altro: Getvingo ci scrive da solo il link con il loro numero di serie.</p></div></div>
+{% if link_locale %}
+<div class="avviso errore">{{ i('attenzione') }}<span>Stai aprendo il portale da questo computer ({{ base }}): gli adesivi scritti da qui funzionano solo qui.</span></div>
+{% endif %}
+
+<div class="scheda pila" id="sa-senza-nfc" hidden>
+  <p><b>Questa pagina funziona da un telefono Android con Chrome.</b></p>
+  <p class="tenue piccolo">iPhone e gli altri browser non possono scrivere gli adesivi da un sito. Apri questa pagina con Chrome da un Android con l'NFC: gli adesivi scritti così funzionano poi su tutti i telefoni, iPhone compresi.</p>
+</div>
+
+<div class="scheda pila" id="sa-box" hidden>
+  <div class="arrivo-hero" style="margin:0">
+    <span class="tondo in_viaggio" id="sa-tondo">{{ i('nfc') }}</span>
+    <h2 id="sa-titolo" style="margin:8px 0 4px">Pronto per iniziare</h2>
+    <p class="tenue" id="sa-testo">Tocca “Inizia” e appoggia il retro del telefono sul primo adesivo.</p>
+  </div>
+  <button type="button" class="btn primario" id="sa-inizia">{{ i('nfc', 's') }} Inizia a scrivere</button>
+  <label class="spunta"><input type="checkbox" id="sa-blocca"> Blocca in sola lettura dopo la scrittura
+    <small class="tenue" style="display:block">Nessuno potrà più cambiarlo, nemmeno Getvingo. Lascialo spento finché fai le prove.</small></label>
+</div>
+
+<section class="scheda" id="sa-fatti-box" hidden style="margin-top:16px">
+  <h3>Scritti adesso</h3>
+  <ul class="sa-elenco" id="sa-fatti"></ul>
+</section>
+
+{% if recenti %}
+<section class="scheda" style="margin-top:16px">
+  <h3>Ultimi scritti dal telefono</h3>
+  <ul class="sa-elenco">
+  {% for t in recenti %}
+    <li><b>{{ t.codice }}</b> <small class="tenue">· n. serie {{ t.uid }} · {{ t.preparato_da.nome if t.preparato_da else '' }} {{ t.preparato_at|data('%d/%m %H:%M') }}</small></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<details class="scheda" style="margin-top:16px"><summary class="tenue piccolo">Come funziona</summary>
+  <ul class="tenue piccolo">
+    <li>Su ogni adesivo va <code>{{ base }}/t?uid=</code> seguito dal suo numero di serie, letto dal telefono: non serve l'UID mirror né un'app.</li>
+    <li>Vanno bene tutti gli adesivi NFC scrivibili (NTAG213/215/216, Ultralight…), anche nuovi e vuoti.</li>
+    <li>Un adesivo già scritto con un link <code>/t/CODICE</code> non si riscrive. Uno scritto male (per esempio con TagWriter senza numero di serie) si sistema appoggiandolo qui.</li>
+    <li>Appena scritto entra nel registro col prossimo codice (es. SIGLA-0001). Al primo tocco su un'auto si apre “Nuova auto”.</li>
+  </ul>
+</details>
+{% endblock %}
+{% block script %}
+<script>
+(function () {
+  var BASE = {{ (base ~ '/t?uid=')|tojson }}, REGISTRA = {{ url_for('admin.registra_adesivo')|tojson }},
+      CSRF = {{ csrf_token()|tojson }};
+  if (!('NDEFReader' in window)) { document.getElementById('sa-senza-nfc').hidden = false; return; }
+  var box = document.getElementById('sa-box'), btn = document.getElementById('sa-inizia'),
+      titolo = document.getElementById('sa-titolo'), testo = document.getElementById('sa-testo'),
+      tondo = document.getElementById('sa-tondo'), blocca = document.getElementById('sa-blocca'),
+      fatti = document.getElementById('sa-fatti'), fattiBox = document.getElementById('sa-fatti-box');
+  box.hidden = false;
+  var lettore = null, occupato = false, ultimo = '', ultimoAt = 0;
+
+  function mostra(t, s, stato) {
+    titolo.textContent = t; testo.textContent = s || '';
+    tondo.className = 'tondo ' + (stato === 'ok' ? 'pronta' : stato === 'errore' ? 'danno' : 'in_viaggio');
+  }
+  function aggiungi(riga) {
+    var li = document.createElement('li'); li.innerHTML = riga; fatti.insertBefore(li, fatti.firstChild); fattiBox.hidden = false;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function linkDi(e) {
+    var link = '';
+    e.message.records.forEach(function (r) {
+      if (!link && (r.recordType === 'url' || r.recordType === 'absolute-url')) link = new TextDecoder().decode(r.data);
+    });
+    return link;
+  }
+  function registra(seriale) {
+    var dati = new FormData(); dati.append('uid', seriale);
+    return fetch(REGISTRA, { method: 'POST', body: dati, headers: { 'X-CSRF': CSRF }, credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.errore || 'Errore'); return j; }); });
+  }
+  function fatto(seriale, j, riscritto) {
+    if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+    mostra((j.codice || 'Adesivo') + ' pronto ✓', 'Toglilo e appoggia il prossimo.', 'ok');
+    aggiungi('<b>' + esc(j.codice) + '</b> <small class="tenue">· n. serie ' + esc(seriale) +
+             (riscritto ? '' : ' · era già scritto') + (j.nuovo ? '' : ' · già nel registro, ' + esc(j.stato)) + '</small>');
+  }
+
+  btn.addEventListener('click', function () {
+    lettore = new NDEFReader();
+    lettore.scan().then(function () {
+      btn.hidden = true;
+      mostra('Appoggia un adesivo', 'Retro del telefono fermo sull’adesivo, finché non vibra.');
+      lettore.onreadingerror = function () {
+        if (!occupato) mostra('Adesivo non letto', 'Riappoggialo fermo al centro del telefono.', 'errore');
+      };
+      lettore.onreading = function (e) {
+        var seriale = (e.serialNumber || '').replace(/:/g, '').toUpperCase();
+        if (occupato) return;
+        // dopo la scrittura l'adesivo è ancora sul telefono: per qualche secondo non lo si rilegge
+        if (seriale && seriale === ultimo && Date.now() - ultimoAt < 4000) return;
+        if (!/^[0-9A-F]{8,20}$/.test(seriale)) {
+          mostra('Numero di serie non letto', 'Questo adesivo non dà il suo numero di serie: usane un altro.', 'errore'); return;
+        }
+        var link = linkDi(e), codice = (link.match(/\/t\/([A-Za-z0-9-]+)/) || [])[1];
+        if (codice) {  // scritto prima col codice: funziona già, non si tocca
+          ultimo = seriale; ultimoAt = Date.now();
+          mostra('Già pronto: ' + codice, 'Questo adesivo ha già il suo link e non va riscritto. Appoggia il prossimo.', 'ok');
+          aggiungi('<b>' + esc(codice) + '</b> <small class="tenue">· già pronto, non riscritto</small>'); return;
+        }
+        occupato = true;
+        var giusto = BASE + seriale, gia = link.toUpperCase() === giusto.toUpperCase();
+        mostra('Sto scrivendo…', 'Tieni il telefono fermo sull’adesivo.');
+        var scrivi = gia ? Promise.resolve() : lettore.write({ records: [{ recordType: 'url', data: giusto }] });
+        scrivi.then(function () { return blocca.checked && lettore.makeReadOnly ? lettore.makeReadOnly() : null; })
+          .then(function () {
+            ultimo = seriale; ultimoAt = Date.now();
+            return registra(seriale).then(function (j) { fatto(seriale, j, !gia); }, function (err) {
+              // l'adesivo è scritto lo stesso: entrerà nel registro al primo tocco
+              mostra('Scritto, ma non registrato', (err && err.message) || 'Connessione assente: si registrerà al primo tocco.', 'errore');
+              aggiungi('<small class="tenue">n. serie ' + esc(seriale) + ' · scritto, non ancora nel registro</small>');
+            });
+          }, function (err) {
+            var nome = err && err.name;
+            mostra('Non scritto', nome === 'NotAllowedError'
+              ? 'L’adesivo è bloccato in sola lettura: non si può riscrivere, usane un altro.'
+              : nome === 'NotSupportedError' ? 'Questo tipo di adesivo non si può scrivere: usane un altro.'
+              : 'Il telefono si è staccato troppo presto: riappoggialo e tienilo fermo.', 'errore');
+          })
+          .then(function () { occupato = false; });
+      };
+    }).catch(function (err) {
+      mostra('NFC non attivo', err && err.name === 'NotAllowedError'
+        ? 'Consenti a Getvingo di usare l’NFC (lucchetto accanto all’indirizzo → Autorizzazioni) e riprova.'
+        : 'Attiva l’NFC nelle impostazioni del telefono (Connessioni → NFC) e riprova.', 'errore');
+    });
+  });
+})();
+</script>
+{% endblock %}

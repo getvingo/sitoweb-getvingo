@@ -69,7 +69,7 @@
 {# Pagine che dal telefono non servono (12/11/2026 sera): il quadro completo si guarda dal computer #}
 {% set solo_pc = g.utente and not g.utente.venditore and (ep in ('main.piazzale', 'main.lavorazioni', 'main.preparazione', 'main.archivio_ddt', 'main.danni',
                   'main.analisi', 'main.nuova_auto', 'main.modifica_auto', 'main.cerca_avanzata', 'main.trasferisci_veicolo')
-                  or (ep.startswith('admin.') and ep not in ('admin.utenti', 'admin.aziende', 'admin.gruppo_concessionaria',
+                  or (ep.startswith('admin.') and ep not in ('admin.utenti', 'admin.aziende', 'admin.scrivi_adesivi', 'admin.gruppo_concessionaria',
                                                             'admin.gruppo_fornitore', 'admin.utente'))
                   or ep.startswith('piattaforma.')) %}
 {% if g.utente %}

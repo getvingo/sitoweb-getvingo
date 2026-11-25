@@ -2531,6 +2531,26 @@ class TestConfigurazioneConcessionaria(Base):
         # il tocco funziona con il codice nuovo (anche scritto in minuscolo)
         self.assertIn("/abbina/TST-0001", self.c.post("/t/tst-0001", data=POS).headers["Location"])
 
+    def test_scrivi_adesivi_dal_telefono(self):
+        """25/11/2026: il telefono scrive il link con il numero di serie e l'adesivo entra subito nel registro."""
+        self.c.post("/admin/azienda", data={"ragione_sociale": "Test S.r.l.", "sigla": "tst", **INDIRIZZO, **FISCALI})
+        t = self.c.get("/admin/adesivi/scrivi").get_data(as_text=True)
+        self.assertIn("Scrivi adesivi", t)
+        self.assertIn("/t?uid=", t)
+        r = self.c.post("/admin/adesivi/registra", data={"uid": "04:a2:3b:1c:5d:6e:80"})
+        self.assertEqual(r.status_code, 200)
+        j = r.get_json()
+        self.assertTrue(j["nuovo"])
+        # riappoggiato: stesso codice, nessun adesivo nuovo
+        j2 = self.c.post("/admin/adesivi/registra", data={"uid": "04A23B1C5D6E80"}).get_json()
+        self.assertEqual((j2["codice"], j2["nuovo"]), (j["codice"], False))
+        self.assertEqual(self.c.post("/admin/adesivi/registra", data={"uid": "00000000000000"}).status_code, 400)
+        with self.app.app_context():
+            tag = Tag.query.filter_by(uid="04A23B1C5D6E80").one()
+            self.assertEqual(tag.origine, "scritto")
+        # il link scritto sull'adesivo porta all'adesivo registrato
+        self.assertIn(f"/t/{j['codice']}", self.c.get("/t?uid=04A23B1C5D6E80").headers["Location"])
+
     def test_sigla_non_valida_o_gia_usata(self):
         with self.app.app_context():
             servizi.crea_organizzazione("Altra S.r.l.", "x@altra.it", "password9")

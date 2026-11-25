@@ -5,6 +5,7 @@ import re
 import secrets
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+from sqlalchemy.exc import IntegrityError
 
 from . import accessi, anagrafica, posta, servizi, uniforma
 from . import vin as vin_mod
@@ -606,6 +607,43 @@ def tag():
     return render_template("admin/tag.html", base=base, link_locale=locale and not current_app.config["BASE_URL"],
                            righe=righe, conta=conta, totale=len(tutti), vista=vista, vista_di=vista_di, ultime=ultime,
                            sigla=g.utente.organizzazione.sigla)
+
+
+@bp.route("/adesivi/scrivi")
+@ruolo_richiesto("admin")
+def scrivi_adesivi():
+    """Scrivi gli adesivi dal telefono (25/11/2026, richiesta dell'utente: TagWriter con UID mirror funzionava male).
+    Da Android con Chrome (Web NFC) il telefono legge il numero di serie del chip e ci scrive il link unico
+    già completo (<sito>/t?uid=<numero di serie>): niente UID mirror, nessun link da caricare a mano,
+    vanno bene tutti gli adesivi NFC scrivibili. Scritti così funzionano poi da ogni telefono, iPhone compresi."""
+    base, locale = _base_adesivi()
+    recenti = (Tag.query.filter_by(origine="scritto").order_by(Tag.preparato_at.desc()).limit(10).all())
+    return render_template("admin/scrivi_adesivi.html", base=base, link_locale=locale and not current_app.config["BASE_URL"],
+                           recenti=recenti)
+
+
+@bp.route("/adesivi/registra", methods=["POST"])
+@ruolo_richiesto("admin")
+def registra_adesivo():
+    """Dopo la scrittura dal telefono: l'adesivo entra nel registro col prossimo codice (SIGLA-000N).
+    Un numero di serie già registrato da questa concessionaria tiene il suo codice."""
+    from .routes import pulisci_uid
+    uid = pulisci_uid(request.form.get("uid"))
+    if not uid:
+        return {"errore": "Numero di serie non valido."}, 400
+    tag = Tag.query.filter_by(uid=uid).execution_options(tutte_le_organizzazioni=True).first()
+    if tag is not None and tag.org_id != g.org_id:
+        return {"errore": "Questo adesivo è registrato da un'altra concessionaria."}, 409
+    nuovo = tag is None
+    if nuovo:
+        tag = servizi.primo_adesivo_libero(uid, "scritto", g.utente)
+        try:
+            db.session.commit()
+        except IntegrityError:  # stesso adesivo registrato nello stesso istante
+            db.session.rollback()
+            tag, nuovo = Tag.query.filter_by(uid=uid).first_or_404(), False
+    return {"codice": tag.codice, "nuovo": nuovo, "uid": uid,
+            "stato": "su un'auto" if tag.veicolo_id else ("già usato" if not tag.mai_usato else "libero")}
 
 
 @bp.route("/uniforma", methods=["GET", "POST"])

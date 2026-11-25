@@ -488,7 +488,7 @@ class Tag(PerOrganizzazione, db.Model):
     trasferito_a = db.Column(db.String(200), default="")
     codice_precedente = db.Column(db.String(16))  # sull'adesivo del nuovo dealer: il link vecchio ancora scritto
 
-    ORIGINI = {"prepara": "Preparato dal telefono", "link_unico": "Link unico, registrato al primo tocco",
+    ORIGINI = {"scritto": "Scritto dal telefono con Getvingo", "prepara": "Preparato dal telefono", "link_unico": "Link unico, registrato al primo tocco",
                "manuale": "Creato a mano da computer", "trasferito": "Arrivato con l'auto da un altro dealer"}
 
     preparato_da = db.relationship("Utente", foreign_keys=[preparato_da_id])

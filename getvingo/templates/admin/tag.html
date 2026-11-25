@@ -10,19 +10,20 @@
 <div class="avviso errore">{{ i('attenzione') }}<span>Stai aprendo il portale da questo computer ({{ base }}): i link creati qui funzionano solo qui, non dal telefono.</span></div>
 {% endif %}
 
-{# 24/11/2026, scelta dell'utente: un solo modo, il link unico con UID mirror #}
+{# 25/11/2026, richiesta dell'utente: senza UID mirror. Il modo principale è scrivere gli adesivi dal telefono
+   (Android con Chrome): il link con il numero di serie lo compone Getvingo. TagWriter resta come alternativa #}
 <section class="scheda adesivi-come" style="margin-bottom:16px">
   <h3>{{ i('nfc', 's') }} Come preparare gli adesivi</h3>
-  <p class="tenue piccolo" style="margin:6px 0 12px">Su tutti gli adesivi lo stesso link. Serve un adesivo <b>NTAG213, 215 o 216</b> e l'app gratuita <b>NXP TagWriter</b> (Android o iPhone), oppure adesivi già scritti così dal fornitore.</p>
-  <div class="adesivi-link"><code id="link-unico">{{ base }}/t?uid=</code>
-    <button type="button" class="btn piccolo" data-copia="link-unico">Copia</button></div>
-  <ol class="adesivi-passi">
-    <li>In TagWriter: <b>Write tags → New dataset → Link</b> e incolla il link.</li>
-    <li>Attiva <b>Add UID mirror</b> (l'adesivo aggiunge da solo il suo numero di serie: senza, gli adesivi sarebbero tutti uguali).</li>
-    <li>Salva il dataset, premi <b>Write</b> e appoggia gli adesivi uno dopo l'altro.</li>
-    <li>Al primo tocco di una persona della concessionaria l'adesivo prende il codice {{ (sigla or 'SIGLA') ~ '-0001' }}… e si apre “Nuova auto”.</li>
-  </ol>
-  <p class="tenue piccolo" style="margin:0">Gli adesivi già scritti con un link <code>/t/{{ sigla or 'SIGLA' }}-000N</code> continuano a funzionare: non vanno riscritti.</p>
+  <p class="tenue piccolo" style="margin:6px 0 12px">Da un <b>telefono Android con Chrome</b> apri <b>Scrivi adesivi</b> e appoggia gli adesivi uno dopo l'altro: Getvingo legge il numero di serie di ognuno e ci scrive il link. Niente app, niente UID mirror, niente link da copiare. Scritti così funzionano su tutti i telefoni, iPhone compresi.</p>
+  <p style="margin:0 0 12px"><a class="btn primario" href="{{ url_for('admin.scrivi_adesivi') }}">{{ i('nfc', 's') }} Scrivi adesivi</a></p>
+  <p class="tenue piccolo" style="margin:0">La pagina si apre anche da Il mio profilo → Account sul telefono. Gli adesivi già scritti con un link <code>/t/{{ sigla or 'SIGLA' }}-000N</code> continuano a funzionare.</p>
+  <details style="margin-top:12px"><summary class="tenue piccolo">Altro modo: NXP TagWriter con UID mirror</summary>
+    <div class="adesivi-link" style="margin-top:8px"><code id="link-unico">{{ base }}/t?uid=</code>
+      <button type="button" class="btn piccolo" data-copia="link-unico">Copia</button></div>
+    <ol class="adesivi-passi">
+      <li>Solo adesivi <b>NTAG213, 215 o 216</b>. In TagWriter: <b>Write tags → New dataset → Link</b> e incolla il link.</li>
+      <li>Attiva <b>Add UID mirror</b>, salva, premi <b>Write</b> e appoggia gli adesivi.</li>
+    </ol></details>
 </section>
 
 {{ pillole([
